@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { ApiRequestError, api } from '../lib/api.js';
 
 /**
@@ -15,11 +15,26 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated(): void }) {
   const [displayName, setDisplayName] = useState('');
   const [password, setPassword] = useState('');
   const [signupCode, setSignupCode] = useState('');
+  /**
+   * Assume a code is needed until the server says otherwise. Guessing the other
+   * way would hide the field on a slow connection and produce a rejected
+   * sign-up with no visible cause.
+   */
+  const [signupCodeRequired, setSignupCodeRequired] = useState(true);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const isRegister = mode === 'register';
+
+  useEffect(() => {
+    api
+      .serverConfig()
+      .then((config) => setSignupCodeRequired(config.signupCodeRequired))
+      // If the server cannot be reached, leave the field showing: a wrong guess
+      // that shows it is recoverable, one that hides it is not.
+      .catch(() => setSignupCodeRequired(true));
+  }, []);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -85,23 +100,31 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated(): void }) {
 
         {isRegister && (
           <>
-            {/* Only some servers require this, so it is optional here and the
-                server rejects a missing or wrong code when it does. */}
-            <div className="field">
-              <label className="field__label" htmlFor="auth-signup-code">
-                Signup code
-              </label>
-              <input
-                id="auth-signup-code"
-                value={signupCode}
-                autoComplete="off"
-                placeholder="Only if your server needs one"
-                onChange={(e) => setSignupCode(e.target.value)}
-              />
-              {fieldErrors.signupCode && (
-                <div className="field__error">{fieldErrors.signupCode}</div>
-              )}
-            </div>
+            {/* Shown only when this server actually requires one, so nobody is
+                left guessing whether to fill it in. */}
+            {signupCodeRequired && (
+              <div className="field">
+                <label className="field__label" htmlFor="auth-signup-code">
+                  Signup code
+                </label>
+                <input
+                  id="auth-signup-code"
+                  value={signupCode}
+                  autoComplete="off"
+                  required
+                  autoFocus
+                  placeholder="e.g. amber-otter-1234"
+                  onChange={(e) => setSignupCode(e.target.value)}
+                />
+                {fieldErrors.signupCode ? (
+                  <div className="field__error">{fieldErrors.signupCode}</div>
+                ) : (
+                  <div className="field__hint">
+                    This server is invite-only. Ask whoever runs it for the code.
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="field">
               <label className="field__label" htmlFor="auth-display">

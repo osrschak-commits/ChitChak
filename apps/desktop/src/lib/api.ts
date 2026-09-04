@@ -147,6 +147,11 @@ class ApiClient {
 
   // --- Auth ---------------------------------------------------------------
 
+  /** Server capabilities the sign-up screen needs before anyone is signed in. */
+  serverConfig(): Promise<{ signupCodeRequired: boolean }> {
+    return this.request<{ signupCodeRequired: boolean }>('/api/config');
+  }
+
   async register(input: {
     email: string;
     username: string;

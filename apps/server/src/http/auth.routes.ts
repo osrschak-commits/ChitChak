@@ -205,6 +205,21 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
   });
 
+  /**
+   * What the client needs to know before anyone has signed in.
+   *
+   * Public and unauthenticated by necessity - it is read on the sign-up screen.
+   * It exposes only whether a code is required, never the code itself, so it
+   * tells an attacker nothing they could not learn by attempting to register.
+   *
+   * Without this the sign-up form had to hedge ("only if your server needs
+   * one"), which meant people either typed nothing when a code was required or
+   * hunted for one that did not exist.
+   */
+  app.get('/api/config', async () => ({
+    signupCodeRequired: Boolean(config.SIGNUP_CODE),
+  }));
+
   // GET/PATCH /api/users/@me live in users.routes.ts alongside the rest of the
   // profile surface.
 }
