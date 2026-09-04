@@ -1,0 +1,45 @@
+# Caddy terminates TLS and routes the two public HTTP endpoints.
+#
+# Certificates are obtained and renewed automatically from Let's Encrypt, which
+# is the whole reason for putting Caddy in front: passwords and access tokens
+# cross these connections, and they should not do so in the clear.
+#
+# Media does NOT pass through here. WebRTC audio and video go straight to the
+# SFU on 7881/tcp and 7882/udp - proxying them would add latency for no benefit
+# and Caddy is not a media server.
+
+{
+	# Where Let's Encrypt sends expiry warnings.
+	email {$ACME_EMAIL}
+}
+
+# The API and the realtime gateway.
+api.{$CHITCHAK_DOMAIN} {
+	# Caddy upgrades WebSocket connections through reverse_proxy automatically,
+	# so /gateway needs no special handling.
+	reverse_proxy chitchak-server:4000
+
+	header {
+		# The API is only ever called by the desktop app, never embedded.
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
+
+# SFU signalling. Media bypasses Caddy entirely; this is the WebSocket the
+# client uses to negotiate, and it must be wss:// to match the API's https://.
+sfu.{$CHITCHAK_DOMAIN} {
+	reverse_proxy chitchak-livekit:7880
+
+	log {
+		output stdout
+		format json
+	}
+}

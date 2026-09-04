@@ -1,0 +1,37 @@
+{
+  "name": "@chitchak/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch --env-file=../../.env src/index.ts",
+    "start": "node --env-file=../../.env dist/index.js",
+    "build": "tsc -b",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx --env-file=../../.env src/db/migrate.ts",
+    "db:seed": "tsx --env-file=../../.env src/db/seed.ts",
+    "db:backfill": "tsx --env-file=../../.env src/db/backfill-ranks.ts",
+    "db:studio": "drizzle-kit studio"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.2",
+    "@fastify/rate-limit": "^10.2.2",
+    "@fastify/websocket": "^11.0.2",
+    "@chitchak/protocol": "*",
+    "drizzle-orm": "^0.38.4",
+    "fastify": "^5.2.1",
+    "ioredis": "^5.4.2",
+    "jose": "^5.9.6",
+    "livekit-server-sdk": "^2.9.2",
+    "postgres": "^3.4.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "@types/ws": "^8.18.1",
+    "drizzle-kit": "^0.30.2",
+    "pino-pretty": "^13.0.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

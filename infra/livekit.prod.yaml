@@ -1,0 +1,48 @@
+# LiveKit SFU - production.
+#
+# The important difference from the development config is how the server
+# advertises itself. Locally it announces 127.0.0.1 because the client is on the
+# same machine; on a real server it has to announce an address the whole
+# internet can route to, or media negotiates and then silently fails.
+
+port: 7880
+
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+
+  # Discover the public address rather than hard-coding it, so the same config
+  # survives the server being rebuilt on a different IP.
+  #
+  # If your provider gives the machine a private address behind a NAT gateway
+  # (some cloud setups do), discovery gets it wrong - set `node_ip` to the
+  # public address explicitly instead and leave this false.
+  use_external_ip: true
+
+  # No force_tcp here. That exists in the development config purely to work
+  # around Docker Desktop's UDP proxy; on a real server UDP is what you want,
+  # and 7881/tcp remains as the fallback for clients whose network blocks it.
+
+# Built-in TURN, for clients behind symmetric NAT or restrictive firewalls -
+# which in practice means a chunk of home and office connections that would
+# otherwise fail to connect at all.
+#
+# UDP only: TURN over TLS needs certificates wired in, and Caddy already holds
+# those for the web endpoints. Add `tls_port` and cert paths if you find people
+# still cannot connect.
+turn:
+  enabled: true
+  udp_port: 3478
+
+# API keys are NOT in this file. LiveKit reads them from the LIVEKIT_KEYS
+# environment variable ("key: secret"), which docker compose supplies from
+# .env.production - so a real secret never lands in a file tracked by git.
+
+room:
+  auto_create: false
+  empty_timeout: 60
+  departure_timeout: 20
+
+logging:
+  level: info
+  json: true

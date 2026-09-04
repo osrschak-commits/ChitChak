@@ -1,0 +1,56 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: chitchak-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: chitchak
+      POSTGRES_PASSWORD: chitchak
+      POSTGRES_DB: chitchak
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chitchak -d chitchak"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: chitchak-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # The SFU. Every client publishes one audio track to it and subscribes to the
+  # tracks of everyone else in the room, so bandwidth is O(1) up per client
+  # instead of O(n) as it would be in a peer-to-peer mesh.
+  livekit:
+    # Pinned to a version that speaks the same RTC protocol as the pinned
+    # livekit-client in apps/desktop. These two move together: a client newer
+    # than the server tries an RTC path the server does not have, falls back,
+    # and then sits in "reconnecting" forever even though media is flowing.
+    image: livekit/livekit-server:v1.13.6
+    container_name: chitchak-livekit
+    restart: unless-stopped
+    command: ["--config", "/etc/livekit.yaml"]
+    ports:
+      - "7880:7880"       # signalling (WebSocket + HTTP API)
+      - "7881:7881"       # WebRTC over TCP (fallback for restrictive networks)
+      - "7882:7882/udp"   # WebRTC over UDP (single-port mode, see infra/livekit.yaml)
+    volumes:
+      - ./infra/livekit.yaml:/etc/livekit.yaml:ro
+
+volumes:
+  postgres-data:
+  redis-data:

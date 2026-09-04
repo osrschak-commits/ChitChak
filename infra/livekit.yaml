@@ -1,0 +1,39 @@
+# LiveKit SFU configuration.
+#
+# Single-port UDP mode (`udp_port`) rather than a `port_range`: publishing a
+# 100+ port range through Docker Desktop on Windows is extremely slow to start,
+# and one multiplexed port is enough until you are running many concurrent rooms.
+port: 7880
+
+rtc:
+  tcp_port: 7881
+  udp_port: 7882
+
+  # Which IP the SFU puts in its ICE candidates.
+  #
+  # This config is written for the SFU running natively on the developer's
+  # machine (`npm run sfu`), not in a container - see the note in the README.
+  # Server and client are both on loopback, so 127.0.0.1 is a candidate that is
+  # genuinely reachable with nothing in between.
+  #
+  # Deploying for real: remove `node_ip`, set `use_external_ip: true` so the SFU
+  # discovers its public address, and open 7881/tcp and 7882/udp. Clients on
+  # other machines cannot reach a 127.0.0.1 candidate.
+  node_ip: 127.0.0.1
+  use_external_ip: false
+
+keys:
+  # Dev credentials. These MUST be replaced in production - anyone holding the
+  # secret can mint a token granting access to any room.
+  devkey: devsecretdevsecretdevsecretdevsecret
+
+room:
+  # Rooms are created on demand by the API server when someone joins a voice
+  # channel, and reaped shortly after the last participant leaves.
+  auto_create: false
+  empty_timeout: 30
+  departure_timeout: 20
+
+logging:
+  level: info
+  json: false

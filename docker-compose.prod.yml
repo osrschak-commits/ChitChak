@@ -1,0 +1,149 @@
+# Production stack. Run with:
+#   docker compose -f docker-compose.prod.yml --env-file .env.production up -d
+#
+# The shape differs from development in three ways that matter:
+#   - Postgres and Redis publish no ports. They are reachable only on the
+#     internal compose network, so the database is not on the internet.
+#   - The API server runs as a built container rather than under tsx.
+#   - Caddy fronts the HTTP endpoints and holds the TLS certificates.
+
+name: chitchak
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: chitchak-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: chitchak
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env.production}
+      POSTGRES_DB: chitchak
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U chitchak -d chitchak']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: chitchak-redis
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    container_name: chitchak-server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgres://chitchak:${POSTGRES_PASSWORD}@postgres:5432/chitchak
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env.production}
+      # Optional. Set it and registration requires the code; leave it empty and
+      # anyone who can reach the API can create an account.
+      SIGNUP_CODE: ${SIGNUP_CODE:-}
+      ACCESS_TOKEN_TTL: 900
+      REFRESH_TOKEN_TTL: 2592000
+      # What the client is told to connect to, and what the server itself uses
+      # for the management API. They differ because one goes through Caddy and
+      # the other stays on the internal network.
+      LIVEKIT_URL: wss://sfu.${CHITCHAK_DOMAIN}
+      LIVEKIT_HOST: http://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?set LIVEKIT_API_KEY in .env.production}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?set LIVEKIT_API_SECRET in .env.production}
+      # The packaged desktop app loads from file://, which sends no Origin
+      # header, so CORS is satisfied without listing an origin here.
+      CLIENT_ORIGIN: https://api.${CHITCHAK_DOMAIN}
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # One-shot: applies pending migrations, then exits. Re-run after deploying a
+  # schema change with:
+  #   docker compose -f docker-compose.prod.yml run --rm migrate
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    container_name: chitchak-migrate
+    restart: 'no'
+    profiles: ['tools']
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://chitchak:${POSTGRES_PASSWORD}@postgres:5432/chitchak
+      # config.ts validates the whole environment on boot, so the migration
+      # container needs the same variables even though it only touches the DB.
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      LIVEKIT_URL: wss://sfu.${CHITCHAK_DOMAIN}
+      LIVEKIT_HOST: http://livekit:7880
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+    command: ['node', 'apps/server/dist/db/migrate.js']
+
+  livekit:
+    image: livekit/livekit-server:v1.13.6
+    container_name: chitchak-livekit
+    restart: unless-stopped
+    command: ['--config', '/etc/livekit.yaml']
+    environment:
+      # Keys come from the environment so no secret is written into a config
+      # file. Format is "key: secret".
+      LIVEKIT_KEYS: '${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}'
+    ports:
+      # Media, straight to the SFU. These must reach the internet directly -
+      # they do not and cannot go through Caddy.
+      - '7881:7881/tcp'
+      - '7882:7882/udp'
+      # TURN, for clients whose network blocks direct UDP.
+      - '3478:3478/udp'
+    volumes:
+      - ./infra/livekit.prod.yaml:/etc/livekit.yaml:ro
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: chitchak-caddy
+    restart: unless-stopped
+    depends_on:
+      - server
+      - livekit
+    environment:
+      CHITCHAK_DOMAIN: ${CHITCHAK_DOMAIN:?set CHITCHAK_DOMAIN in .env.production}
+      ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env.production}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  postgres-data:
+  redis-data:
+  caddy-data:
+  caddy-config:

@@ -1,0 +1,2379 @@
+/*
+ * ChitChak — visual system.
+ *
+ * The reference is studio and broadcast hardware, not chat apps: warm graphite
+ * panels, brass for the thing you have selected, and one cool signal colour
+ * reserved exclusively for live audio. Two accents, each with exactly one job,
+ * so colour always carries meaning instead of decoration.
+ */
+
+:root {
+  /* Surfaces. Warm near-black with a violet-brown cast, deliberately not the
+     blue-black that every gaming chat app uses. */
+  --graphite-900: #131215;
+  --graphite-850: #17161a;
+  --graphite-800: #1c1a1f;
+  --graphite-750: #232128;
+  --graphite-700: #2b2932;
+  --graphite-600: #383540;
+
+  /* Brass: selection, focus, "this is you". Warm, metallic, restrained. */
+  --brass-500: #c9954a;
+  --brass-400: #d9a45b;
+  --brass-300: #e6bd83;
+  --brass-glow: rgba(217, 164, 91, 0.14);
+
+  /* Signal: live audio only. Nothing else in the app may use this colour. */
+  --signal-500: #35bfae;
+  --signal-400: #4fd6c4;
+  --signal-glow: rgba(79, 214, 196, 0.16);
+
+  --alert-400: #e0605f;
+  --alert-glow: rgba(224, 96, 95, 0.14);
+
+  --text-bright: #f2f0f4;
+  --text-primary: #ddd9e2;
+  --text-secondary: #9d98a8;
+  --text-muted: #6b6675;
+  --text-faint: #4c4855;
+
+  --line: #2a2830;
+  --line-strong: #363340;
+
+  --radius-lg: 10px;
+  --radius: 7px;
+  --radius-sm: 5px;
+
+  --sidebar-w: 244px;
+  --topbar-h: 46px;
+
+  --font-ui: 'Archivo Variable', 'Archivo', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text-primary);
+  background: var(--graphite-850);
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  width: 100%;
+  color: var(--text-bright);
+  background: var(--graphite-900);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  outline: none;
+  transition: border-color 120ms var(--ease), box-shadow 120ms var(--ease);
+}
+
+textarea {
+  resize: vertical;
+  min-height: 76px;
+  line-height: 1.5;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--brass-500);
+  box-shadow: 0 0 0 3px var(--brass-glow);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-faint);
+}
+
+:focus-visible {
+  outline: 2px solid var(--brass-400);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* Small caps labels: the panel-legend voice used throughout. */
+.legend {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ==========================================================================
+   Shell
+   ========================================================================== */
+
+.shell {
+  display: grid;
+  grid-template-rows: var(--topbar-h) 1fr;
+  height: 100%;
+  background: var(--graphite-850);
+}
+
+.shell__body {
+  display: grid;
+  grid-template-columns: var(--sidebar-w) 1fr;
+  min-height: 0;
+}
+
+/* --- Top bar -------------------------------------------------------------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px 0 14px;
+  background: var(--graphite-900);
+  border-bottom: 1px solid var(--line);
+  /* Electron frameless-style drag region; harmless in a normal window. */
+  -webkit-app-region: drag;
+}
+
+.topbar > * {
+  -webkit-app-region: no-drag;
+}
+
+.wordmark {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  color: var(--brass-400);
+  padding-right: 12px;
+  margin-right: 2px;
+  border-right: 1px solid var(--line);
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}
+
+/* Server switcher replaces the icon rail entirely. */
+.switcher {
+  position: relative;
+}
+
+.switcher__button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  transition: background 120ms var(--ease), border-color 120ms var(--ease);
+  max-width: 260px;
+}
+
+.switcher__button:hover,
+.switcher__button[aria-expanded='true'] {
+  background: var(--graphite-750);
+  border-color: var(--line-strong);
+}
+
+.switcher__name {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.switcher__chevron {
+  color: var(--text-muted);
+  font-size: 9px;
+  margin-left: 2px;
+}
+
+.switcher__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 280px;
+  padding: 6px;
+  background: var(--graphite-800);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  z-index: 60;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.switcher__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 9px;
+  border-radius: var(--radius);
+  text-align: left;
+  color: var(--text-secondary);
+}
+
+.switcher__item:hover {
+  background: var(--graphite-700);
+  color: var(--text-bright);
+}
+
+.switcher__item--active {
+  color: var(--text-bright);
+  background: var(--graphite-750);
+}
+
+.switcher__divider {
+  height: 1px;
+  background: var(--line);
+  margin: 6px 4px;
+}
+
+.topbar__spacer {
+  flex: 1;
+}
+
+/* Your account, top right. */
+.me {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px 0 6px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  transition: background 120ms var(--ease), border-color 120ms var(--ease), color 120ms var(--ease);
+  max-width: 200px;
+}
+
+.me:hover {
+  background: var(--graphite-750);
+  border-color: var(--line-strong);
+  color: var(--text-bright);
+}
+
+.me__name {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Sidebar -------------------------------------------------------------- */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--graphite-900);
+  border-right: 1px solid var(--line);
+}
+
+.sidebar__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 10px 8px;
+}
+
+/*
+ * Server-level actions, above the channels. Set apart from the channel list by
+ * a rule rather than a heading: they are not a category of channel, and giving
+ * them a legend would imply they were.
+ */
+.serverbar {
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.serverbar__item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: left;
+  transition: background 110ms var(--ease), color 110ms var(--ease);
+}
+
+.serverbar__item:hover {
+  background: var(--graphite-800);
+  color: var(--text-bright);
+}
+
+.serverbar__item svg {
+  flex-shrink: 0;
+  color: var(--text-faint);
+}
+
+.serverbar__item:hover svg {
+  color: var(--brass-400);
+}
+
+.group {
+  margin-bottom: 18px;
+}
+
+.group__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 6px 7px;
+}
+
+/*
+ * Text channels: a tight, quiet list. No leading hash - that glyph is the most
+ * recognisable thing about the app this is trying not to look like, and the
+ * label already says these are text.
+ */
+.chan {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  text-align: left;
+  position: relative;
+  font-size: 13px;
+  transition: background 110ms var(--ease), color 110ms var(--ease);
+}
+
+.chan:hover:not(:disabled) {
+  color: var(--text-primary);
+  background: var(--graphite-850);
+}
+
+.chan:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.chan--active {
+  color: var(--text-bright);
+  background: var(--graphite-800);
+}
+
+/* A short brass tick, not a full-height bar - it marks the row without
+   pretending to be a tab. */
+.chan__tick {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: transparent;
+  transition: background 110ms var(--ease), transform 110ms var(--ease);
+}
+
+.chan--active .chan__tick {
+  background: var(--brass-400);
+  transform: scale(1.6);
+}
+
+.chan__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chan__glyph {
+  width: 15px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+}
+
+.chan__count {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * Voice rooms: cards, not list rows.
+ *
+ * These are the substance of a voice app - a room you can see into before you
+ * commit to entering it. Each carries a signal rail down its left edge that
+ * lights when someone in that room is talking, an occupancy readout, and the
+ * faces of whoever is inside.
+ */
+.room {
+  position: relative;
+  width: 100%;
+  text-align: left;
+  padding: 9px 11px 9px 14px;
+  margin-bottom: 5px;
+  border-radius: var(--radius);
+  background: var(--graphite-850);
+  border: 1px solid var(--line);
+  color: var(--text-secondary);
+  overflow: hidden;
+  transition: border-color 130ms var(--ease), background 130ms var(--ease);
+}
+
+.room:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--graphite-800);
+}
+
+.room:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* The signal rail. Dim when the room is idle, teal when someone is talking. */
+.room::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--graphite-700);
+  transition: background 140ms var(--ease);
+}
+
+.room--occupied::before {
+  background: var(--graphite-600);
+}
+
+.room--active::before {
+  background: var(--signal-400);
+  box-shadow: 0 0 10px var(--signal-glow);
+}
+
+/* The room you are actually in. */
+.room--joined {
+  background: var(--graphite-800);
+  border-color: rgba(79, 214, 196, 0.28);
+  color: var(--text-primary);
+}
+
+.room--joined::before {
+  background: var(--signal-400);
+}
+
+.room__head {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.room__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.room--joined .room__name {
+  color: var(--text-bright);
+}
+
+.room__count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.room--occupied .room__count {
+  color: var(--signal-500);
+}
+
+/* Faces of who is inside, shown when the room is not the one you are in. */
+.room__faces {
+  display: flex;
+  align-items: center;
+  margin-top: 7px;
+  padding-left: 1px;
+}
+
+.room__faces .avatar {
+  margin-left: -6px;
+  box-shadow: 0 0 0 2px var(--graphite-850);
+}
+
+.room__faces .avatar:first-child {
+  margin-left: 0;
+}
+
+.room__more {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  margin-left: 8px;
+}
+
+/* Full roster, shown for the room you are in. */
+.roster {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/*
+ * The roster of the room you are in hangs directly off its card, reading as
+ * one block. The card loses its bottom corners so the seam disappears.
+ */
+.room--joined {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  margin-bottom: 0;
+}
+
+.roster--attached {
+  position: relative;
+  margin: 0 0 5px;
+  padding: 8px 11px 9px 14px;
+  background: var(--graphite-800);
+  border: 1px solid rgba(79, 214, 196, 0.28);
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+/* Continue the room's signal rail down the roster. */
+.roster--attached::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: -1px;
+  bottom: 0;
+  width: 3px;
+  background: var(--signal-400);
+}
+
+.roster__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 2px;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 12.5px;
+}
+
+.roster__row:hover {
+  background: var(--graphite-750);
+}
+
+.roster__row--interactive {
+  cursor: pointer;
+}
+
+.roster__row--speaking {
+  color: var(--text-primary);
+}
+
+.roster__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roster__flags {
+  display: flex;
+  gap: 5px;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.roster__flags .is-alert {
+  color: var(--alert-400);
+}
+
+/* ==========================================================================
+   Signature: the level meter
+   Three bars that rise with real audio level, used at every size in the app.
+   ========================================================================== */
+
+.meter {
+  display: flex;
+  align-items: flex-end;
+  gap: 1.5px;
+  height: 11px;
+  flex-shrink: 0;
+}
+
+.meter__bar {
+  width: 2px;
+  border-radius: 1px;
+  background: var(--graphite-600);
+  transition: height 70ms linear, background-color 90ms var(--ease);
+}
+
+.meter--live .meter__bar {
+  background: var(--signal-400);
+}
+
+.meter--lg {
+  height: 18px;
+  gap: 2px;
+}
+
+.meter--lg .meter__bar {
+  width: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meter__bar {
+    transition: background-color 90ms var(--ease);
+  }
+}
+
+/* --- Avatars -------------------------------------------------------------- */
+
+.avatar {
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  font-weight: 600;
+  color: var(--graphite-900);
+  overflow: hidden;
+  position: relative;
+  background: var(--graphite-600);
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Speaking ring drawn as a shadow so it never shifts layout when it toggles
+   many times a second during conversation. */
+.avatar--speaking {
+  box-shadow: 0 0 0 2px var(--graphite-900), 0 0 0 3.5px var(--signal-400);
+}
+
+.avatar__status {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 34%;
+  height: 34%;
+  min-width: 8px;
+  min-height: 8px;
+  border-radius: 50%;
+  border: 2px solid var(--graphite-900);
+}
+
+.avatar__status--online {
+  background: var(--signal-500);
+}
+.avatar__status--idle {
+  background: var(--brass-400);
+}
+.avatar__status--dnd {
+  background: var(--alert-400);
+}
+.avatar__status--offline {
+  background: var(--graphite-600);
+}
+
+/* --- Self panel ----------------------------------------------------------- */
+
+/* Live call bar, at the foot of the channel column. */
+.callbar {
+  border-top: 1px solid var(--line);
+  padding: 10px 12px 11px;
+  background: linear-gradient(180deg, rgba(79, 214, 196, 0.05), transparent);
+  flex-shrink: 0;
+}
+
+.callbar__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 9px;
+}
+
+.callbar__state {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--signal-400);
+}
+
+.callbar__state--pending {
+  color: var(--brass-400);
+}
+
+.callbar__where {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 9px;
+}
+
+.callbar__controls {
+  display: flex;
+  gap: 5px;
+}
+
+/* --- Buttons -------------------------------------------------------------- */
+
+.icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  transition: background 110ms var(--ease), color 110ms var(--ease);
+}
+
+.icon-btn:hover {
+  background: var(--graphite-750);
+  color: var(--text-bright);
+}
+
+.icon-btn--on {
+  background: var(--brass-glow);
+  color: var(--brass-300);
+}
+
+.icon-btn--danger {
+  color: var(--alert-400);
+}
+
+.icon-btn--danger:hover {
+  background: var(--alert-glow);
+  color: var(--alert-400);
+}
+
+/* Call controls are wider and equal-weight: they are the primary actions. */
+.ctl {
+  flex: 1;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  background: var(--graphite-750);
+  color: var(--text-secondary);
+  transition: background 110ms var(--ease), color 110ms var(--ease);
+}
+
+.ctl:hover {
+  background: var(--graphite-700);
+  color: var(--text-bright);
+}
+
+.ctl--engaged {
+  background: var(--signal-glow);
+  color: var(--signal-400);
+}
+
+.ctl--muted {
+  background: var(--alert-glow);
+  color: var(--alert-400);
+}
+
+.ctl--leave:hover {
+  background: var(--alert-glow);
+  color: var(--alert-400);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 15px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  font-size: 13px;
+  width: auto;
+  transition: background 120ms var(--ease), color 120ms var(--ease);
+}
+
+.btn--primary {
+  background: var(--brass-400);
+  color: #241a08;
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--brass-300);
+}
+
+.btn--primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn--ghost {
+  background: var(--graphite-750);
+  color: var(--text-primary);
+}
+
+.btn--ghost:hover {
+  background: var(--graphite-700);
+}
+
+.btn--danger {
+  background: transparent;
+  color: var(--alert-400);
+  border: 1px solid rgba(224, 96, 95, 0.35);
+}
+
+.btn--danger:hover {
+  background: var(--alert-glow);
+}
+
+.btn--block {
+  width: 100%;
+}
+
+.btn--sm {
+  padding: 6px 11px;
+  font-size: 12px;
+}
+
+.linkish {
+  color: var(--brass-400);
+  font-size: 13px;
+  padding: 0;
+  width: auto;
+}
+
+.linkish:hover {
+  color: var(--brass-300);
+  text-decoration: underline;
+}
+
+/* ==========================================================================
+   Main pane
+   ========================================================================== */
+
+.pane {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: var(--graphite-850);
+}
+
+.pane__header {
+  height: 46px;
+  flex-shrink: 0;
+  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pane__title {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-bright);
+}
+
+.pane__topic {
+  color: var(--text-muted);
+  font-size: 12.5px;
+  padding-left: 12px;
+  margin-left: 2px;
+  border-left: 1px solid var(--line-strong);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- The call: its own view, not a strip ---------------------------------- */
+
+.callhead {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.callhead__switch {
+  display: flex;
+  gap: 5px;
+  margin-left: auto;
+}
+
+/* The whole pane below the header. `min-height: 0` on both this and its
+   children is what stops a shared screen forcing the pane taller than the
+   window - the bug that made a share overflow instead of fitting. */
+.call {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  overflow: hidden;
+}
+
+/*
+ * No presentation: participants tile evenly.
+ *
+ * Tiles hold 16:9 rather than stretching to fill the row. With `1fr` rows a
+ * single participant took the whole pane height and came out portrait - very
+ * obvious on a tall or narrow window, and wrong for a camera, which is
+ * landscape. The grid is capped and centred so one person does not get an
+ * absurd tile on a wide display either.
+ */
+.call__grid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  /* The column count is set inline from the participant count - see
+     gridColumns() in CallView. `auto-fit` was leaving one person with a
+     third-width tile because its empty tracks did not collapse here. */
+  grid-auto-rows: auto;
+  gap: 10px;
+  align-content: center;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  overflow-y: auto;
+}
+
+.call__grid .tile {
+  aspect-ratio: 16 / 9;
+}
+
+/* A shared screen takes the room; everyone else becomes a filmstrip. */
+.call__stage {
+  flex: 1;
+  min-height: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: #000;
+  border: 1px solid var(--line-strong);
+  position: relative;
+}
+
+.call__filmstrip {
+  flex-shrink: 0;
+  height: 104px;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 2px;
+}
+
+.call__filmstrip .tile {
+  flex: 0 0 158px;
+  height: 100%;
+  aspect-ratio: auto;
+}
+
+/* Who or what is on the stage. */
+.call__stage-label {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(10, 9, 12, 0.7);
+  backdrop-filter: blur(6px);
+  font-size: 12px;
+  color: var(--text-bright);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* A tile carrying video is clickable: it can take the stage. */
+.tile--enlargeable {
+  cursor: zoom-in;
+}
+
+.tile--enlargeable:hover {
+  border-color: var(--brass-500);
+}
+
+.tile--enlargeable::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--brass-glow);
+  opacity: 0;
+  transition: opacity 120ms var(--ease);
+  pointer-events: none;
+}
+
+.tile--enlargeable:hover::after {
+  opacity: 1;
+}
+
+.call__alone {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--text-muted);
+  align-self: center;
+}
+
+.call__alone .empty__title {
+  margin-bottom: 4px;
+}
+
+/* --- Video surfaces ------------------------------------------------------- */
+
+.surface {
+  position: absolute;
+  inset: 0;
+  background: #000;
+}
+
+.surface__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Your own camera is mirrored, which is how people expect to see themselves. */
+.surface__video--mirror {
+  transform: scaleX(-1);
+}
+
+/* A shared screen is letterboxed, never cropped: cropping a presentation cuts
+   off exactly the edges someone is trying to show you. */
+.surface__video--contain {
+  object-fit: contain;
+}
+
+.surface__expand {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  display: grid;
+  place-items: center;
+  color: var(--text-bright);
+  background: rgba(10, 9, 12, 0.6);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 120ms var(--ease), background 120ms var(--ease);
+}
+
+.surface:hover .surface__expand,
+.surface__expand:focus-visible {
+  opacity: 1;
+}
+
+.surface__expand:hover {
+  background: rgba(10, 9, 12, 0.85);
+}
+
+/* Fullscreen: the element becomes the whole screen, so it must letterbox
+   rather than crop, and the controls stay reachable. */
+.surface:fullscreen {
+  position: fixed;
+  background: #000;
+}
+
+.surface:fullscreen .surface__video {
+  object-fit: contain;
+}
+
+.surface:fullscreen .surface__expand {
+  opacity: 0.55;
+}
+
+.strip__lamp {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--signal-400);
+  box-shadow: 0 0 8px var(--signal-400);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .strip__lamp {
+    animation: lamp 2.4s ease-in-out infinite;
+  }
+}
+
+@keyframes lamp {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.tile {
+  position: relative;
+  min-height: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--graphite-800);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  transition: border-color 130ms var(--ease), box-shadow 130ms var(--ease);
+  animation: tile-in 200ms var(--ease);
+}
+
+@keyframes tile-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile {
+    animation: none;
+  }
+}
+
+.tile--speaking {
+  border-color: var(--signal-500);
+  box-shadow: 0 0 0 1px var(--signal-500), 0 0 22px -6px var(--signal-glow);
+}
+
+.tile--self {
+  border-color: var(--line-strong);
+}
+
+.tile__footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 18px 10px 8px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: linear-gradient(transparent, rgba(10, 9, 12, 0.85));
+}
+
+.tile__name {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.tile__flags {
+  display: flex;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--alert-400);
+}
+
+/* Filmstrip tiles are small; the meter and name still have to read. */
+.tile--compact .tile__footer {
+  padding: 14px 7px 5px;
+  gap: 5px;
+}
+
+.tile--compact .tile__name {
+  font-size: 11px;
+}
+
+.tile--compact .tile__flags {
+  display: none;
+}
+
+/* --- Messages ------------------------------------------------------------- */
+
+.messages {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 18px 8px;
+  display: flex;
+  flex-direction: column;
+  user-select: text;
+}
+
+.msg {
+  display: flex;
+  gap: 11px;
+  padding: 3px 0;
+}
+
+.msg--grouped {
+  padding-top: 0;
+}
+
+.msg__gutter {
+  width: 34px;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+}
+
+.msg__stamp {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: transparent;
+  padding-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Timestamp only appears on hover for grouped messages: present when wanted,
+   silent otherwise. */
+.msg--grouped:hover .msg__stamp {
+  color: var(--text-faint);
+}
+
+.msg__body {
+  min-width: 0;
+  flex: 1;
+}
+
+.msg__meta {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  margin-bottom: 1px;
+}
+
+.msg__author {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text-bright);
+}
+
+.msg__time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+.msg__text {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  color: var(--text-primary);
+  font-size: 13.5px;
+}
+
+.composer {
+  padding: 8px 18px 18px;
+  flex-shrink: 0;
+}
+
+.composer input {
+  background: var(--graphite-800);
+  border-color: var(--line-strong);
+  padding: 11px 14px;
+  border-radius: var(--radius);
+}
+
+.composer__hint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+  height: 14px;
+  padding: 3px 2px 0;
+}
+
+/* --- Empty and error states ----------------------------------------------- */
+
+.empty {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 40px;
+  text-align: center;
+}
+
+.empty__inner {
+  max-width: 340px;
+}
+
+.empty__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 6px;
+}
+
+.empty__body {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.notice {
+  margin: 12px 18px 0;
+  padding: 10px 13px;
+  border-radius: var(--radius-sm);
+  background: var(--alert-glow);
+  border: 1px solid rgba(224, 96, 95, 0.28);
+  color: #f0a9ab;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12.5px;
+}
+
+.notice button {
+  margin-left: auto;
+  color: inherit;
+  opacity: 0.65;
+}
+
+.notice button:hover {
+  opacity: 1;
+}
+
+/* ==========================================================================
+   Auth
+   ========================================================================== */
+
+.auth {
+  height: 100%;
+  display: grid;
+  place-items: center;
+  background: var(--graphite-900);
+}
+
+.auth__card {
+  width: 392px;
+  padding: 34px;
+}
+
+.auth__mark {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  color: var(--brass-400);
+  margin-bottom: 22px;
+}
+
+.auth__title {
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text-bright);
+  margin: 0 0 5px;
+}
+
+.auth__sub {
+  color: var(--text-muted);
+  font-size: 13px;
+  margin: 0 0 26px;
+}
+
+.field {
+  margin-bottom: 15px;
+}
+
+.field__label {
+  display: block;
+  margin-bottom: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.field__error {
+  color: var(--alert-400);
+  font-size: 12px;
+  margin-top: 5px;
+}
+
+.field__hint {
+  color: var(--text-faint);
+  font-size: 11.5px;
+  margin-top: 5px;
+}
+
+.auth__switch {
+  text-align: center;
+  margin-top: 20px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ==========================================================================
+   Dialogs
+   ========================================================================== */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(9, 8, 11, 0.66);
+  backdrop-filter: blur(3px);
+  display: grid;
+  place-items: center;
+  z-index: 100;
+  padding: 28px;
+  animation: fade 120ms var(--ease);
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.modal {
+  width: 100%;
+  max-width: 480px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--graphite-800);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.modal--wide {
+  max-width: 720px;
+}
+
+.modal__head {
+  padding: 18px 22px 15px;
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+
+.modal__title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text-bright);
+  margin: 0;
+}
+
+.modal__sub {
+  color: var(--text-muted);
+  font-size: 12.5px;
+  margin: 3px 0 0;
+}
+
+.modal__body {
+  padding: 20px 22px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.modal__foot {
+  padding: 14px 22px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 9px;
+  justify-content: flex-end;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* Tabbed settings: a vertical rail, so sections can grow without wrapping. */
+.settings {
+  display: grid;
+  grid-template-columns: 168px 1fr;
+  min-height: 0;
+  flex: 1;
+}
+
+.settings__rail {
+  border-right: 1px solid var(--line);
+  padding: 14px 10px;
+  background: var(--graphite-850);
+  overflow-y: auto;
+}
+
+.settings__tab {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 11px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-bottom: 2px;
+  position: relative;
+}
+
+.settings__tab:hover {
+  background: var(--graphite-800);
+  color: var(--text-primary);
+}
+
+.settings__tab--active {
+  background: var(--graphite-750);
+  color: var(--text-bright);
+  font-weight: 600;
+}
+
+.settings__panel {
+  padding: 20px 22px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.section {
+  margin-bottom: 26px;
+}
+
+.section:last-child {
+  margin-bottom: 0;
+}
+
+.section__title {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.row__label {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.row__hint {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  max-width: 330px;
+  line-height: 1.45;
+}
+
+.row__control {
+  flex-shrink: 0;
+}
+
+/* Segmented control */
+.segmented {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: var(--graphite-900);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+}
+
+.segmented button {
+  padding: 5px 12px;
+  border-radius: 3px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.segmented button:hover {
+  color: var(--text-bright);
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--brass-400);
+  color: #241a08;
+  font-weight: 600;
+}
+
+/* Switch */
+.switch {
+  width: 38px;
+  height: 21px;
+  border-radius: 11px;
+  background: var(--graphite-600);
+  position: relative;
+  transition: background 140ms var(--ease);
+  flex-shrink: 0;
+}
+
+.switch[aria-checked='true'] {
+  background: var(--brass-500);
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2.5px;
+  left: 2.5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text-bright);
+  transition: transform 140ms var(--ease);
+}
+
+.switch[aria-checked='true']::after {
+  transform: translateX(17px);
+}
+
+/* Editable list rows, used for channels and members. */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.list__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--graphite-850);
+  border: 1px solid var(--line);
+}
+
+.list__row:hover {
+  border-color: var(--line-strong);
+}
+
+.list__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.list__name {
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.list__meta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--text-faint);
+  margin-top: 2px;
+}
+
+.list__actions {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+/* Avatar picker */
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.picker__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  align-items: flex-start;
+}
+
+.swatches {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  transition: transform 110ms var(--ease), border-color 110ms var(--ease);
+}
+
+.swatch:hover {
+  transform: scale(1.12);
+}
+
+.swatch[aria-pressed='true'] {
+  border-color: var(--text-bright);
+}
+
+.inline-form {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.inline-form input,
+.inline-form select {
+  flex: 1;
+}
+
+.inline-form select {
+  flex: 0 0 92px;
+}
+
+.hidden-input {
+  display: none;
+}
+
+/* --- Ranks ---------------------------------------------------------------- */
+
+.ranks {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.ranks__list {
+  border-right: 1px solid var(--line);
+  padding-right: 16px;
+}
+
+.ranks__row {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ranks__item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  text-align: left;
+}
+
+.ranks__item:hover {
+  background: var(--graphite-800);
+  color: var(--text-primary);
+}
+
+.ranks__item--active {
+  background: var(--graphite-750);
+  color: var(--text-bright);
+}
+
+.ranks__dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ranks__editor {
+  min-width: 0;
+}
+
+.switch:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* --- Screen share picker -------------------------------------------------- */
+
+.sources {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.source {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 7px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--graphite-850);
+  text-align: left;
+  transition: border-color 110ms var(--ease), background 110ms var(--ease);
+}
+
+.source:hover {
+  border-color: var(--line-strong);
+  background: var(--graphite-800);
+}
+
+.source--selected {
+  border-color: var(--brass-400);
+  background: var(--brass-glow);
+}
+
+.source__preview {
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-sm);
+  background: var(--graphite-900);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.source__preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.source__name {
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --- Message actions ------------------------------------------------------ */
+
+.msg {
+  position: relative;
+}
+
+.msg__actions {
+  position: absolute;
+  top: -10px;
+  right: 0;
+  display: none;
+  gap: 2px;
+  padding: 2px;
+  background: var(--graphite-800);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+
+.msg:hover .msg__actions,
+.msg:focus-within .msg__actions {
+  display: flex;
+}
+
+.msg__edited {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-faint);
+  margin-left: 6px;
+}
+
+.msg__editor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.msg__editor-hint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-faint);
+}
+
+/* --- Error boundary ------------------------------------------------------- */
+
+.boundary {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 40px;
+  min-height: 0;
+}
+
+.boundary__inner {
+  max-width: 380px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.boundary__detail {
+  font-size: 11px;
+  color: var(--text-faint);
+  background: var(--graphite-900);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  padding: 8px 11px;
+  margin: 6px 0 4px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.boundary--quiet {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  color: var(--text-faint);
+}
+
+/* --- Profile: a spec plate, not a social card ----------------------------- */
+
+.plate {
+  position: fixed;
+  z-index: 200;
+  width: 308px;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--graphite-800);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.55);
+  animation: plate-in 130ms var(--ease);
+  /* Room for the rail, which runs the full height down the left edge. */
+  padding-left: 3px;
+}
+
+@keyframes plate-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plate {
+    animation: none;
+  }
+}
+
+.plate__rail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.plate__head {
+  display: flex;
+  gap: 13px;
+  padding: 15px 15px 13px;
+}
+
+/* Square, not round. A circular avatar over a banner is the shape this design
+   is specifically avoiding. */
+.plate__portrait {
+  width: 62px;
+  height: 62px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.plate__portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.plate__initial {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--graphite-900);
+}
+
+.plate__titles {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+
+.plate__name {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text-bright);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.plate__handle {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.plate__live {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 4px;
+}
+
+.plate__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.plate__dot--online {
+  background: var(--signal-500);
+}
+.plate__dot--idle {
+  background: var(--brass-400);
+}
+.plate__dot--dnd {
+  background: var(--alert-400);
+}
+.plate__dot--offline {
+  background: var(--graphite-600);
+}
+
+.plate__status {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* The facts, as a fixed label/value grid - the part that makes it read as a
+   plate rather than a bio. */
+.plate__fields {
+  margin: 0;
+  padding: 12px 15px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.plate__field {
+  display: grid;
+  grid-template-columns: 62px 1fr;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.plate__field dt {
+  padding-top: 1px;
+}
+
+.plate__field dd {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-primary);
+  min-width: 0;
+}
+
+.plate__dim {
+  color: var(--text-faint);
+}
+
+.plate__ranks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.plate__rank {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.plate__inroom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  color: var(--signal-400);
+}
+
+.plate__flag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--alert-400);
+  border: 1px solid rgba(224, 96, 95, 0.4);
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+
+.plate__about {
+  padding: 12px 15px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.plate__about p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.plate__volume {
+  padding: 12px 15px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.plate__volume-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.plate__volume-row input {
+  flex: 1;
+  padding: 0;
+  border: none;
+  background: transparent;
+  accent-color: var(--brass-400);
+}
+
+.plate__volume-value {
+  font-size: 11px;
+  color: var(--text-muted);
+  width: 38px;
+  text-align: right;
+}
+
+.plate__foot {
+  padding: 12px 15px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Names that open a card announce themselves on hover. */
+.clickable-name {
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.clickable-name:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* --- Context menu --------------------------------------------------------- */
+
+.menu {
+  position: fixed;
+  z-index: 200;
+  min-width: 190px;
+  padding: 5px;
+  background: var(--graphite-800);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+}
+
+.menu__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 13px;
+  text-align: left;
+}
+
+.menu__item:hover:not(:disabled) {
+  background: var(--graphite-700);
+  color: var(--text-bright);
+}
+
+.menu__item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.menu__item--danger {
+  color: var(--alert-400);
+}
+
+.menu__item--danger:hover:not(:disabled) {
+  background: var(--alert-glow);
+}
+
+.menu__divider {
+  height: 1px;
+  background: var(--line);
+  margin: 5px 4px;
+}
+
+.menu__label {
+  padding: 6px 9px 4px;
+}
+
+.menu__chevron {
+  color: var(--text-faint);
+  font-size: 9px;
+}
+
+.menu__check {
+  color: var(--signal-400);
+  font-size: 11px;
+}
+
+/* Submenus indent rather than fly out: a flyout that leaves the parent needs
+   hover-intent handling to not vanish while you aim at it. */
+.menu__submenu {
+  margin: 2px 0 4px 10px;
+  padding-left: 6px;
+  border-left: 1px solid var(--line-strong);
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+/* Explains why a menu is short, rather than leaving it looking broken. */
+.menu__note {
+  padding: 7px 10px 8px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-faint);
+}
+
+.menu__error {
+  margin: 4px 5px 6px;
+  padding: 6px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--alert-glow);
+  border: 1px solid rgba(224, 96, 95, 0.28);
+  color: #f0a9ab;
+  font-size: 11.5px;
+}
+
+.menu__slider {
+  padding: 6px 9px 9px;
+}
+
+.menu__slider input {
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  accent-color: var(--brass-400);
+}
+
+/* Scrollbars: present but recessive. */
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--graphite-700);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--graphite-600);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}

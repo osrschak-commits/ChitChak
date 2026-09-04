@@ -1,0 +1,44 @@
+{
+  "name": "chitchak",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down",
+    "infra:logs": "docker compose logs -f",
+    "db:generate": "npm run db:generate -w @chitchak/server",
+    "db:migrate": "npm run db:migrate -w @chitchak/server",
+    "db:seed": "npm run db:seed -w @chitchak/server",
+    "build:protocol": "npm run build -w @chitchak/protocol",
+    "dev:server": "npm run build:protocol && npm run dev -w @chitchak/server",
+    "dev:desktop": "npm run build:protocol && npm run dev -w @chitchak/desktop",
+    "dev": "npm run build:protocol && concurrently -n server,desktop -c blue,magenta \"npm run dev -w @chitchak/server\" \"npm run dev -w @chitchak/desktop\"",
+    "setup": "npm install && npm run build:protocol && npm run infra:up && npm run db:migrate && npm run db:seed",
+    "typecheck": "tsc -b packages/protocol apps/server apps/desktop",
+    "gen:env": "node scripts/generate-env.mjs",
+    "prod:up": "docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build",
+    "prod:migrate": "docker compose -f docker-compose.prod.yml --env-file .env.production --profile tools run --rm migrate",
+    "prod:logs": "docker compose -f docker-compose.prod.yml --env-file .env.production logs -f",
+    "prod:down": "docker compose -f docker-compose.prod.yml --env-file .env.production down"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2",
+    "typescript": "^5.7.3"
+  },
+  "allowScripts": {
+    "esbuild@0.24.2": true,
+    "esbuild@0.18.20": true,
+    "esbuild@0.19.12": true,
+    "esbuild@0.28.2": true,
+    "esbuild@0.25.12": true,
+    "electron@33.4.11": true
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1788473763121,
+      "tag": "0000_closed_shockwave",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1788490457399,
+      "tag": "0001_profiles_video_images",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1788490472011,
+      "tag": "0002_drop_legacy_image_urls",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788531405537,
+      "tag": "0003_ranks_bans_overwrites",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788550313881,
+      "tag": "0004_server_deafen",
+      "breakpoints": true
+    }
+  ]
+}

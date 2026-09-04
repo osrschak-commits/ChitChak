@@ -1,0 +1,49 @@
+appId: com.chitchak.desktop
+productName: ChitChak
+copyright: Copyright © 2026
+
+directories:
+  output: release
+  buildResources: build
+
+# Only the built output ships. The renderer is bundled by Vite and the main
+# process by esbuild, so node_modules is not needed inside the package - which
+# keeps the installer small and avoids shipping dev dependencies.
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch: [x64]
+  # Skips the winCodeSign toolchain download.
+  #
+  # That package contains macOS symlinks, and extracting a symlink on Windows
+  # needs a privilege a normal user account does not have - so the build fails
+  # on the download, before it ever gets to packaging. We are not signing
+  # anything, so the toolchain is dead weight.
+  #
+  # The cost is that the inner app .exe keeps Electron's default icon; the
+  # installer, Start Menu entry and desktop shortcut all still use ours. To get
+  # the inner icon too, turn on Windows Developer Mode (Settings > System > For
+  # developers), which grants the symlink privilege, and set this back to true.
+  signAndEditExecutable: false
+
+nsis:
+  # A one-click installer that picks its own location and launches immediately
+  # is exactly the behaviour that makes people distrust an unsigned download.
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: ChitChak
+  # Named so the download is obviously what it claims to be.
+  artifactName: ChitChak-Setup-${version}.${ext}
+
+# The build is not code-signed. Windows SmartScreen will warn on first run until
+# the download builds reputation, which is unavoidable without a certificate
+# (~£200/year). Tell people to expect it rather than letting them be surprised.

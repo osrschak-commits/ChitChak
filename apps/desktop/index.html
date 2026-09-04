@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      The renderer never loads remote code. The hosts it may reach are injected
+      at build time from VITE_CONNECT_SRC / VITE_IMG_SRC, because a packaged
+      build talks to a real server and a development build talks to localhost -
+      hard-coding either one breaks the other.
+
+      See .env.development and .env.production.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: %VITE_IMG_SRC%; media-src 'self' blob:; connect-src 'self' %VITE_CONNECT_SRC%"
+    />
+    <title>ChitChak</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

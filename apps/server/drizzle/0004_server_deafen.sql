@@ -1,0 +1,1 @@
+ALTER TABLE "voice_states" ADD COLUMN "server_deafened" boolean DEFAULT false NOT NULL;
