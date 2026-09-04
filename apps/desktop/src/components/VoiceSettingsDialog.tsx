@@ -55,6 +55,12 @@ export function VoiceSettingsDialog({ onClose }: { onClose(): void }) {
     return () => window.removeEventListener('keydown', onKeyDown, { capture: true });
   }, [capturing]);
 
+  // Which device is actually in use, so "System default" can be inspected too.
+  const activeInput = audioSettings.inputDeviceId
+    ? devices.inputs.find((d) => d.deviceId === audioSettings.inputDeviceId)
+    : (devices.inputs.find((d) => d.deviceId === 'default') ?? devices.inputs[0]);
+  const loopbackWarning = describeLoopback(activeInput?.label ?? '');
+
   return (
     <div className="scrim" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -83,6 +89,7 @@ export function VoiceSettingsDialog({ onClose }: { onClose(): void }) {
                   </option>
                 ))}
               </select>
+              {loopbackWarning && <div className="field__error">{loopbackWarning}</div>}
             </div>
 
             <div className="field">
@@ -220,6 +227,32 @@ export function VoiceSettingsDialog({ onClose }: { onClose(): void }) {
       </div>
     </div>
   );
+}
+
+/**
+ * Warns when the chosen input is a loopback device.
+ *
+ * Stereo Mix, VB-CABLE, Voicemeeter and similar capture whatever the computer
+ * is playing rather than a microphone, so picking one - or having it as the
+ * system default - broadcasts your games, music and other calls to everyone in
+ * the room. It is a genuinely confusing thing to debug from the listening end,
+ * because your voice comes through fine alongside everything else.
+ */
+function describeLoopback(label: string): string | null {
+  const loopback = [
+    'stereo mix',
+    'what u hear',
+    'what you hear',
+    'wave out',
+    'cable output',
+    'voicemeeter out',
+    'loopback',
+    'virtual audio',
+    'vb-audio',
+  ];
+  const lower = label.toLowerCase();
+  if (!loopback.some((name) => lower.includes(name))) return null;
+  return `"${label}" captures everything playing on your PC, not your voice. Everyone will hear your games, music and notifications. Pick your actual microphone instead.`;
 }
 
 /**

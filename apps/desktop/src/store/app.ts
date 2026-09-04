@@ -91,8 +91,8 @@ interface AppState {
   toggleMute(): void;
   toggleDeafen(): void;
   toggleCamera(): Promise<void>;
-  /** Pass a source id from the picker; omit to stop sharing. */
-  startScreenShare(sourceId: string): Promise<void>;
+  /** Pass a source id from the picker. `withAudio` shares the computer's sound too. */
+  startScreenShare(sourceId: string, withAudio?: boolean): Promise<void>;
   stopScreenShare(): Promise<void>;
   setTransmitMode(mode: TransmitMode): void;
   setPushToTalkActive(active: boolean): void;
@@ -343,13 +343,13 @@ export const useApp = create<AppState>((set, get) => ({
     }
   },
 
-  async startScreenShare(sourceId) {
+  async startScreenShare(sourceId, withAudio = false) {
     if (!get().voiceChannelId) return;
     try {
       // Electron has no built-in source chooser: the main process is told which
       // screen to hand over, and only then does getDisplayMedia succeed.
-      await window.chitchak?.selectScreenSource(sourceId);
-      await getEngine().startScreenShare();
+      await window.chitchak?.selectScreenSource(sourceId, withAudio);
+      await getEngine().startScreenShare(withAudio);
     } catch {
       // The engine surfaces a readable message through onError.
       await window.chitchak?.selectScreenSource(null);

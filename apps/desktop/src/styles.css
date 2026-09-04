@@ -1750,6 +1750,20 @@ textarea::placeholder {
   gap: 16px;
 }
 
+.picker__audio {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  cursor: pointer;
+  max-width: 340px;
+}
+
+.picker__audio > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
 .picker__actions {
   display: flex;
   flex-direction: column;

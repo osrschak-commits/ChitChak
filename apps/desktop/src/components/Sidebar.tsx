@@ -412,9 +412,9 @@ function CallBar() {
 
       {picking && (
         <ScreenPicker
-          onPick={(sourceId) => {
+          onPick={(sourceId, withAudio) => {
             setPicking(false);
-            void startScreenShare(sourceId);
+            void startScreenShare(sourceId, withAudio);
           }}
           onClose={() => setPicking(false)}
         />

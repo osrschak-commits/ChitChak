@@ -70,6 +70,22 @@ export const defaultAudioSettings: AudioSettings = {
  */
 const LEVEL_SAMPLE_MS = 50;
 
+/**
+ * Turns a device id into a constraint the browser must honour.
+ *
+ * A bare `deviceId: "abc"` is only a *preference* - Chromium is free to ignore
+ * it and open the system default instead, silently. On a machine whose default
+ * capture device is a loopback (Stereo Mix, VB-CABLE, Voicemeeter), that means
+ * the app transmits everything playing on the computer and changing the setting
+ * appears to do nothing.
+ *
+ * `exact` makes it a requirement: the right device, or an OverconstrainedError
+ * we can report. Undefined is left undefined, so "System default" really is.
+ */
+function exactDevice(deviceId: string | undefined): { exact: string } | undefined {
+  return deviceId ? { exact: deviceId } : undefined;
+}
+
 export class VoiceEngine {
   private room: Room | null = null;
   private micTrack: LocalAudioTrack | null = null;
@@ -241,7 +257,7 @@ export class VoiceEngine {
 
     try {
       this.cameraTrack = await createLocalVideoTrack({
-        deviceId: this.settings.videoDeviceId,
+        deviceId: exactDevice(this.settings.videoDeviceId),
         // 720p is the sweet spot for a call tile: sharp at the sizes these are
         // actually rendered, and a third of the bitrate of 1080p.
         resolution: { width: 1280, height: 720, frameRate: 30 },
@@ -268,14 +284,15 @@ export class VoiceEngine {
 
   // --- Screen share --------------------------------------------------------
 
-  async startScreenShare(): Promise<void> {
+  async startScreenShare(withAudio = false): Promise<void> {
     const room = this.room;
     if (!room || this.screenTracks.length > 0) return;
 
     try {
-      // The browser's own picker handles source selection; Electron shows the
-      // native window/screen chooser for it.
-      const tracks = await room.localParticipant.createScreenTracks({ audio: true });
+      // Audio only when asked for: loopback capture takes everything the
+      // machine is playing, which is rarely what someone sharing a window
+      // intends to broadcast.
+      const tracks = await room.localParticipant.createScreenTracks({ audio: withAudio });
       for (const track of tracks) {
         await room.localParticipant.publishTrack(track);
         if (track instanceof LocalVideoTrack) this.screenTracks.push(track);
@@ -360,7 +377,7 @@ export class VoiceEngine {
 
     try {
       this.micTrack = await createLocalAudioTrack({
-        deviceId: this.settings.inputDeviceId,
+        deviceId: exactDevice(this.settings.inputDeviceId),
         echoCancellation: this.settings.echoCancellation,
         noiseSuppression: this.settings.noiseSuppression,
         autoGainControl: this.settings.autoGainControl,

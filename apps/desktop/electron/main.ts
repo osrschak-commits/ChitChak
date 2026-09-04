@@ -142,6 +142,15 @@ function registerPushToTalk(accelerator: string): boolean {
  * `getDisplayMedia()` call that follows.
  */
 let pendingScreenSourceId: string | null = null;
+/**
+ * Whether the pending share should carry the computer's sound.
+ *
+ * Off unless asked for. Loopback capture takes *everything* playing on the
+ * machine, not just the window being shared, so doing it by default means
+ * people broadcast their music, notifications and other calls without
+ * realising.
+ */
+let pendingScreenAudio = false;
 
 /**
  * Microphone and screen-capture permissions.
@@ -191,7 +200,9 @@ function installPermissionHandlers(): void {
       }
 
       const sourceId = pendingScreenSourceId;
+      const withAudio = pendingScreenAudio;
       pendingScreenSourceId = null;
+      pendingScreenAudio = false;
 
       void desktopCapturer.getSources({ types: ['screen', 'window'] }).then((sources) => {
         const chosen = sources.find((source) => source.id === sourceId);
@@ -199,9 +210,9 @@ function installPermissionHandlers(): void {
           callback({});
           return;
         }
-        // 'loopback' captures system audio alongside the picture on Windows.
-        // Elsewhere it is ignored, and the share is silent.
-        callback({ video: chosen, audio: 'loopback' });
+        // 'loopback' captures system audio on Windows, and is ignored
+        // elsewhere. Only requested when the person ticked the box.
+        callback(withAudio ? { video: chosen, audio: 'loopback' } : { video: chosen });
       });
     },
     // We resolve the source ourselves rather than letting Chromium prompt.
@@ -236,10 +247,14 @@ app.whenReady().then(() => {
   });
 
   /** Records the choice for the getDisplayMedia call the renderer makes next. */
-  ipcMain.handle('screen:select-source', (_event, sourceId: string | null) => {
-    pendingScreenSourceId = sourceId;
-    return { ok: true };
-  });
+  ipcMain.handle(
+    'screen:select-source',
+    (_event, sourceId: string | null, withAudio: boolean = false) => {
+      pendingScreenSourceId = sourceId;
+      pendingScreenAudio = Boolean(withAudio);
+      return { ok: true };
+    },
+  );
 
   ipcMain.handle('ptt:set-key', (_event, accelerator: string) => {
     const ok = registerPushToTalk(accelerator);

@@ -18,11 +18,14 @@ export function ScreenPicker({
   onPick,
   onClose,
 }: {
-  onPick(sourceId: string): void;
+  onPick(sourceId: string, withAudio: boolean): void;
   onClose(): void;
 }) {
   const [sources, setSources] = useState<Source[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  // Off by default. Sharing computer sound captures everything playing on the
+  // machine - other calls, music, notifications - not just what is on screen.
+  const [withAudio, setWithAudio] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -55,7 +58,7 @@ export function ScreenPicker({
               key={source.id}
               className={`source ${selected === source.id ? 'source--selected' : ''}`}
               onClick={() => setSelected(source.id)}
-              onDoubleClick={() => onPick(source.id)}
+              onDoubleClick={() => onPick(source.id, withAudio)}
               title={source.name}
             >
               <span className="source__preview">
@@ -94,13 +97,28 @@ export function ScreenPicker({
         </div>
 
         <div className="modal__foot">
+          <label className="picker__audio" style={{ marginRight: 'auto' }}>
+            <input
+              type="checkbox"
+              style={{ width: 'auto' }}
+              checked={withAudio}
+              onChange={(e) => setWithAudio(e.target.checked)}
+            />
+            <span>
+              <span className="row__label">Share computer sound</span>
+              <span className="row__hint">
+                Sends everything your PC is playing, not just this window.
+              </span>
+            </span>
+          </label>
+
           <button className="btn btn--ghost" onClick={onClose}>
             Cancel
           </button>
           <button
             className="btn btn--primary"
             disabled={!selected}
-            onClick={() => selected && onPick(selected)}
+            onClick={() => selected && onPick(selected, withAudio)}
           >
             Share
           </button>

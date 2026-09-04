@@ -38,8 +38,8 @@ const api = {
    * Electron asks the main process which source to hand over, and this is the
    * answer it gives. Pass null to cancel.
    */
-  selectScreenSource(sourceId: string | null): Promise<{ ok: boolean }> {
-    return ipcRenderer.invoke('screen:select-source', sourceId);
+  selectScreenSource(sourceId: string | null, withAudio = false): Promise<{ ok: boolean }> {
+    return ipcRenderer.invoke('screen:select-source', sourceId, withAudio);
   },
 };
 
