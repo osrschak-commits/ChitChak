@@ -63,7 +63,6 @@ export function initUpdater(resolveWindow: () => BrowserWindow | null): void {
   // The quiet path: someone who never touches the banner still gets the update
   // applied when they close the app, so the next launch is current.
   autoUpdater.autoInstallOnAppQuit = true;
-  autoUpdater.logger = null;
 
   autoUpdater.on('checking-for-update', () => {
     // Only surfaced when there is nothing else to say, so a routine background
