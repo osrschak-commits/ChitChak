@@ -71,10 +71,36 @@ function createWindow(): void {
     return { action: 'deny' };
   });
 
+  /**
+   * Keep the window on our own page, and send anything else to the browser.
+   *
+   * The earlier version of this allowed only the dev-server URL, which in a
+   * packaged build meant *everything* was blocked - including the app
+   * reloading itself. That is not a navigation to somewhere else, so it must
+   * be allowed, or actions that refresh the app silently do nothing.
+   */
   mainWindow.webContents.on('will-navigate', (event, url) => {
-    const allowed = isDev && url.startsWith(devServerUrl);
-    if (!allowed) {
-      event.preventDefault();
+    const current = mainWindow?.webContents.getURL() ?? '';
+
+    let sameDocument = false;
+    try {
+      const target = new URL(url);
+      const here = new URL(current);
+      // file:// has a null origin, so compare protocol and path instead.
+      sameDocument =
+        target.protocol === here.protocol &&
+        target.host === here.host &&
+        target.pathname === here.pathname;
+    } catch {
+      sameDocument = false;
+    }
+
+    if (sameDocument) return;
+
+    event.preventDefault();
+    // Only hand real web links to the browser. Refusing anything else avoids
+    // asking the OS to open an arbitrary scheme on our behalf.
+    if (url.startsWith('https://') || url.startsWith('http://')) {
       void shell.openExternal(url);
     }
   });

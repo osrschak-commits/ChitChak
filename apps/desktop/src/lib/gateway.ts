@@ -122,6 +122,25 @@ export class GatewayClient {
     });
   }
 
+  /**
+   * Drop the socket and open a fresh one.
+   *
+   * The gateway captures a user's guild membership when it identifies, so after
+   * joining or creating a server the existing socket will not route that
+   * server's events. Reconnecting re-identifies and returns a complete
+   * snapshot, which is the same result a full page reload gave without
+   * discarding the window.
+   */
+  async reconnect(): Promise<void> {
+    this.deliberatelyClosed = true;
+    clearTimeout(this.reconnectTimer);
+    this.stopHeartbeat();
+    this.socket?.close(1000, 'reconnecting');
+    this.socket = null;
+    this.attempts = 0;
+    await this.connect();
+  }
+
   close(): void {
     this.deliberatelyClosed = true;
     clearTimeout(this.reconnectTimer);

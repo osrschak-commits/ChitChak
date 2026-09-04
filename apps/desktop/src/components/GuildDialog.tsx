@@ -1,28 +1,35 @@
 import { useState } from 'react';
 import { api } from '../lib/api.js';
+import { useApp } from '../store/app.js';
 
 /**
  * Create a server, or join one with an invite code.
  *
- * Both reload afterwards: the gateway captures a user's guild membership when
- * the socket identifies, so a guild joined mid-session does not route events
- * until the connection is re-established. Reconnecting is the honest fix until
- * the gateway grows a live membership update.
+ * Both finish by reconnecting the gateway rather than reloading the window. The
+ * gateway captures a user's guild membership when it identifies, so a server
+ * joined mid-session would otherwise receive none of its events. Reloading the
+ * whole app achieved that too, but it threw away the window to do it - and in a
+ * packaged build the navigation guard blocked the reload outright, leaving this
+ * dialog stuck on "Working" while the server had in fact been created.
  */
 export function GuildDialog({ mode, onClose }: { mode: 'create' | 'join'; onClose(): void }) {
+  const enterGuild = useApp((s) => s.enterGuild);
   const [value, setValue] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const isCreate = mode === 'create';
 
   async function submit() {
-    if (value.trim().length < 2) return;
+    if (value.trim().length < 2 || busy) return;
     setBusy(true);
     setError(null);
     try {
-      if (isCreate) await api.createGuild(value.trim());
-      else await api.joinByInvite(value.trim());
-      window.location.reload();
+      const guildId = isCreate
+        ? (await api.createGuild(value.trim())).guild.id
+        : (await api.joinByInvite(value.trim())).guild.id;
+
+      await enterGuild(guildId);
+      onClose();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Something went wrong');
       setBusy(false);
@@ -50,6 +57,7 @@ export function GuildDialog({ mode, onClose }: { mode: 'create' | 'join'; onClos
               id="guild-value"
               value={value}
               autoFocus
+              disabled={busy}
               className={isCreate ? undefined : 'mono'}
               style={isCreate ? undefined : { letterSpacing: '0.15em', textTransform: 'uppercase' }}
               placeholder={isCreate ? 'Friday Night Raids' : 'ABCD2345'}
@@ -63,7 +71,7 @@ export function GuildDialog({ mode, onClose }: { mode: 'create' | 'join'; onClos
         </div>
 
         <div className="modal__foot">
-          <button className="btn btn--ghost" onClick={onClose}>
+          <button className="btn btn--ghost" disabled={busy} onClick={onClose}>
             Cancel
           </button>
           <button
@@ -71,7 +79,7 @@ export function GuildDialog({ mode, onClose }: { mode: 'create' | 'join'; onClos
             disabled={busy || value.trim().length < 2}
             onClick={() => void submit()}
           >
-            {busy ? 'Working…' : isCreate ? 'Create server' : 'Join server'}
+            {busy ? (isCreate ? 'Creating…' : 'Joining…') : isCreate ? 'Create server' : 'Join server'}
           </button>
         </div>
       </div>

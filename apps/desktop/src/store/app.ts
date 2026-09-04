@@ -49,6 +49,11 @@ interface AppState {
   selectedGuildId: string | null;
   selectedTextChannelId: string | null;
   /**
+   * A server just created or joined, to open once its snapshot arrives. The
+   * guild does not exist client-side until then, so the selection has to wait.
+   */
+  pendingGuildId: string | null;
+  /**
    * What the main pane shows. A call is a place you go, not a strip bolted on
    * top of a text channel - so being in a call and reading a channel are
    * separate views you switch between.
@@ -75,6 +80,8 @@ interface AppState {
   selectGuild(guildId: string): void;
   selectTextChannel(channelId: string): void;
   setMainView(view: 'chat' | 'call'): void;
+  /** Refresh membership after creating or joining a server, then open it. */
+  enterGuild(guildId: string): Promise<void>;
   loadMessages(channelId: string): Promise<void>;
   sendMessage(channelId: string, content: string): void;
   editMessage(messageId: string, content: string): Promise<void>;
@@ -175,6 +182,7 @@ export const useApp = create<AppState>((set, get) => ({
 
   selectedGuildId: null,
   selectedTextChannelId: null,
+  pendingGuildId: null,
   mainView: 'chat',
 
   voiceChannelId: null,
@@ -233,6 +241,11 @@ export const useApp = create<AppState>((set, get) => ({
   setMainView(view) {
     if (view === 'call' && !get().voiceChannelId) return;
     set({ mainView: view });
+  },
+
+  async enterGuild(guildId) {
+    set({ pendingGuildId: guildId });
+    await gateway.reconnect();
   },
 
   async loadMessages(channelId) {
@@ -405,12 +418,16 @@ function applyServerMessage(
         message.d;
       const channelMap = new Map(channels.map((c) => [c.id, c]));
 
-      // Keep the current selection across a reconnect if it still exists, so a
-      // dropped connection does not also lose your place.
+      // A server just created or joined wins; otherwise keep the current
+      // selection across a reconnect, so a dropped connection does not also
+      // lose your place.
+      const pending = get().pendingGuildId;
       const previousGuild = get().selectedGuildId;
-      const guildId = guilds.some((g) => g.id === previousGuild)
-        ? previousGuild
-        : (guilds[0]?.id ?? null);
+      const guildId = guilds.some((g) => g.id === pending)
+        ? pending
+        : guilds.some((g) => g.id === previousGuild)
+          ? previousGuild
+          : (guilds[0]?.id ?? null);
 
       const previousText = get().selectedTextChannelId;
       const textStillValid =
@@ -430,6 +447,7 @@ function applyServerMessage(
         presences: new Map(presences.map((p) => [p.userId, p.status])),
         selectedGuildId: guildId,
         selectedTextChannelId: textStillValid ?? firstText?.id ?? null,
+        pendingGuildId: null,
       });
 
       const channelToLoad = get().selectedTextChannelId;
