@@ -31,12 +31,22 @@ const HOST = process.env.CHITCHAK_RELEASE_HOST ?? 'root@194.164.23.93';
 const REMOTE_DIR = process.env.CHITCHAK_RELEASE_DIR ?? '/root/ChitChak/updates';
 const KEY = process.env.CHITCHAK_RELEASE_KEY ?? path.join(process.env.USERPROFILE ?? process.env.HOME ?? '', '.ssh', 'id_ed25519_chitchak');
 
+/**
+ * Only npm needs a shell, and only on Windows, where it is npm.cmd rather than
+ * an executable. Everything else runs without one - a shell on Windows re-parses
+ * the arguments, which splits anything containing a space, so `git commit -m
+ * "Release 1.0.0"` arrives as three separate pathspecs.
+ */
+function needsShell(command) {
+  return process.platform === 'win32' && command === 'npm';
+}
+
 function run(command, args, options = {}) {
-  return execFileSync(command, args, { stdio: 'inherit', shell: process.platform === 'win32', ...options });
+  return execFileSync(command, args, { stdio: 'inherit', shell: needsShell(command), ...options });
 }
 
 function capture(command, args) {
-  return execFileSync(command, args, { encoding: 'utf8', shell: process.platform === 'win32' }).trim();
+  return execFileSync(command, args, { encoding: 'utf8', shell: needsShell(command) }).trim();
 }
 
 function bump(current, how) {
