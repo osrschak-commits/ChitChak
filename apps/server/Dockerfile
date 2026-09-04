@@ -28,6 +28,12 @@ RUN npm run build --workspace @chitchak/protocol \
 # Drop dev dependencies for the runtime image.
 RUN npm prune --omit=dev --workspace @chitchak/server --workspace @chitchak/protocol --include-workspace-root
 
+# npm workspaces hoist almost everything to the root node_modules, so a
+# workspace's own node_modules may legitimately not exist. COPY fails outright
+# on a missing source, so create the directories rather than making the runtime
+# stage guess which ones survived hoisting.
+RUN mkdir -p /repo/apps/server/node_modules /repo/packages/protocol/node_modules
+
 # ---------------------------------------------------------------------------
 
 FROM node:22-alpine AS runtime
