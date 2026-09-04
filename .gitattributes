@@ -1,0 +1,7 @@
+# Shell scripts must keep LF endings: bash on Linux treats a trailing \r as
+# part of the command, so a CRLF script fails on the first line.
+*.sh text eol=lf
+Dockerfile text eol=lf
+Caddyfile text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
