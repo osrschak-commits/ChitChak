@@ -15,9 +15,20 @@
 
 # The API and the realtime gateway.
 api.{$CHITCHAK_DOMAIN} {
+	# Update artifacts, served as plain files rather than proxied to the API.
+	# The desktop app checks latest.yml here on launch. Kept on this domain so
+	# there is one certificate and one thing to keep running.
+	handle /updates/* {
+		root * /srv
+		file_server
+		header Cache-Control "public, max-age=60"
+	}
+
 	# Caddy upgrades WebSocket connections through reverse_proxy automatically,
 	# so /gateway needs no special handling.
-	reverse_proxy chitchak-server:4000
+	handle {
+		reverse_proxy chitchak-server:4000
+	}
 
 	header {
 		# The API is only ever called by the desktop app, never embedded.

@@ -1,3 +1,4 @@
+import { pathToFileURL } from 'node:url';
 import { build } from 'esbuild';
 
 /**
@@ -26,6 +27,10 @@ export async function buildElectron({ minify = false } = {}) {
   });
 }
 
-if (import.meta.url === `file://${process.argv[1]?.replace(/\\/g, '/')}`) {
+// pathToFileURL rather than string concatenation: on Windows a path starts with
+// a drive letter, so "file://" + "C:/..." produces file://C:/... where Node
+// gives file:///C:/... - the comparison never matched and running this file
+// directly did nothing at all, silently.
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   await buildElectron();
 }

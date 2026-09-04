@@ -24,6 +24,7 @@
     "setup": "npm install && npm run build:protocol && npm run infra:up && npm run db:migrate && npm run db:seed",
     "typecheck": "tsc -b packages/protocol apps/server apps/desktop",
     "gen:env": "node scripts/generate-env.mjs",
+    "release": "node scripts/release.mjs",
     "prod:up": "docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build",
     "prod:migrate": "docker compose -f docker-compose.prod.yml --env-file .env.production --profile tools run --rm migrate",
     "prod:logs": "docker compose -f docker-compose.prod.yml --env-file .env.production logs -f",

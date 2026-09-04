@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { BrowserWindow, app, desktopCapturer, globalShortcut, ipcMain, shell } from 'electron';
+import { initUpdater } from './updater.js';
 
 /**
  * Electron main process.
@@ -224,6 +225,7 @@ app.whenReady().then(() => {
   createWindow();
   installPermissionHandlers();
   registerPushToTalk(pushToTalkAccelerator);
+  initUpdater(() => mainWindow);
 
   /**
    * Screens and windows available to share, with preview thumbnails.

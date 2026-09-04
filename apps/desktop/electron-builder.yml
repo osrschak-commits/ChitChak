@@ -14,6 +14,21 @@ files:
   - dist-electron/**/*
   - package.json
 
+# Where the app looks for updates, and where `npm run release` uploads them.
+#
+# A plain directory of files behind Caddy rather than a hosted service: the
+# desktop app fetches latest.yml, compares the version to its own, and pulls the
+# installer if it is newer. Nothing to run, nothing to authenticate against.
+publish:
+  - provider: generic
+    url: https://api.chitchak.com/updates
+    channel: latest
+    # latest.yml carries a sha512 of the installer and electron-updater refuses
+    # a download that does not match, so a corrupted or truncated transfer is
+    # caught. That is an integrity check, not an authenticity one: it proves the
+    # file matches the manifest, and HTTPS is what makes the manifest itself
+    # trustworthy. Code signing would be the missing piece.
+
 win:
   icon: build/icon.ico
   target:

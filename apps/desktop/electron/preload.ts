@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
+import type { UpdateState } from './updater.js';
 
 /**
  * The only bridge between the renderer and Node.
@@ -40,6 +41,22 @@ const api = {
    */
   selectScreenSource(sourceId: string | null, withAudio = false): Promise<{ ok: boolean }> {
     return ipcRenderer.invoke('screen:select-source', sourceId, withAudio);
+  },
+
+  /** Where the app is in the check/download/install cycle, right now. */
+  getUpdateState(): Promise<UpdateState> {
+    return ipcRenderer.invoke('update:state');
+  },
+
+  onUpdateState(handler: (state: UpdateState) => void): () => void {
+    const listener = (_event: unknown, state: UpdateState) => handler(state);
+    ipcRenderer.on('update:state', listener);
+    return () => ipcRenderer.off('update:state', listener);
+  },
+
+  /** Quits, installs the downloaded update and reopens. */
+  installUpdate(): Promise<{ ok: boolean }> {
+    return ipcRenderer.invoke('update:install');
   },
 };
 

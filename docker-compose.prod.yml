@@ -139,6 +139,9 @@ services:
       - '443:443'
     volumes:
       - ./infra/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Installer downloads. A bind mount rather than a named volume so new
+      # builds can simply be copied into ./updates over SSH.
+      - ./updates:/srv/updates:ro
       - caddy-data:/data
       - caddy-config:/config
 
