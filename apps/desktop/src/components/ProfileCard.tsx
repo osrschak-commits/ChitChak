@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { mediaUrl } from '../lib/api.js';
 import { outranks } from '../lib/permissions.js';
 import { usePermissions, useRanks } from '../hooks/usePermissions.js';
-import { fallbackAccent, useApp, voiceEngine } from '../store/app.js';
+import { fallbackAccent, useApp } from '../store/app.js';
 import { Meter } from './primitives.js';
 
 /**
@@ -54,7 +54,6 @@ export function ProfileCard({
 
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x, y });
-  const [volume, setVolume] = useState(100);
 
   const member = members.get(`${guildId}:${userId}`);
   const state = voiceStates.get(userId);
@@ -195,26 +194,6 @@ export function ProfileCard({
         <div className="plate__about">
           <span className="legend">About</span>
           <p>{member.user.bio}</p>
-        </div>
-      )}
-
-      {state && !isSelf && (
-        <div className="plate__volume">
-          <span className="legend">Volume for you</span>
-          <div className="plate__volume-row">
-            <input
-              type="range"
-              min={0}
-              max={200}
-              value={volume}
-              onChange={(event) => {
-                const next = Number(event.target.value);
-                setVolume(next);
-                voiceEngine()?.setParticipantVolume(userId, next / 100);
-              }}
-            />
-            <span className="mono plate__volume-value">{volume}%</span>
-          </div>
         </div>
       )}
 

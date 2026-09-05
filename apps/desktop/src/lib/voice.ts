@@ -4,6 +4,9 @@ import {
   LocalAudioTrack,
   LocalVideoTrack,
   RemoteAudioTrack,
+  // A value import, not a type one: volume is applied with an instanceof check,
+  // because getParticipantByIdentity can also return the local participant.
+  RemoteParticipant,
   RemoteVideoTrack,
   Room,
   RoomEvent,
@@ -11,7 +14,7 @@ import {
   createLocalAudioTrack,
   createLocalVideoTrack,
 } from 'livekit-client';
-import type { Participant, RemoteParticipant, RemoteTrack, RemoteTrackPublication } from 'livekit-client';
+import type { Participant, RemoteTrack, RemoteTrackPublication } from 'livekit-client';
 
 /**
  * The voice engine: everything that touches actual media.
@@ -328,11 +331,37 @@ export class VoiceEngine {
 
   // --- Settings ------------------------------------------------------------
 
-  /** Per-user volume, 0..2. Above 1 is amplification, useful for quiet mics. */
+  /**
+   * How loud each person is, for this listener only. 0..1.
+   *
+   * Held here rather than left to LiveKit because a participant object is
+   * recreated whenever someone leaves and rejoins a room, taking its volume
+   * with it. Keeping the map on the engine means a level you set once survives
+   * them reconnecting, you rejoining, and the app restarting.
+   *
+   * The ceiling is 1 and not higher on purpose: below the surface this sets
+   * `HTMLMediaElement.volume`, which *throws* above 1.0 rather than clamping.
+   * Amplifying past 100% needs a Web Audio gain stage, which would also take
+   * over output-device selection and deafening - a bigger change than it looks.
+   */
+  private volumes = new Map<string, number>();
+
   setParticipantVolume(userId: string, volume: number): void {
+    const clamped = Math.max(0, Math.min(1, volume));
+    this.volumes.set(userId, clamped);
+    this.applyVolume(userId);
+  }
+
+  /** Seeds saved levels before anyone's audio arrives. */
+  setParticipantVolumes(volumes: Map<string, number>): void {
+    this.volumes = new Map(volumes);
+    for (const userId of this.volumes.keys()) this.applyVolume(userId);
+  }
+
+  private applyVolume(userId: string): void {
     const participant = this.room?.getParticipantByIdentity(userId);
-    if (participant && 'setVolume' in participant) {
-      (participant as RemoteParticipant).setVolume(Math.max(0, Math.min(2, volume)));
+    if (participant instanceof RemoteParticipant) {
+      participant.setVolume(this.volumes.get(userId) ?? 1);
     }
   }
 
@@ -427,12 +456,16 @@ export class VoiceEngine {
   private onTrackSubscribed(
     track: RemoteTrack,
     publication: RemoteTrackPublication,
-    _participant: RemoteParticipant,
+    participant: RemoteParticipant,
   ): void {
     if (track instanceof RemoteAudioTrack) {
       const element = track.attach();
       element.autoplay = true;
       element.muted = this.deafened;
+      // Their saved level, applied to the track that just arrived. Without this
+      // the setting only takes effect on people already talking when it was
+      // changed, and silently resets for everyone who joins later.
+      track.setVolume(this.volumes.get(participant.identity) ?? 1);
       // Kept out of the layout: it exists to play audio, not to be seen.
       element.style.display = 'none';
       document.body.appendChild(element);

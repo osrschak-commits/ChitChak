@@ -36,6 +36,8 @@ export function MemberMenu({
   const channels = useApp((s) => s.channels);
   const voiceStates = useApp((s) => s.voiceStates);
   const selfId = useApp((s) => s.user?.id);
+  const userVolumes = useApp((s) => s.userVolumes);
+  const setUserVolume = useApp((s) => s.setUserVolume);
   const ranks = useRanks();
   const { self, can, resolve } = usePermissions();
 
@@ -90,6 +92,11 @@ export function MemberMenu({
   const canGrantRanks = can(Permission.MANAGE_RANKS) && actionable && assignableRanks.length > 0;
   const canMuteThem = can(Permission.MUTE_MEMBERS) && actionable && Boolean(state);
   const canMoveThem = can(Permission.MOVE_MEMBERS) && actionable && Boolean(state);
+  // Available to anyone, regardless of rank: it is your own playback, not power
+  // over them. Only offered when they are in a room, because otherwise there is
+  // nothing to be loud.
+  const canSetVolume = !isSelf && Boolean(state);
+  const volume = userVolumes[userId] ?? 100;
   const canKickThem = can(Permission.KICK_MEMBERS) && actionable;
   const canBanThem = can(Permission.BAN_MEMBERS) && actionable;
   const hasAnyAction = canGrantRanks || canMuteThem || canMoveThem || canKickThem || canBanThem;
@@ -145,7 +152,33 @@ export function MemberMenu({
         </button>
       )}
 
-      {onViewProfile && hasAnyAction && <div className="menu__divider" />}
+      {/*
+        Not a moderation action - it changes nothing for anyone else, it only
+        changes what this computer plays. It lives here because this is the menu
+        you already open when someone is too loud, and because a slider inside a
+        popover card was somewhere people had to go looking for.
+      */}
+      {canSetVolume && (
+        <>
+          {onViewProfile && <div className="menu__divider" />}
+          <div className="menu__volume">
+            <div className="menu__volume-head">
+              <span className="legend">Volume for you</span>
+              <span className="mono menu__volume-value">{volume}%</span>
+            </div>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={volume}
+              aria-label={`How loud ${displayName} is for you`}
+              onChange={(event) => setUserVolume(userId, Number(event.target.value))}
+            />
+          </div>
+        </>
+      )}
+
+      {(onViewProfile || canSetVolume) && hasAnyAction && <div className="menu__divider" />}
 
       {canGrantRanks && (
         <>
@@ -287,7 +320,7 @@ export function MemberMenu({
       */}
       {!hasAnyAction && (
         <>
-          {onViewProfile && <div className="menu__divider" />}
+          {(onViewProfile || canSetVolume) && <div className="menu__divider" />}
           <div className="menu__note">
             {isSelf
               ? 'This is you. Moderation actions appear when you right-click someone else.'

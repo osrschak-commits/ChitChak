@@ -94,11 +94,22 @@ export function ProfileDialog({ onClose }: { onClose(): void }) {
   }
 
   return (
-    <div className="scrim" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <div className="modal__head">
-          <h2 className="modal__title">Your profile</h2>
-          <p className="modal__sub">This is what people see in your servers.</p>
+    /*
+      No click-outside-to-close here, unlike the other dialogs. This one holds
+      unsaved text - a half-written bio, a changed username - and a stray click
+      on the page behind it would discard the lot with no warning. Leaving is a
+      deliberate act: the × at the top, and nothing else.
+    */
+    <div className="scrim">
+      <div className="modal">
+        <div className="modal__head modal__head--closable">
+          <div>
+            <h2 className="modal__title">Your profile</h2>
+            <p className="modal__sub">This is what people see in your servers.</p>
+          </div>
+          <button className="modal__close" onClick={onClose} aria-label="Close" title="Close">
+            ✕
+          </button>
         </div>
 
         <div className="modal__body">
@@ -227,9 +238,6 @@ export function ProfileDialog({ onClose }: { onClose(): void }) {
               Saved
             </span>
           )}
-          <button className="btn btn--ghost" onClick={onClose}>
-            Close
-          </button>
           <button className="btn btn--primary" disabled={busy || !dirty} onClick={() => void save()}>
             {busy ? 'Saving…' : 'Save changes'}
           </button>

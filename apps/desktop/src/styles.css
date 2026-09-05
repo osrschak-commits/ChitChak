@@ -1557,6 +1557,32 @@ textarea::placeholder {
   flex-shrink: 0;
 }
 
+/* For dialogs that can only be left deliberately, so the way out has to be
+   visible rather than implied by the page behind them. */
+.modal__head--closable {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.modal__close {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin: -3px -6px 0 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1;
+  transition: background 120ms var(--ease), color 120ms var(--ease);
+}
+
+.modal__close:hover {
+  background: var(--graphite-750);
+  color: var(--text-bright);
+}
+
 .modal__title {
   font-size: 16px;
   font-weight: 700;
@@ -2263,35 +2289,6 @@ textarea::placeholder {
   white-space: pre-wrap;
 }
 
-.plate__volume {
-  padding: 12px 15px;
-  border-top: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-}
-
-.plate__volume-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.plate__volume-row input {
-  flex: 1;
-  padding: 0;
-  border: none;
-  background: transparent;
-  accent-color: var(--brass-400);
-}
-
-.plate__volume-value {
-  font-size: 11px;
-  color: var(--text-muted);
-  width: 38px;
-  text-align: right;
-}
-
 .plate__foot {
   padding: 12px 15px;
   border-top: 1px solid var(--line);
@@ -2363,6 +2360,37 @@ textarea::placeholder {
 
 .menu__label {
   padding: 6px 9px 4px;
+}
+
+/* A control rather than a command, so it is not styled as a menu item - no
+   hover highlight, and the row keeps its own padding. */
+.menu__volume {
+  padding: 4px 9px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.menu__volume-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.menu__volume-value {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.menu__volume input {
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  accent-color: var(--brass-400);
+  cursor: pointer;
 }
 
 .menu__chevron {
