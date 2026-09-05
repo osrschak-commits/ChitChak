@@ -171,8 +171,36 @@ docker compose -f docker-compose.prod.yml --env-file .env.production \
   --profile tools run --rm migrate
 ```
 
-Rebuild and redistribute the installer only when the client itself changes.
 Server-only changes need no new installer.
+
+### Shipping a new version of the app
+
+When the desktop client changes, one command builds it and publishes it:
+
+```bash
+npm run release            # 0.1.2 -> 0.1.3
+npm run release -- minor   # 0.1.2 -> 0.2.0
+npm run release -- 1.0.0   # exactly that
+git push --follow-tags
+```
+
+That bumps the version, builds the installer, and copies it plus a `latest.yml`
+manifest to `/root/ChitChak/updates` on the server, which Caddy serves at
+`https://api.chitchak.com/updates`.
+
+Nobody needs telling. Every running copy checks that manifest 15 seconds after
+launch and every 30 minutes after, downloads the new build quietly in the
+background, and offers a **Update ready · Restart** button in the top right.
+Ignoring the button is fine — the installer runs when the app is closed, so the
+next launch is on the new version either way. A call is never interrupted.
+
+Updates are differential: the client compares block maps and fetches only the
+parts that changed, which is why an 85 MB installer takes seconds rather than
+minutes. That is also why old installers and their `.blockmap` files are worth
+leaving in the updates directory rather than deleting.
+
+The only version that ever needs handing round by hand is the first one, because
+a copy of the app has to exist before it can update itself.
 
 ## Backups
 
