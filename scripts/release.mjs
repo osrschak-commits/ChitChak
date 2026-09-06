@@ -150,7 +150,12 @@ for (const name of artifacts) {
 if (shouldBump) {
   run('git', ['add', 'apps/desktop/package.json', 'package-lock.json'], { cwd: repo });
   run('git', ['commit', '-m', `Release ${version}`], { cwd: repo });
-  run('git', ['tag', `v${version}`], { cwd: repo });
+  // Annotated (-a -m), not lightweight. `git push --follow-tags` - the command
+  // this script tells you to run, and the one in DEPLOY.md - pushes annotated
+  // tags only and silently ignores lightweight ones. Every release before 0.1.4
+  // was tagged locally and never pushed, which nothing noticed until the macOS
+  // workflow, which triggers on v* tags arriving at GitHub, never fired.
+  run('git', ['tag', '-a', `v${version}`, '-m', `Release ${version}`], { cwd: repo });
 }
 
 const base = 'https://api.chitchak.com/updates';
