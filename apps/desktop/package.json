@@ -9,8 +9,10 @@
   "scripts": {
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs",
+    "build:web": "vite build --config vite.web.config.ts",
     "icon": "node scripts/make-icon.mjs",
     "dist:win": "node scripts/make-icon.mjs && node scripts/build.mjs && electron-builder --win --config electron-builder.yml",
+    "dist:mac": "node scripts/make-icon.mjs && node scripts/build.mjs && electron-builder --mac --config electron-builder.yml",
     "typecheck": "tsc --noEmit"
   },
   "//": "livekit-client is pinned exactly, not with a caret. It negotiates an RTC protocol version with the SFU, and a client newer than the server in docker-compose.yml connects, silently falls back, and then reports 'reconnecting' forever while media actually flows. Upgrade this and the livekit-server image together.",

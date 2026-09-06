@@ -35,6 +35,19 @@ const api = {
   },
 
   /**
+   * Whether the OS will let us capture the screen. Always 'granted' outside
+   * macOS, which is the only platform that gates it - and gates it silently.
+   */
+  getScreenAccess(): Promise<'granted' | 'denied' | 'restricted' | 'not-determined' | 'unknown'> {
+    return ipcRenderer.invoke('screen:access');
+  },
+
+  /** Opens macOS's Screen Recording settings. No-op elsewhere. */
+  openScreenSettings(): Promise<{ ok: boolean }> {
+    return ipcRenderer.invoke('screen:open-settings');
+  },
+
+  /**
    * Records which source to share. Must be called before starting the share:
    * Electron asks the main process which source to hand over, and this is the
    * answer it gives. Pass null to cancel.

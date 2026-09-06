@@ -14,7 +14,10 @@ export function VoiceSettingsDialog({ onClose }: { onClose(): void }) {
     outputs: MediaDeviceInfo[];
     cameras: MediaDeviceInfo[];
   }>({ inputs: [], outputs: [], cameras: [] });
-  const [pttKey, setPttKey] = useState('F8');
+  // Replaced by the main process a tick later; this only decides what the
+  // button reads until then. Kept in step with the default in electron/main.ts,
+  // which picks Option+Space on macOS because F8 is a media key there.
+  const [pttKey, setPttKey] = useState(window.chitchak?.platform === 'darwin' ? 'Alt+Space' : 'F8');
   const [capturing, setCapturing] = useState(false);
   const [keyError, setKeyError] = useState<string | null>(null);
 
@@ -44,7 +47,7 @@ export function VoiceSettingsDialog({ onClose }: { onClose(): void }) {
 
       const result = await window.chitchak?.setPushToTalkKey(accelerator);
       if (result && !result.ok) {
-        setKeyError(`${accelerator} is already taken by another application.`);
+        setKeyError(`${formatAccelerator(accelerator)} is already taken by another application.`);
         setPttKey(result.accelerator);
       } else {
         setPttKey(accelerator);
@@ -172,7 +175,7 @@ export function VoiceSettingsDialog({ onClose }: { onClose(): void }) {
                   {keyError && <div className="field__error">{keyError}</div>}
                 </div>
                 <button className="btn btn--ghost btn--sm row__control mono" onClick={() => setCapturing(true)}>
-                  {capturing ? 'Press a key…' : pttKey}
+                  {capturing ? 'Press a key…' : formatAccelerator(pttKey)}
                 </button>
               </div>
             )}
@@ -253,6 +256,29 @@ function describeLoopback(label: string): string | null {
   const lower = label.toLowerCase();
   if (!loopback.some((name) => lower.includes(name))) return null;
   return `"${label}" captures everything playing on your PC, not your voice. Everyone will hear your games, music and notifications. Pick your actual microphone instead.`;
+}
+
+/**
+ * An Electron accelerator, written the way the platform writes it.
+ *
+ * "Alt+Super+K" is a correct accelerator and a meaningless label on a Mac,
+ * where no key is called Alt, none is called Super, and modifiers are drawn as
+ * symbols with nothing between them. Display only - the string sent to the main
+ * process is always the accelerator itself.
+ */
+function formatAccelerator(accelerator: string): string {
+  if (window.chitchak?.platform !== 'darwin') return accelerator;
+
+  const symbols: Record<string, string> = {
+    Ctrl: '⌃',
+    Alt: '⌥',
+    Shift: '⇧',
+    Super: '⌘',
+  };
+  return accelerator
+    .split('+')
+    .map((part) => symbols[part] ?? part)
+    .join('');
 }
 
 /**

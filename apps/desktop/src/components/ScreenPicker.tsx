@@ -27,6 +27,16 @@ export function ScreenPicker({
   // machine - other calls, music, notifications - not just what is on screen.
   const [withAudio, setWithAudio] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // macOS gates screen capture behind a system permission and, unhelpfully,
+  // grants a useless version of it when denied: sources still come back, just
+  // with generic names and the desktop picture as every thumbnail. Without
+  // this the picker looks broken rather than blocked.
+  const [blocked, setBlocked] = useState(false);
+
+  // Computer sound is a Windows-only capability - see the loopback comment in
+  // electron/main.ts - so the checkbox is not shown where ticking it would do
+  // nothing.
+  const canShareAudio = window.chitchak?.platform === 'win32';
 
   useEffect(() => {
     const bridge = window.chitchak;
@@ -35,6 +45,12 @@ export function ScreenPicker({
       setSources([]);
       return;
     }
+
+    void bridge
+      .getScreenAccess()
+      .then((access) => setBlocked(access !== 'granted'))
+      .catch(() => setBlocked(false));
+
     bridge
       .listScreenSources()
       .then((list) => {
@@ -82,12 +98,27 @@ export function ScreenPicker({
         <div className="modal__head">
           <h2 className="modal__title">Share your screen</h2>
           <p className="modal__sub">
-            Everyone in the call sees this until you stop. System audio is included on Windows.
+            Everyone in the call sees this until you stop.
+            {canShareAudio && ' Computer sound can go with it.'}
           </p>
         </div>
 
         <div className="modal__body">
           {error && <div className="notice">{error}</div>}
+          {blocked && (
+            <div className="notice">
+              macOS has not granted ChitChak permission to record the screen, so this list is
+              incomplete and anything you share will come out blank. Turn ChitChak on under
+              Screen &amp; System Audio Recording, then quit and reopen the app — macOS only
+              applies it on relaunch.{' '}
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => void window.chitchak?.openScreenSettings()}
+              >
+                Open Settings
+              </button>
+            </div>
+          )}
           {sources === null && <p className="empty__body">Looking for windows…</p>}
           {sources !== null && sources.length === 0 && !error && (
             <p className="empty__body">Nothing available to share.</p>
@@ -97,20 +128,22 @@ export function ScreenPicker({
         </div>
 
         <div className="modal__foot">
-          <label className="picker__audio" style={{ marginRight: 'auto' }}>
-            <input
-              type="checkbox"
-              style={{ width: 'auto' }}
-              checked={withAudio}
-              onChange={(e) => setWithAudio(e.target.checked)}
-            />
-            <span>
-              <span className="row__label">Share computer sound</span>
-              <span className="row__hint">
-                Sends everything your PC is playing, not just this window.
+          {canShareAudio && (
+            <label className="picker__audio" style={{ marginRight: 'auto' }}>
+              <input
+                type="checkbox"
+                style={{ width: 'auto' }}
+                checked={withAudio}
+                onChange={(e) => setWithAudio(e.target.checked)}
+              />
+              <span>
+                <span className="row__label">Share computer sound</span>
+                <span className="row__hint">
+                  Sends everything your PC is playing, not just this window.
+                </span>
               </span>
-            </span>
-          </label>
+            </label>
+          )}
 
           <button className="btn btn--ghost" onClick={onClose}>
             Cancel

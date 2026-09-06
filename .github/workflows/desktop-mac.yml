@@ -1,0 +1,77 @@
+# Builds the macOS app.
+#
+# It exists because a .dmg can only be made on macOS - electron-builder refuses
+# outright anywhere else - and the machine this project is developed on runs
+# Windows. A GitHub runner is the Mac.
+#
+# It produces the same files `npm run release` would produce on a real Mac, and
+# stops there rather than uploading them: publishing means an SSH key for the
+# update host, and a build server holding a key to production is a trade worth
+# making deliberately, not by default. Download the artifact and copy it up -
+# DEPLOY.md has the two commands.
+
+name: Desktop (macOS)
+
+on:
+  # Every release tag the Windows build pushes, so the Mac build of a version
+  # exists without anyone remembering to ask for it.
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      domain:
+        description: 'Domain the build points at (api. and sfu. are derived from it)'
+        required: false
+        default: chitchak.com
+
+jobs:
+  build:
+    # An Apple Silicon runner. It builds the arm64 app natively and the x64 one
+    # by packaging Electron's x64 binaries, which needs no emulation.
+    runs-on: macos-14
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Write the build's environment
+        # .env.production is git-ignored - it is per-deployment, not per-repo -
+        # so it has to be written here. The values are public URLs, not secrets;
+        # what makes them matter is that they are compiled into the app, and a
+        # build pointed at the wrong host connects to nothing.
+        env:
+          DOMAIN: ${{ github.event.inputs.domain || 'chitchak.com' }}
+        run: |
+          cat > apps/desktop/.env.production <<EOF
+          VITE_API_BASE=https://api.$DOMAIN
+          VITE_CONNECT_SRC=https://api.$DOMAIN wss://api.$DOMAIN https://sfu.$DOMAIN wss://sfu.$DOMAIN
+          VITE_IMG_SRC=https://api.$DOMAIN
+          EOF
+          cat apps/desktop/.env.production
+
+      - run: npm run build:protocol
+
+      - name: Build the app
+        # No signing identity is configured, so electron-builder ad-hoc signs -
+        # enough for Apple Silicon to run the binary, not enough for Gatekeeper
+        # to let it through without `xattr -dr com.apple.quarantine`.
+        run: npm run dist:mac -w @chitchak/desktop
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chitchak-macos
+          # latest-mac.yml is included because it is not an incidental build
+          # file: it is the manifest running Macs read to notice a new version,
+          # and an upload without it publishes a release nobody is told about.
+          path: |
+            apps/desktop/release/*.dmg
+            apps/desktop/release/*.zip
+            apps/desktop/release/*.blockmap
+            apps/desktop/release/latest-mac.yml
+          if-no-files-found: error

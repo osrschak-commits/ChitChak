@@ -1,4 +1,6 @@
-import { app, ipcMain, type BrowserWindow } from 'electron';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { app, ipcMain, shell, type BrowserWindow } from 'electron';
 import electronUpdater from 'electron-updater';
 
 /**
@@ -14,16 +16,29 @@ import electronUpdater from 'electron-updater';
  * download happens quietly in the background, and installing is either the
  * user's explicit choice or something that happens on quit, when by definition
  * nobody is talking. The app is never restarted out from under anyone.
+ *
+ * macOS is the exception, and not by choice. Squirrel.Mac - which is what
+ * electron-updater drives there - checks that the update it downloaded carries
+ * the same code signature as the app already running, and refuses the swap if
+ * it cannot. This build has no Apple Developer ID, so that check can never
+ * pass. Rather than quietly pulling 95 MB in order to fail at the last step,
+ * macOS is told there is a new version and handed the download link. If a
+ * certificate is ever bought, deleting the `isMac` branches below is the whole
+ * of the change.
  */
 
 // electron-updater is CommonJS with a default export, so it cannot be
 // destructured in an import statement under Node's ESM interop rules.
 const { autoUpdater } = electronUpdater;
 
+const isMac = process.platform === 'darwin';
+
 /** Mirrors what the renderer needs to show. */
 export type UpdateState =
   | { phase: 'idle' }
   | { phase: 'checking' }
+  /** macOS only: a newer version exists and has to be installed by hand. */
+  | { phase: 'available'; version: string; url: string | null }
   | { phase: 'downloading'; version: string; percent: number }
   | { phase: 'ready'; version: string }
   | { phase: 'error'; message: string };
@@ -39,6 +54,32 @@ function setState(next: UpdateState): void {
 /** How often a running app looks for a new version. */
 const CHECK_INTERVAL_MS = 30 * 60 * 1000;
 
+/**
+ * The download the macOS banner links to.
+ *
+ * The host is read out of `app-update.yml`, the manifest electron-builder
+ * copies into the package from the `publish` block - so there is one place
+ * where the update host is configured, not two that can drift apart. The file
+ * is three lines of YAML; a regex is proportionate to reading one of them, and
+ * avoids pulling a parser into the main process for it.
+ *
+ * The filename, on the other hand, does have to match `mac.artifactName` in
+ * electron-builder.yml. Renaming the artifact there means changing it here.
+ */
+function macDownloadUrl(version: string): string | null {
+  let base: string | null = null;
+  try {
+    const config = readFileSync(path.join(process.resourcesPath, 'app-update.yml'), 'utf8');
+    base = /^url:\s*(\S+)/m.exec(config)?.[1] ?? null;
+  } catch {
+    // Nothing to link to. The banner still says a new version exists, which is
+    // the part that matters - it is just not clickable.
+    return null;
+  }
+  if (!base) return null;
+  return `${base.replace(/\/+$/, '')}/ChitChak-${version}-${process.arch}.dmg`;
+}
+
 export function initUpdater(resolveWindow: () => BrowserWindow | null): void {
   getWindow = resolveWindow;
 
@@ -47,6 +88,13 @@ export function initUpdater(resolveWindow: () => BrowserWindow | null): void {
   ipcMain.handle('update:state', () => state);
 
   ipcMain.handle('update:install', () => {
+    // On macOS "install" is "open the download in a browser". Same button, same
+    // channel, because from the renderer's side it is the same intent.
+    if (state.phase === 'available') {
+      if (state.url) void shell.openExternal(state.url);
+      return { ok: state.url !== null };
+    }
+
     if (state.phase !== 'ready') return { ok: false };
     // Silent: the assisted installer's wizard is right for a first install and
     // wrong for an update the person already agreed to. Force-run: put them
@@ -59,10 +107,12 @@ export function initUpdater(resolveWindow: () => BrowserWindow | null): void {
   // and electron-updater throws rather than no-opping.
   if (!app.isPackaged) return;
 
-  autoUpdater.autoDownload = true;
+  autoUpdater.autoDownload = !isMac;
   // The quiet path: someone who never touches the banner still gets the update
-  // applied when they close the app, so the next launch is current.
-  autoUpdater.autoInstallOnAppQuit = true;
+  // applied when they close the app, so the next launch is current. Not on
+  // macOS, where the install cannot succeed and would only produce an error
+  // dialog on quit.
+  autoUpdater.autoInstallOnAppQuit = !isMac;
 
   autoUpdater.on('checking-for-update', () => {
     // Only surfaced when there is nothing else to say, so a routine background
@@ -80,6 +130,9 @@ export function initUpdater(resolveWindow: () => BrowserWindow | null): void {
   let incoming = '';
   autoUpdater.on('update-available', (info) => {
     incoming = info.version;
+    if (isMac) {
+      setState({ phase: 'available', version: info.version, url: macDownloadUrl(info.version) });
+    }
   });
 
   autoUpdater.on('download-progress', (progress) => {
@@ -99,7 +152,9 @@ export function initUpdater(resolveWindow: () => BrowserWindow | null): void {
 
   const check = () => {
     // A pending install is final; checking again would only download it twice.
-    if (state.phase === 'ready') return;
+    // The same goes for a macOS banner already showing the download - nothing
+    // said thirty minutes later changes what the person has to do.
+    if (state.phase === 'ready' || state.phase === 'available') return;
     void autoUpdater.checkForUpdates().catch(() => {
       /* Reported through the 'error' event above. */
     });

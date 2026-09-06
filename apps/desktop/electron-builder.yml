@@ -59,6 +59,62 @@ nsis:
   # Named so the download is obviously what it claims to be.
   artifactName: ChitChak-Setup-${version}.${ext}
 
-# The build is not code-signed. Windows SmartScreen will warn on first run until
-# the download builds reputation, which is unavoidable without a certificate
-# (~£200/year). Tell people to expect it rather than letting them be surprised.
+mac:
+  icon: build/icon.icns
+  category: public.app-category.social-networking
+  # The Windows installer's shape plus the architecture, because on macOS the
+  # architecture is the one thing the person downloading has to get right.
+  # Naming it explicitly also stops electron-builder dropping "x64" from the
+  # default name, which it does for the default architecture only - leaving the
+  # two files looking like they are for different things.
+  artifactName: ChitChak-${version}-${arch}.${ext}
+  # Two separate builds rather than one universal binary. A universal .dmg is
+  # ~190 MB because it carries both architectures; nearly every Mac in use is
+  # Apple Silicon, so this keeps the common download at ~95 MB and gives Intel
+  # its own file. The docs say which is which.
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+    # electron-updater on macOS installs from a zip, never a dmg - Squirrel.Mac
+    # swaps the .app bundle in place. Removing this target would not just drop a
+    # file from the release, it would drop updates entirely.
+    - target: zip
+      arch: [arm64, x64]
+
+  # macOS refuses microphone and camera access unless the bundle declares, in
+  # words, why it wants them - and the refusal is a hard crash the first time
+  # the app asks, not a dialog the user can decline. These strings are what the
+  # system prompt shows, and what stays visible in Settings > Privacy afterwards.
+  extendInfo:
+    NSMicrophoneUsageDescription: ChitChak needs your microphone so you can talk in voice channels.
+    NSCameraUsageDescription: ChitChak needs your camera so you can turn video on in a call.
+    NSHighResolutionCapable: true
+
+  # Both of these only mean anything with an Apple Developer ID, which this
+  # build does not have. Hardened runtime without notarisation buys nothing and
+  # can only break media access; asking to notarise without a certificate fails
+  # the build outright.
+  hardenedRuntime: false
+  notarize: false
+  # `identity` is deliberately absent. Left alone, electron-builder ad-hoc signs
+  # the arm64 build, which Apple Silicon requires before it will run a binary at
+  # all. Setting `identity: null` turns that off and produces a .app that cannot
+  # launch on any M-series Mac.
+
+dmg:
+  title: ChitChak ${version}
+
+# The build is not code-signed on either platform.
+#
+# Windows: SmartScreen warns on first run until the download builds reputation.
+# Tell people to expect it rather than letting them be surprised.
+#
+# macOS: Gatekeeper refuses the app outright - "ChitChak is damaged and can't be
+# opened" - because it arrives quarantined with no Developer ID. Right-click >
+# Open no longer clears that on current macOS; `xattr -dr com.apple.quarantine
+# /Applications/ChitChak.app` does. The same missing signature is why
+# Squirrel.Mac cannot install updates - it verifies what it downloaded against
+# the running app's signature - so on macOS the updater offers a download link
+# instead of updating silently.
+#
+# Certificates fix both: ~£200/year for Windows, $99/year for Apple.

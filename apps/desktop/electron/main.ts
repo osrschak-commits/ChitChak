@@ -1,6 +1,18 @@
 import path from 'node:path';
-import { BrowserWindow, app, desktopCapturer, globalShortcut, ipcMain, shell } from 'electron';
+import {
+  BrowserWindow,
+  app,
+  desktopCapturer,
+  globalShortcut,
+  ipcMain,
+  nativeTheme,
+  shell,
+  systemPreferences,
+} from 'electron';
 import { initUpdater } from './updater.js';
+
+const isMac = process.platform === 'darwin';
+const isWindows = process.platform === 'win32';
 
 /**
  * Electron main process.
@@ -34,8 +46,14 @@ let mainWindow: BrowserWindow | null = null;
  * keydown/keyup and gets true hold-to-talk; while it is not focused, this
  * shortcut toggles transmission on and off. Proper global hold-to-talk needs a
  * native OS hook (uiohook-napi or similar) - see README.
+ *
+ * The default differs by platform because F8 is not a free key on a Mac: unless
+ * "Use F1, F2 etc. as standard function keys" is turned on - and it is off by
+ * default - the OS consumes it as Play/Pause before any app sees it, so the
+ * binding registers successfully and then never fires. Option+Space is unbound
+ * on macOS and reachable without contorting a hand.
  */
-let pushToTalkAccelerator = 'F8';
+let pushToTalkAccelerator = isMac ? 'Alt+Space' : 'F8';
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -181,8 +199,47 @@ function installPermissionHandlers(): void {
    */
   const ALLOWED_PERMISSIONS = new Set(['media', 'display-capture', 'fullscreen']);
 
-  session.setPermissionRequestHandler((_webContents, permission, callback) => {
-    callback(ALLOWED_PERMISSIONS.has(permission));
+  session.setPermissionRequestHandler((_webContents, permission, callback, details) => {
+    if (!ALLOWED_PERMISSIONS.has(permission)) {
+      callback(false);
+      return;
+    }
+
+    // On Windows and Linux, saying yes here is the whole of it. macOS has a
+    // second gate underneath - TCC - and Chromium does not open it for us: a
+    // getUserMedia call with no OS-level grant fails with a bare NotAllowedError
+    // and no prompt, which looks exactly like a broken microphone. Ask the
+    // system here, at the moment the app actually wants the device, rather than
+    // ambushing someone with two permission dialogs on first launch.
+    if (!isMac || permission !== 'media') {
+      callback(true);
+      return;
+    }
+
+    // Chromium does not always say which devices it wants. Treating an unstated
+    // request as a microphone one matches what this app asks for nearly every
+    // time, and asking for a permission that turns out not to be needed is a
+    // dialog too many, not a failure.
+    const requested = (details as { mediaTypes?: Array<'audio' | 'video'> }).mediaTypes ?? [];
+    const mediaTypes = requested.length > 0 ? requested : (['audio'] as const);
+
+    const devices = mediaTypes.map((type) =>
+      type === 'audio' ? ('microphone' as const) : ('camera' as const),
+    );
+
+    void (async () => {
+      for (const device of devices) {
+        if (systemPreferences.getMediaAccessStatus(device) === 'granted') continue;
+        // Resolves false when denied, and - the case worth knowing about - when
+        // the person has denied it before, in which case macOS shows nothing at
+        // all and only a trip to System Settings can undo it.
+        if (!(await systemPreferences.askForMediaAccess(device))) {
+          callback(false);
+          return;
+        }
+      }
+      callback(true);
+    })();
   });
 
   // Some of these arrive as synchronous checks rather than requests, and the
@@ -211,9 +268,13 @@ function installPermissionHandlers(): void {
           callback({});
           return;
         }
-        // 'loopback' captures system audio on Windows, and is ignored
-        // elsewhere. Only requested when the person ticked the box.
-        callback(withAudio ? { video: chosen, audio: 'loopback' } : { video: chosen });
+        // 'loopback' captures system audio, and Windows is the only platform
+        // where Chromium implements it. macOS has no system-audio tap without a
+        // kernel extension or a virtual device like BlackHole, so asking for it
+        // there does not degrade to silence - the whole capture fails. Only
+        // requested when the person ticked the box, and only where it works.
+        const loopback = withAudio && isWindows;
+        callback(loopback ? { video: chosen, audio: 'loopback' } : { video: chosen });
       });
     },
     // We resolve the source ourselves rather than letting Chromium prompt.
@@ -222,6 +283,12 @@ function installPermissionHandlers(): void {
 }
 
 app.whenReady().then(() => {
+  // The UI is graphite and has no light variant. Left to follow the system, a
+  // Mac in light mode frames it in a pale native title bar and hands it white
+  // scrollbars and white save dialogs; saying "dark" once makes the chrome the
+  // OS draws match the window it is drawing around.
+  nativeTheme.themeSource = 'dark';
+
   createWindow();
   installPermissionHandlers();
   registerPushToTalk(pushToTalkAccelerator);
@@ -246,6 +313,34 @@ app.whenReady().then(() => {
       kind: source.id.startsWith('screen:') ? ('screen' as const) : ('window' as const),
       thumbnail: source.thumbnail.isEmpty() ? null : source.thumbnail.toDataURL(),
     }));
+  });
+
+  /**
+   * Whether macOS will let us see the screen at all.
+   *
+   * Screen Recording is the one permission macOS will not prompt for from
+   * inside the app: `getSources()` simply returns the desktop picture and a
+   * list of windows with no names, so the picker looks broken rather than
+   * blocked. The renderer asks first and explains, instead of showing an empty
+   * grid. Everywhere else this is always 'granted'.
+   */
+  ipcMain.handle('screen:access', () => {
+    if (!isMac) return 'granted';
+    return systemPreferences.getMediaAccessStatus('screen');
+  });
+
+  /**
+   * Opens the Screen Recording pane of System Settings.
+   *
+   * The permission only takes effect on relaunch, which macOS says in its own
+   * dialog - so nothing here tries to re-check it afterwards.
+   */
+  ipcMain.handle('screen:open-settings', () => {
+    if (!isMac) return { ok: false };
+    void shell.openExternal(
+      'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
+    );
+    return { ok: true };
   });
 
   /** Records the choice for the getDisplayMedia call the renderer makes next. */
