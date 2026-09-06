@@ -33,6 +33,17 @@ import {
 export type TransmitMode = 'voice-activity' | 'push-to-talk';
 
 interface AppState {
+  /**
+   * Whether there is a session at all - the only thing that decides between the
+   * sign-in screen and the app.
+   *
+   * Distinct from `user`, which is null both before anyone has signed in and in
+   * the seconds before the first snapshot arrives. Treating those two as the
+   * same state is what used to leave a signed-out person looking at "cannot
+   * reach the server": no user, and a socket that had just been closed on
+   * purpose, are indistinguishable from a server that is down.
+   */
+  authenticated: boolean;
   user: SelfUser | null;
   gatewayStatus: GatewayStatus;
 
@@ -78,6 +89,8 @@ interface AppState {
   voiceError: string | null;
 
   boot(): Promise<void>;
+  /** Called by the sign-in screen once the API has accepted a login. */
+  markAuthenticated(): void;
   signOut(): Promise<void>;
   selectGuild(guildId: string): void;
   selectTextChannel(channelId: string): void;
@@ -94,7 +107,8 @@ interface AppState {
   toggleDeafen(): void;
   toggleCamera(): Promise<void>;
   /** Pass a source id from the picker. `withAudio` shares the computer's sound too. */
-  startScreenShare(sourceId: string, withAudio?: boolean): Promise<void>;
+  /** `sourceId` is null in a browser, where the browser runs its own picker. */
+  startScreenShare(sourceId: string | null, withAudio?: boolean): Promise<void>;
   stopScreenShare(): Promise<void>;
   setTransmitMode(mode: TransmitMode): void;
   setPushToTalkActive(active: boolean): void;
@@ -171,7 +185,35 @@ function pushVoiceState(state: AppState): void {
   });
 }
 
+/**
+ * Everything forgotten when a session ends, built fresh each time.
+ *
+ * A function rather than a constant because the empty collections must be new
+ * objects: handing out the same Map twice would have two sign-outs sharing one,
+ * and whatever the second session put in it would still be there for the third.
+ */
+function signedOutState() {
+  return {
+    authenticated: false,
+    user: null,
+    guilds: [] as Guild[],
+    channels: new Map<string, Channel>(),
+    members: new Map<string, GuildMember>(),
+    ranks: new Map<string, Rank>(),
+    overwrites: new Map<string, ChannelOverwrite>(),
+    voiceStates: new Map<string, VoiceState>(),
+    presences: new Map<string, PresenceStatus>(),
+    messages: new Map<string, Message[]>(),
+    selectedGuildId: null,
+    selectedTextChannelId: null,
+    pendingGuildId: null,
+    mainView: 'chat' as const,
+    gatewayStatus: 'closed' as GatewayStatus,
+  };
+}
+
 export const useApp = create<AppState>((set, get) => ({
+  authenticated: api.isAuthenticated,
   user: api.user,
   gatewayStatus: 'idle',
 
@@ -210,22 +252,19 @@ export const useApp = create<AppState>((set, get) => ({
     await gateway.connect();
   },
 
+  markAuthenticated() {
+    set({ authenticated: true });
+  },
+
   async signOut() {
     await get().leaveVoice();
     gateway.close();
+    // Clears the stored session, which fires onSessionEnded below and empties
+    // the store. Doing it here as well would be belt and braces except in one
+    // case that matters: signing out of a session the API has already dropped,
+    // where nothing "ends" and nothing would otherwise be cleared.
     await api.logout();
-    set({
-      user: null,
-      guilds: [],
-      channels: new Map(),
-      members: new Map(),
-      voiceStates: new Map(),
-      presences: new Map(),
-      messages: new Map(),
-      selectedGuildId: null,
-      selectedTextChannelId: null,
-      gatewayStatus: 'closed',
-    });
+    set(signedOutState());
   },
 
   selectGuild(guildId) {
@@ -352,8 +391,11 @@ export const useApp = create<AppState>((set, get) => ({
     if (!get().voiceChannelId) return;
     try {
       // Electron has no built-in source chooser: the main process is told which
-      // screen to hand over, and only then does getDisplayMedia succeed.
-      await window.chitchak?.selectScreenSource(sourceId, withAudio);
+      // screen to hand over, and only then does getDisplayMedia succeed. A
+      // browser is the other way round - it has a chooser and will not let a
+      // page pre-select anything - so there is no source to record, and
+      // getDisplayMedia raises the picker itself.
+      if (sourceId !== null) await window.chitchak?.selectScreenSource(sourceId, withAudio);
       await getEngine().startScreenShare(withAudio);
     } catch {
       // The engine surfaces a readable message through onError.
@@ -731,6 +773,23 @@ function loadAudioSettings(): AudioSettings {
     return defaultAudioSettings;
   }
 }
+
+/**
+ * A session ending anywhere empties the store, once.
+ *
+ * The path this exists for is not the Sign out button - that one clears up
+ * after itself. It is a refresh token the server has stopped accepting, which
+ * is discovered inside whichever request happened to 401 next, and would
+ * otherwise leave the app rendering a shell for an account it can no longer
+ * act as, retrying a socket that will never be allowed to open.
+ */
+api.onSessionEnded(() => {
+  // Stops the reconnect loop as well as the socket: without this, a dead
+  // session goes on retrying behind the sign-in screen with a token the server
+  // has already refused.
+  gateway.close();
+  useApp.setState(signedOutState());
+});
 
 // Dev only: lets the store be inspected and driven from a debugger or the
 // DevTools console, e.g. `__chitchak.getState().joinVoice(id)`. Never in a build.

@@ -10,19 +10,23 @@ import { Sidebar } from './components/Sidebar.js';
 import { TopBar } from './components/TopBar.js';
 import { VoiceSettingsDialog } from './components/VoiceSettingsDialog.js';
 import { usePushToTalk } from './hooks/usePushToTalk.js';
-import { api } from './lib/api.js';
+import { serverHost } from './lib/api.js';
 import { useApp } from './store/app.js';
 
 type Overlay = 'none' | 'profile' | 'voice-settings' | 'server-settings' | 'create-guild' | 'join-guild';
 
 export function App() {
-  const [authenticated, setAuthenticated] = useState(api.isAuthenticated);
   const [overlay, setOverlay] = useState<Overlay>('none');
   /** Which section the settings dialog opens on, so "Invite people" lands there. */
   const [settingsTab, setSettingsTab] = useState<'overview' | 'invites'>('overview');
   const [pttKey, setPttKey] = useState('F8');
 
   const boot = useApp((s) => s.boot);
+  // Read from the store, never mirrored into local state. Signing out and a
+  // session expiring both end in the store, and a copy here would not hear
+  // about either.
+  const authenticated = useApp((s) => s.authenticated);
+  const markAuthenticated = useApp((s) => s.markAuthenticated);
   const user = useApp((s) => s.user);
   const gatewayStatus = useApp((s) => s.gatewayStatus);
   const selectedGuildId = useApp((s) => s.selectedGuildId);
@@ -40,7 +44,7 @@ export function App() {
   usePushToTalk(pttKey);
 
   if (!authenticated) {
-    return <AuthScreen onAuthenticated={() => setAuthenticated(true)} />;
+    return <AuthScreen onAuthenticated={markAuthenticated} />;
   }
 
   // The snapshot has not arrived yet. Rendering the shell against empty state
@@ -55,7 +59,7 @@ export function App() {
             <>
               <h2 className="empty__title">Cannot reach the server</h2>
               <p className="empty__body">
-                Check that the API is running on port 4000. This retries by itself.
+                Nothing is answering at {serverHost()}. This keeps retrying by itself.
               </p>
             </>
           ) : (

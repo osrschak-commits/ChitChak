@@ -61,6 +61,21 @@ class ApiClient {
    * refresh token, and rotation would revoke five of them as replays.
    */
   private refreshing: Promise<boolean> | null = null;
+  private sessionEndedHandlers = new Set<() => void>();
+
+  /**
+   * Called when a session ends, however it ends.
+   *
+   * Signing out is the obvious way. The one this exists for is the other one: a
+   * refresh token the server no longer accepts clears the session from inside a
+   * failed request, several layers below anything that renders. Without a way
+   * to say so, the app keeps showing a signed-in shell for an account it can no
+   * longer act as, and the only way out is to restart it.
+   */
+  onSessionEnded(handler: () => void): () => void {
+    this.sessionEndedHandlers.add(handler);
+    return () => this.sessionEndedHandlers.delete(handler);
+  }
 
   get accessToken(): string | null {
     return this.session?.accessToken ?? null;
@@ -75,6 +90,7 @@ class ApiClient {
   }
 
   private persist(session: StoredSession | null): void {
+    const ended = this.session !== null && session === null;
     this.session = session;
     try {
       if (session) localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
@@ -82,6 +98,9 @@ class ApiClient {
     } catch {
       // Non-fatal: the session simply will not survive a restart.
     }
+    // Announced after the write, so a handler that asks `isAuthenticated` gets
+    // the answer that is now true rather than the one it is reacting to.
+    if (ended) for (const handler of this.sessionEndedHandlers) handler();
   }
 
   private async request<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
@@ -462,3 +481,20 @@ export function mediaUrl(path: string | null): string | null {
 
 export const api = new ApiClient();
 export const apiBase = API_BASE;
+
+/**
+ * The host this build actually talks to, for the screens that report not
+ * reaching it.
+ *
+ * Named rather than described, because the same source is not always pointed at
+ * the same place. These messages used to say "check that the API is running on
+ * port 4000", which is true only in development and is misleading advice for
+ * someone in a browser, or on a laptop whose wifi has dropped.
+ */
+export function serverHost(): string {
+  try {
+    return new URL(API_BASE).host;
+  } catch {
+    return API_BASE;
+  }
+}

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { ApiRequestError, api } from '../lib/api.js';
+import { ApiRequestError, api, serverHost } from '../lib/api.js';
 
 /**
  * Sign in / sign up.
@@ -62,7 +62,7 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated(): void }) {
         // needs the summary line.
         if (!error.details) setFormError(error.message);
       } else {
-        setFormError('Could not reach the server. Is it running on port 4000?');
+        setFormError(`Could not reach ${serverHost()}. Check your connection and try again.`);
       }
     } finally {
       setBusy(false);
