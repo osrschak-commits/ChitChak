@@ -85,8 +85,15 @@ apps/desktop        Electron + React
   electron/         Main process and preload bridge
   src/lib/          api (REST), gateway (WebSocket), voice (WebRTC)
   src/store/        Single Zustand store; server events patch it
+apps/site           chitchak.com: the landing page, and the host for /app
 infra/livekit.yaml  SFU config
 ```
+
+`src/` is the client, not the desktop client. It is built twice — once bundled
+into the Electron app, once for the browser (`vite.web.config.ts`) and served at
+`/app` — from the same source. Every use of the Electron bridge in it is written
+as `window.chitchak?.…` for that reason: what a browser cannot provide is
+guarded at the point of use, not compiled out.
 
 ## Design
 

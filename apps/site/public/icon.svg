@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- The same mark the app icon draws: three bars, middle one tallest. -->
+  <rect width="256" height="256" rx="44" fill="#17161a" />
+  <rect x="62" y="80" width="34" height="96" rx="10" fill="#d9a45b" />
+  <rect x="111" y="44" width="34" height="168" rx="10" fill="#4fd6c4" />
+  <rect x="160" y="66" width="34" height="124" rx="10" fill="#d9a45b" />
+</svg>

@@ -70,8 +70,10 @@ services:
       LIVEKIT_API_KEY: ${LIVEKIT_API_KEY:?set LIVEKIT_API_KEY in .env.production}
       LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET:?set LIVEKIT_API_SECRET in .env.production}
       # The packaged desktop app loads from file://, which sends no Origin
-      # header, so CORS is satisfied without listing an origin here.
-      CLIENT_ORIGIN: https://api.${CHITCHAK_DOMAIN}
+      # header at all, and is allowed on that basis. This is for the web client,
+      # which is a real browser origin and would otherwise be refused by CORS.
+      # www redirects to the apex, so there is only ever one.
+      CLIENT_ORIGIN: https://${CHITCHAK_DOMAIN}
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
@@ -124,6 +126,28 @@ services:
     volumes:
       - ./infra/livekit.prod.yaml:/etc/livekit.yaml:ro
 
+  # chitchak.com: the landing page, and the web client at /app.
+  #
+  # It builds the client from the same source the desktop app uses, so a deploy
+  # of this service is how the browser version ships. Nothing else depends on
+  # it - the API and the desktop app are unaffected if it is down.
+  site:
+    build:
+      context: .
+      dockerfile: apps/site/Dockerfile
+      args:
+        # Compiled into the bundle and into its CSP, so the image is specific to
+        # a domain and has to be rebuilt if that ever changes.
+        CHITCHAK_DOMAIN: ${CHITCHAK_DOMAIN:?set CHITCHAK_DOMAIN in .env.production}
+    container_name: chitchak-site
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'wget', '--spider', '-q', 'http://127.0.0.1/']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   caddy:
     image: caddy:2-alpine
     container_name: chitchak-caddy
@@ -131,6 +155,7 @@ services:
     depends_on:
       - server
       - livekit
+      - site
     environment:
       CHITCHAK_DOMAIN: ${CHITCHAK_DOMAIN:?set CHITCHAK_DOMAIN in .env.production}
       ACME_EMAIL: ${ACME_EMAIL:?set ACME_EMAIL in .env.production}

@@ -13,6 +13,47 @@
 	email {$ACME_EMAIL}
 }
 
+# The public site, and the web client it hosts at /app.
+{$CHITCHAK_DOMAIN} {
+	# Installers, served straight off the same directory the desktop app updates
+	# from - one copy of each build, reachable under two names. handle_path
+	# strips the prefix, so /download/ChitChak-Setup-1.0.0.exe is
+	# /srv/updates/ChitChak-Setup-1.0.0.exe.
+	#
+	# `browse` gives /download/ a plain index. It is the fallback the download
+	# page falls back to when it cannot read the manifests, and the honest
+	# answer to "where are the older builds".
+	handle_path /download/* {
+		root * /srv/updates
+		file_server browse
+		header Cache-Control "public, max-age=300"
+	}
+
+	handle {
+		reverse_proxy chitchak-site:80
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		# The site frames nothing and should be framed by nothing.
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		-Server
+	}
+
+	log {
+		output stdout
+		format json
+	}
+}
+
+# One canonical name. Without this, the web client at www would be a second
+# origin - a second entry in the API's CORS allowlist, and a second, separate
+# localStorage holding a second, separate login.
+www.{$CHITCHAK_DOMAIN} {
+	redir https://{$CHITCHAK_DOMAIN}{uri} permanent
+}
+
 # The API and the realtime gateway.
 api.{$CHITCHAK_DOMAIN} {
 	# Update artifacts, served as plain files rather than proxied to the API.

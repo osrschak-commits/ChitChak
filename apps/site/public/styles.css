@@ -1,0 +1,497 @@
+/*
+ * chitchak.com
+ *
+ * The same visual system as the app - warm graphite, brass for the thing you
+ * act on, and the signal colour reserved for live audio, which on a static page
+ * means the logo's middle bar and nothing else. Tokens are duplicated from
+ * apps/desktop/src/styles.css rather than shared, because a landing page that
+ * imports the app's stylesheet would pull in a whole component library to use
+ * six colours.
+ */
+
+@font-face {
+  font-family: 'Archivo Variable';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/archivo-latin-wght-normal.woff2') format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono-latin-400-normal.woff2') format('woff2');
+}
+
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/ibm-plex-mono-latin-500-normal.woff2') format('woff2');
+}
+
+:root {
+  --graphite-900: #131215;
+  --graphite-850: #17161a;
+  --graphite-800: #1c1a1f;
+  --graphite-750: #232128;
+  --graphite-700: #2b2932;
+
+  --brass-500: #c9954a;
+  --brass-400: #d9a45b;
+  --brass-300: #e6bd83;
+  --brass-glow: rgba(217, 164, 91, 0.14);
+
+  --signal-400: #4fd6c4;
+
+  --text-bright: #f2f0f4;
+  --text-primary: #ddd9e2;
+  --text-secondary: #9d98a8;
+  --text-muted: #6b6675;
+
+  --line: #2a2830;
+  --line-strong: #363340;
+
+  --radius-lg: 10px;
+  --radius: 7px;
+
+  --font-ui: 'Archivo Variable', 'Archivo', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  --page: 780px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--text-primary);
+  background: var(--graphite-850);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* The page sits on a very slight warm glow, so the flat near-black does not
+   read as an unstyled document. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(900px 420px at 50% -140px, rgba(217, 164, 91, 0.07), transparent 70%);
+}
+
+a {
+  color: var(--brass-300);
+  text-decoration-color: rgba(230, 189, 131, 0.35);
+  text-underline-offset: 2px;
+}
+
+a:hover {
+  text-decoration-color: var(--brass-300);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-size: 0.86em;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* --- Bar ------------------------------------------------------------------ */
+
+.bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 20px 24px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-bright);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+}
+
+.mark {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  background: var(--graphite-900);
+  padding: 3px;
+}
+
+.bar__nav {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  font-size: 14px;
+}
+
+.bar__nav a:not(.btn) {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.bar__nav a:not(.btn):hover {
+  color: var(--text-primary);
+}
+
+/* --- Buttons -------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--graphite-750);
+  color: var(--text-primary);
+  font: inherit;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    border-color 120ms var(--ease),
+    background 120ms var(--ease),
+    transform 120ms var(--ease);
+}
+
+.btn:hover {
+  border-color: var(--brass-500);
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: none;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--brass-400);
+  outline-offset: 2px;
+}
+
+.btn--primary {
+  background: var(--brass-400);
+  border-color: var(--brass-400);
+  color: #1a1408;
+  font-weight: 600;
+  box-shadow: 0 0 0 6px var(--brass-glow);
+}
+
+.btn--primary:hover {
+  background: var(--brass-300);
+  border-color: var(--brass-300);
+}
+
+.btn--ghost {
+  background: transparent;
+}
+
+.btn--sm {
+  padding: 7px 14px;
+  font-size: 13.5px;
+}
+
+/* --- Layout --------------------------------------------------------------- */
+
+main {
+  position: relative;
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 0 24px 40px;
+}
+
+section + section {
+  margin-top: 72px;
+}
+
+.section-title {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.section-sub {
+  margin: 0 0 22px;
+  max-width: 60ch;
+  color: var(--text-secondary);
+}
+
+/* --- Hero ----------------------------------------------------------------- */
+
+.hero {
+  padding: 44px 0 8px;
+}
+
+.eyebrow {
+  margin: 0 0 14px;
+  color: var(--signal-400);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0 0 18px;
+  font-size: clamp(34px, 6.4vw, 54px);
+  line-height: 1.06;
+  letter-spacing: -0.03em;
+  font-weight: 600;
+  color: var(--text-bright);
+  max-width: 15ch;
+}
+
+.lede {
+  margin: 0 0 30px;
+  max-width: 58ch;
+  font-size: 17px;
+  color: var(--text-secondary);
+}
+
+.cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.cta__note {
+  margin: 14px 0 0;
+  font-size: 13.5px;
+  color: var(--text-muted);
+}
+
+.notice {
+  margin: 26px 0 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line-strong);
+  border-left: 2px solid var(--brass-400);
+  border-radius: var(--radius);
+  background: var(--graphite-800);
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.notice strong {
+  color: var(--text-primary);
+}
+
+/* --- Points --------------------------------------------------------------- */
+
+.points {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+.point {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--graphite-800);
+}
+
+.point h2 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-bright);
+  letter-spacing: -0.01em;
+}
+
+.point p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+/* --- Downloads ------------------------------------------------------------ */
+
+.dl-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: var(--graphite-800);
+}
+
+.dl {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+}
+
+.dl + .dl {
+  border-top: 1px solid var(--line);
+}
+
+/* The platform you are on, resolved by download.js. */
+.dl--yours {
+  background: var(--graphite-750);
+  box-shadow: inset 2px 0 0 var(--brass-400);
+}
+
+.dl__what {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dl__name {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.dl--muted .dl__name {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.dl__meta {
+  color: var(--text-muted);
+}
+
+.dl__soon {
+  color: var(--text-muted);
+  padding-right: 4px;
+}
+
+/* --- Notes ---------------------------------------------------------------- */
+
+.note {
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--graphite-800);
+}
+
+.note + .note {
+  margin-top: 14px;
+}
+
+.note h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.note p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.note em {
+  color: var(--text-primary);
+  font-style: normal;
+}
+
+.note strong {
+  color: var(--text-primary);
+}
+
+.note__after {
+  margin-top: 12px !important;
+}
+
+.code {
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--graphite-900);
+  color: var(--brass-300);
+  font-size: 13px;
+  overflow-x: auto;
+}
+
+.code code {
+  font: inherit;
+}
+
+/* --- Foot ----------------------------------------------------------------- */
+
+.foot {
+  position: relative;
+  max-width: var(--page);
+  margin: 0 auto;
+  padding: 28px 24px 48px;
+  border-top: 1px solid var(--line);
+  color: var(--text-muted);
+  font-size: 13.5px;
+}
+
+.foot p {
+  margin: 0;
+  max-width: 60ch;
+}
+
+/* --- Narrow --------------------------------------------------------------- */
+
+@media (max-width: 720px) {
+  .points {
+    grid-template-columns: 1fr;
+  }
+
+  .bar__nav a:not(.btn) {
+    display: none;
+  }
+
+  .cta .btn {
+    flex: 1 1 auto;
+  }
+
+  .dl {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .btn {
+    transition: none;
+  }
+
+  .btn:hover {
+    transform: none;
+  }
+}

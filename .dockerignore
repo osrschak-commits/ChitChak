@@ -1,0 +1,42 @@
+# Kept out of every build context.
+#
+# Without this, `docker compose build` on a development machine uploads the
+# whole repo including node_modules and every build output - hundreds of
+# megabytes, none of it used, and some of it actively wrong: a host-built
+# node_modules carries binaries compiled for the host, not for Alpine.
+#
+# The server builds from a fresh clone where most of this does not exist, so
+# this file is mainly what makes building from a working copy behave the same
+# way as building on the server.
+
+node_modules
+**/node_modules
+
+# Build output. Every image rebuilds what it needs from source.
+dist
+**/dist
+**/dist-electron
+**/dist-web
+**/release
+**/*.tsbuildinfo
+
+# Generated during packaging.
+apps/desktop/build
+
+# Published installers. Large, and served from a bind mount rather than baked
+# into an image.
+updates
+
+# Secrets. Compose passes what a container needs through the environment.
+.env
+.env.local
+.env.production
+**/.env.production
+
+.git
+.github
+.gitignore
+.vscode
+*.md
+.DS_Store
+Thumbs.db

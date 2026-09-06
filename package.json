@@ -18,6 +18,8 @@
     "db:migrate": "npm run db:migrate -w @chitchak/server",
     "db:seed": "npm run db:seed -w @chitchak/server",
     "build:protocol": "npm run build -w @chitchak/protocol",
+    "build:web": "npm run build:protocol && npm run build:web -w @chitchak/desktop",
+    "dev:site": "npm run build:web && npm run preview -w @chitchak/site",
     "dev:server": "npm run build:protocol && npm run dev -w @chitchak/server",
     "dev:desktop": "npm run build:protocol && npm run dev -w @chitchak/desktop",
     "dev": "npm run build:protocol && concurrently -n server,desktop -c blue,magenta \"npm run dev -w @chitchak/server\" \"npm run dev -w @chitchak/desktop\"",

@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      Everything this page needs is served from this origin - the stylesheet,
+      the one script, the fonts, and the installers under /download. Nothing is
+      fetched from anywhere else, so the policy can simply say 'self' and mean
+      it.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; base-uri 'none'; form-action 'none'"
+    />
+    <title>ChitChak — voice-first chat for small groups</title>
+    <meta
+      name="description"
+      content="Servers, channels and live audio for a handful of people who already know each other. Free, self-hosted, and available for Windows, macOS and in the browser."
+    />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <a class="brand" href="/">
+        <svg class="mark" viewBox="0 0 256 256" aria-hidden="true" focusable="false">
+          <rect x="62" y="80" width="34" height="96" rx="10" fill="#d9a45b" />
+          <rect x="111" y="44" width="34" height="168" rx="10" fill="#4fd6c4" />
+          <rect x="160" y="66" width="34" height="124" rx="10" fill="#d9a45b" />
+        </svg>
+        <span>ChitChak</span>
+      </a>
+      <nav class="bar__nav">
+        <a href="#downloads">Downloads</a>
+        <a class="btn btn--ghost btn--sm" href="/app">Open in browser</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow mono">Voice-first chat</p>
+        <h1>A room your friends can just be in.</h1>
+        <p class="lede">
+          Servers, channels and live audio, for a handful of people who already know each other.
+          No feed, no algorithm, no ads — somewhere to talk, and to leave running while you do
+          something else.
+        </p>
+
+        <div class="cta">
+          <!--
+            Filled in by download.js once it knows the platform and the current
+            version. It stays a link to the downloads table so it still does
+            something useful if the script never runs.
+          -->
+          <a class="btn btn--primary" id="primary-download" href="#downloads">
+            <span id="primary-label">Download ChitChak</span>
+          </a>
+          <a class="btn btn--ghost" id="secondary-cta" href="/app">Open in browser instead</a>
+        </div>
+        <p class="cta__note" id="primary-note">
+          Free. You will need an invite code from whoever runs your server.
+        </p>
+
+        <!-- Shown by download.js on a phone or tablet. -->
+        <p class="notice" id="mobile-note" hidden>
+          <strong>ChitChak is desktop-only for now.</strong> The browser version works, but it is
+          laid out for a keyboard and a wide window, so it will feel cramped here. A proper
+          mobile app is the next thing being built.
+        </p>
+      </section>
+
+      <section class="points">
+        <div class="point">
+          <h2>Voice that stays out of the way</h2>
+          <p>
+            Join a channel and you are in the room. Push-to-talk or voice activation, per-person
+            volume, and a level meter so you can see who is actually talking.
+          </p>
+        </div>
+        <div class="point">
+          <h2>Small by design</h2>
+          <p>
+            Servers, channels, ranks and per-channel permissions — the parts that a group of
+            friends actually uses, without the thousand-member machinery around them.
+          </p>
+        </div>
+        <div class="point">
+          <h2>Yours to run</h2>
+          <p>
+            One server, one domain, one Docker stack. Accounts and messages live in your database,
+            and the desktop app updates itself from your own machine.
+          </p>
+        </div>
+      </section>
+
+      <section id="downloads" class="downloads">
+        <h2 class="section-title">Downloads</h2>
+        <p class="section-sub">
+          Current version <span class="mono" id="version-line">—</span>. The desktop app keeps
+          itself up to date after the first install.
+        </p>
+
+        <ul class="dl-list" id="dl-list">
+          <li class="dl" data-platform="win">
+            <div class="dl__what">
+              <span class="dl__name">Windows</span>
+              <span class="dl__meta mono" data-role="meta">10 and 11, 64-bit</span>
+            </div>
+            <a class="btn btn--ghost btn--sm" data-role="link" href="/download/">Installer</a>
+          </li>
+          <li class="dl" data-platform="mac-arm64">
+            <div class="dl__what">
+              <span class="dl__name">macOS · Apple Silicon</span>
+              <span class="dl__meta mono" data-role="meta">M1 and later</span>
+            </div>
+            <a class="btn btn--ghost btn--sm" data-role="link" href="/download/">Disk image</a>
+          </li>
+          <li class="dl" data-platform="mac-x64">
+            <div class="dl__what">
+              <span class="dl__name">macOS · Intel</span>
+              <span class="dl__meta mono" data-role="meta">2019 and earlier</span>
+            </div>
+            <a class="btn btn--ghost btn--sm" data-role="link" href="/download/">Disk image</a>
+          </li>
+          <li class="dl dl--muted">
+            <div class="dl__what">
+              <span class="dl__name">Browser</span>
+              <span class="dl__meta mono">Chrome, Edge, Firefox, Safari</span>
+            </div>
+            <a class="btn btn--ghost btn--sm" href="/app">Open</a>
+          </li>
+          <li class="dl dl--muted">
+            <div class="dl__what">
+              <span class="dl__name">iOS and Android</span>
+              <span class="dl__meta mono">not yet</span>
+            </div>
+            <span class="dl__soon mono">Coming</span>
+          </li>
+        </ul>
+      </section>
+
+      <section class="notes">
+        <h2 class="section-title">First run</h2>
+        <p class="section-sub">
+          The builds are not code-signed — certificates cost more per year than this project costs
+          to run — so both operating systems will object once, in their own way. Neither warning
+          means anything is wrong, and you should be suspicious of a download that does not tell
+          you to expect them.
+        </p>
+
+        <div class="note">
+          <h3>Windows</h3>
+          <p>
+            SmartScreen says <em>“Windows protected your PC”</em>. Click <strong>More info</strong>,
+            then <strong>Run anyway</strong>.
+          </p>
+        </div>
+
+        <div class="note">
+          <h3>macOS</h3>
+          <p>
+            Gatekeeper says <em>“ChitChak is damaged and can’t be opened”</em>, which is not true —
+            it is what an unsigned app gets. Drag ChitChak to Applications, then run this once in
+            Terminal:
+          </p>
+          <pre class="code mono"><code>xattr -dr com.apple.quarantine /Applications/ChitChak.app</code></pre>
+          <p class="note__after">
+            On first use macOS will ask for the microphone. If you share your screen it will also
+            ask for Screen Recording, and that one only takes effect after you quit and reopen the
+            app.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      <p>
+        ChitChak is a small self-hosted chat server. Accounts are invite-only.
+        <a href="/app">Open the web client</a> or
+        <a href="/download/">browse every build</a>.
+      </p>
+    </footer>
+
+    <script src="/download.js" type="module"></script>
+  </body>
+</html>

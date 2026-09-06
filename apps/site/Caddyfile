@@ -1,0 +1,34 @@
+# The site container's own server. Files only.
+#
+# TLS, the domain names, the security headers and /download are the edge
+# Caddy's job - see infra/Caddyfile. This one is reached only over the internal
+# compose network, on plain HTTP, and its whole responsibility is deciding what
+# may be cached.
+
+:80 {
+	root * /srv
+	encode zstd gzip
+
+	# Vite fingerprints every filename it emits, so these can be cached for a
+	# year and a deploy simply produces different names.
+	@immutable path /app/assets/*
+	header @immutable Cache-Control "public, max-age=31536000, immutable"
+
+	# The fonts are versioned by the package that ships them, not by filename,
+	# but they are the same three files release after release.
+	@fonts path /fonts/*
+	header @fonts Cache-Control "public, max-age=31536000, immutable"
+
+	# Everything an update actually changes. no-cache means "revalidate", not
+	# "do not store": the browser still gets a 304 when nothing moved, and a
+	# deploy is visible immediately instead of whenever a cache decides.
+	@entry path / /index.html /styles.css /download.js /icon.svg /app /app/ /app/index.html
+	header @entry Cache-Control "no-cache"
+
+	file_server
+
+	log {
+		output stdout
+		format json
+	}
+}

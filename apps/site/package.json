@@ -1,0 +1,10 @@
+{
+  "name": "@chitchak/site",
+  "version": "0.1.0",
+  "private": true,
+  "description": "chitchak.com - the landing page and the host for the web client",
+  "//": "No build step and no dependencies. The page is hand-written HTML and CSS in public/, and the image built from apps/site/Dockerfile is what compiles the web client and serves both. `npm run preview` is a local look at the page, nothing more.",
+  "scripts": {
+    "preview": "node scripts/preview.mjs"
+  }
+}

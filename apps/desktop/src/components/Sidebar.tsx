@@ -392,7 +392,15 @@ function CallBar() {
         </button>
         <button
           className={`ctl ${screenShareOn ? 'ctl--engaged' : ''}`}
-          onClick={() => (screenShareOn ? void stopScreenShare() : setPicking(true))}
+          onClick={() => {
+            if (screenShareOn) return void stopScreenShare();
+            // In a browser there is nothing to pick from: the page is not
+            // allowed to enumerate windows, and getDisplayMedia raises the
+            // browser's own chooser. Showing ours first would be two pickers,
+            // the first of them empty.
+            if (!window.chitchak) return void startScreenShare(null);
+            setPicking(true);
+          }}
           aria-pressed={screenShareOn}
           disabled={!mayShareScreen}
           title={
