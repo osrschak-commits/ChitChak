@@ -25,18 +25,27 @@ export function ScreenPicker({
   const [selected, setSelected] = useState<string | null>(null);
   // Off by default. Sharing computer sound captures everything playing on the
   // machine - other calls, music, notifications - not just what is on screen.
-  const [withAudio, setWithAudio] = useState(false);
+  // Computer sound is a Windows-only capability - see the loopback comment in
+  // electron/main.ts - so the checkbox is not shown where ticking it would do
+  // nothing.
+  const canShareAudio = window.chitchak?.platform === 'win32';
+
+  /**
+   * On by default where it works.
+   *
+   * Sharing a game, a video or a call without its sound is almost never what
+   * somebody meant to do, and the failure is silent on both ends: the sharer
+   * hears everything perfectly and nobody thinks to mention it for a while. The
+   * warning underneath is the reason this can be a default rather than a trap -
+   * it says plainly what gets sent, before anything is sent.
+   */
+  const [withAudio, setWithAudio] = useState(canShareAudio);
   const [error, setError] = useState<string | null>(null);
   // macOS gates screen capture behind a system permission and, unhelpfully,
   // grants a useless version of it when denied: sources still come back, just
   // with generic names and the desktop picture as every thumbnail. Without
   // this the picker looks broken rather than blocked.
   const [blocked, setBlocked] = useState(false);
-
-  // Computer sound is a Windows-only capability - see the loopback comment in
-  // electron/main.ts - so the checkbox is not shown where ticking it would do
-  // nothing.
-  const canShareAudio = window.chitchak?.platform === 'win32';
 
   useEffect(() => {
     const bridge = window.chitchak;

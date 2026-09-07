@@ -144,7 +144,14 @@ export function CallView() {
               <span className="offer__mark" aria-hidden="true">
                 ▶
               </span>
-              <span className="offer__who">{nameOf(share.userId)} is streaming</span>
+              <span className="offer__who">
+                {nameOf(share.userId)} is streaming
+                {/* Silence you chose and silence that went wrong look the same
+                    from here, so the offer says which it will be. */}
+                <span className="offer__sound mono">
+                  {share.hasAudio ? 'with sound' : 'no sound'}
+                </span>
+              </span>
               <button className="btn btn--sm" onClick={() => watchScreen(share.trackSid)}>
                 Watch
               </button>

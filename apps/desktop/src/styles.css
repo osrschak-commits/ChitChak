@@ -3150,3 +3150,12 @@ textarea::placeholder {
   padding: 8px 10px 0;
   color: var(--text-faint);
 }
+
+.offer__sound {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}

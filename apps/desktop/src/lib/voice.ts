@@ -49,6 +49,14 @@ export interface ScreenShare {
   trackSid: string;
   /** Whether this viewer has chosen to receive it. */
   watching: boolean;
+  /**
+   * Whether the sharer included their computer's sound.
+   *
+   * Worth saying out loud: a silent share and a share whose audio failed look
+   * identical to whoever is watching, and the sharer hears everything perfectly
+   * either way, so nobody finds out for a while.
+   */
+  hasAudio: boolean;
 }
 
 export interface VoiceCallbacks {
@@ -709,10 +717,14 @@ export class VoiceEngine {
         // stopped; there is nothing to watch and offering it would be a button
         // that does nothing.
         if (publication.isMuted) continue;
+        const hasAudio = [...participant.trackPublications.values()].some(
+          (other) => other.source === Track.Source.ScreenShareAudio && !other.isMuted,
+        );
         shares.push({
           userId: participant.identity,
           trackSid: publication.trackSid,
           watching: this.watching.has(publication.trackSid),
+          hasAudio,
         });
       }
     }
