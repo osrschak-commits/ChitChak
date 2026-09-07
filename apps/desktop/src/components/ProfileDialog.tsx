@@ -35,6 +35,9 @@ export function ProfileDialog({ onClose }: { onClose(): void }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   if (!user) return null;
@@ -59,6 +62,28 @@ export function ProfileDialog({ onClose }: { onClose(): void }) {
         if (!caught.details) setError(caught.message);
       } else {
         setError('Could not save your profile');
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteAccount() {
+    setBusy(true);
+    setDeleteError(null);
+    try {
+      await api.deleteAccount(deletePassword);
+      // The account is gone and its tokens with it. signOut tears down the
+      // gateway and empties the store, which lands on the sign-in screen.
+      await signOut();
+      onClose();
+    } catch (caught) {
+      if (caught instanceof ApiRequestError) {
+        // Owning servers comes back as a conflict with a message naming them,
+        // and a wrong password as a field error. Both are worth reading.
+        setDeleteError(caught.details?.password ?? caught.message);
+      } else {
+        setDeleteError('Could not reach the server. Nothing has been deleted.');
       }
     } finally {
       setBusy(false);
@@ -229,6 +254,69 @@ export function ProfileDialog({ onClose }: { onClose(): void }) {
                 Sign out
               </button>
             </div>
+
+            {!deleting ? (
+              <div className="row">
+                <div>
+                  <div className="row__label">Delete account</div>
+                  <div className="row__hint">
+                    Permanent. Your name, email and picture are erased everywhere.
+                  </div>
+                </div>
+                <button
+                  className="btn btn--ghost btn--sm row__control"
+                  onClick={() => {
+                    setDeleting(true);
+                    setDeleteError(null);
+                    setDeletePassword('');
+                  }}
+                >
+                  Delete account
+                </button>
+              </div>
+            ) : (
+              <div className="row" style={{ alignItems: 'flex-start' }}>
+                <div style={{ flex: 1 }}>
+                  <div className="row__label">Delete account</div>
+                  <div className="row__hint">
+                    This cannot be undone. Your profile is erased and you are removed from every
+                    server. Messages you have already sent stay where they are, shown as
+                    “Deleted User”, so other people’s conversations still make sense.
+                  </div>
+
+                  <div className="field" style={{ marginTop: 12, maxWidth: 320 }}>
+                    <label className="field__label" htmlFor="delete-password">
+                      Confirm your password
+                    </label>
+                    <input
+                      id="delete-password"
+                      type="password"
+                      value={deletePassword}
+                      autoComplete="current-password"
+                      onChange={(e) => setDeletePassword(e.target.value)}
+                    />
+                    {deleteError && <div className="field__error">{deleteError}</div>}
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 9, marginTop: 12 }}>
+                    <button
+                      className="btn btn--danger btn--sm"
+                      disabled={busy || deletePassword.length === 0}
+                      onClick={() => void deleteAccount()}
+                    >
+                      {busy ? 'Deleting…' : 'Delete my account for ever'}
+                    </button>
+                    <button
+                      className="btn btn--ghost btn--sm"
+                      disabled={busy}
+                      onClick={() => setDeleting(false)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

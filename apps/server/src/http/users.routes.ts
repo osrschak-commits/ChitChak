@@ -1,10 +1,26 @@
 import type { FastifyInstance } from 'fastify';
-import { imageUploadSchema, updateProfileSchema } from '@chitchak/protocol';
+import {
+  GatewayCloseCode,
+  deleteAccountSchema,
+  imageUploadSchema,
+  updateProfileSchema,
+} from '@chitchak/protocol';
 import { and, eq, ne, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { guildMembers, images, users } from '../db/schema.js';
+import {
+  guildMembers,
+  guilds,
+  images,
+  invites,
+  memberRanks,
+  passwordResets,
+  refreshTokens,
+  users,
+  voiceStates,
+} from '../db/schema.js';
 import { registry } from '../gateway/registry.js';
 import { errors } from '../lib/errors.js';
+import { verifyPassword } from '../lib/password.js';
 import { toPublicUser, toSelfUser } from '../services/serialize.js';
 import { authenticate, requireUser } from './authenticate.js';
 import { decodeDataUrl } from '../lib/images.js';
@@ -121,6 +137,107 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
 
       await broadcastProfile(userId, updated);
       return toSelfUser(updated);
+    },
+  });
+
+  /**
+   * Delete your own account.
+   *
+   * Erases the person, keeps the thread. The row survives - emptied of every
+   * personal field - because messages.authorId cascades, so deleting it would
+   * take every message they ever sent and leave everyone else's conversations
+   * full of replies to nothing. What remains identifies nobody.
+   *
+   * Servers they own are the one thing this refuses to decide. Handing someone
+   * else's community to an arbitrary member, or deleting it out from under its
+   * users, are both worse than saying no and letting the owner choose.
+   */
+  app.delete('/api/users/@me', {
+    // The tightest limit in the app. There is no legitimate reason to call this
+    // more than once, and a wrong password should not be cheap to retry.
+    config: { rateLimit: { max: 5, timeWindow: '15 minutes' } },
+    preHandler: authenticate,
+    handler: async (request, reply) => {
+      const { userId } = requireUser(request);
+
+      const parsed = deleteAccountSchema.safeParse(request.body);
+      if (!parsed.success) {
+        throw errors.invalid('Enter your password to confirm', {
+          password: 'Required',
+        });
+      }
+
+      const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
+      if (!user || user.deletedAt) throw errors.unauthorized('Account no longer exists');
+
+      if (!(await verifyPassword(parsed.data.password, user.passwordHash))) {
+        throw errors.invalid('That password is not right', {
+          password: 'Incorrect password',
+        });
+      }
+
+      const owned = await db
+        .select({ id: guilds.id, name: guilds.name })
+        .from(guilds)
+        .where(eq(guilds.ownerId, userId));
+
+      if (owned.length > 0) {
+        const names = owned.map((g) => g.name).join(', ');
+        throw errors.conflict(
+          `You still own ${owned.length === 1 ? 'a server' : `${owned.length} servers`}: ${names}. ` +
+            'Transfer ownership or delete them first, then delete your account.',
+        );
+      }
+
+      const now = new Date();
+
+      await db.transaction(async (tx) => {
+        // Both columns are uniquely indexed, so the placeholders have to stay
+        // unique too - hence the id. `.invalid` is reserved by RFC 2606 and can
+        // never be a real address, so nothing can be sent to it by accident.
+        await tx
+          .update(users)
+          .set({
+            email: `deleted+${user.id}@deleted.invalid`,
+            username: `deleted_${user.id}`,
+            displayName: 'Deleted User',
+            bio: null,
+            accentColor: null,
+            avatarVersion: 0,
+            // Not a hash of anything - it does not parse as one, so
+            // verifyPassword rejects it without computing a thing.
+            passwordHash: 'deleted',
+            deletedAt: now,
+            // Invalidates every access token already issued, which are
+            // stateless and cannot be revoked one at a time.
+            tokensValidFrom: now,
+          })
+          .where(eq(users.id, userId));
+
+        // Nothing here cascades on its own, because the row is staying.
+        await tx.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
+        await tx.delete(passwordResets).where(eq(passwordResets.userId, userId));
+        await tx.delete(memberRanks).where(eq(memberRanks.userId, userId));
+        await tx.delete(guildMembers).where(eq(guildMembers.userId, userId));
+        await tx.delete(voiceStates).where(eq(voiceStates.userId, userId));
+        // Their invites stop working: a link handed out by an account that no
+        // longer exists should not keep letting strangers in.
+        await tx.delete(invites).where(eq(invites.createdBy, userId));
+        // images has no foreign key at all - ownerId is a plain text column -
+        // so the avatar would otherwise sit in the database forever.
+        await tx
+          .delete(images)
+          .where(and(eq(images.kind, 'user_avatar'), eq(images.ownerId, userId)));
+      });
+
+      // Tokens are dead, but an open socket authenticated a while ago and is
+      // still connected. Close it rather than waiting for its next heartbeat.
+      for (const session of registry.localSessionsFor(userId)) {
+        session.close(GatewayCloseCode.AuthenticationFailed, 'account deleted');
+      }
+
+      request.log.info({ userId }, 'account deleted and anonymised');
+      return reply.code(204).send();
     },
   });
 

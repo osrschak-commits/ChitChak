@@ -50,6 +50,17 @@ export const resetPasswordSchema = z.object({
   password: passwordSchema,
 });
 
+/**
+ * Deleting your own account.
+ *
+ * The password is re-entered rather than trusted from the session: a session is
+ * something that can be left open on a shared machine or stolen, and this is
+ * the one action nobody can undo.
+ */
+export const deleteAccountSchema = z.object({
+  password: z.string().min(1),
+});
+
 export const updateProfileSchema = z
   .object({
     displayName: z.string().min(1, 'Display name cannot be empty').max(48),
@@ -192,6 +203,7 @@ export type LoginBody = z.infer<typeof loginSchema>;
 export type RefreshBody = z.infer<typeof refreshSchema>;
 export type ForgotPasswordBody = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordBody = z.infer<typeof resetPasswordSchema>;
+export type DeleteAccountBody = z.infer<typeof deleteAccountSchema>;
 export type UpdateProfileBody = z.infer<typeof updateProfileSchema>;
 export type ImageUploadBody = z.infer<typeof imageUploadSchema>;
 export type CreateGuildBody = z.infer<typeof createGuildSchema>;

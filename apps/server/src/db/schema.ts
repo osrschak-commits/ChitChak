@@ -52,6 +52,18 @@ export const users = pgTable(
     // issued before this moment is treated as invalid even though its signature
     // is still good.
     tokensValidFrom: timestamp('tokens_valid_from', { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Set when the account is deleted. The row itself stays, emptied of
+     * everything personal.
+     *
+     * It has to stay: messages.authorId references it with ON DELETE CASCADE,
+     * so removing the row would take every message the person ever sent with
+     * it - and half of everyone else's conversations along with them. What is
+     * actually erased is the personal data (see deleteAccount in
+     * users.routes.ts); what remains is an authorless "Deleted User" that
+     * threads can still hang from.
+     */
+    deletedAt: timestamp('deleted_at', { withTimezone: true }),
   },
   (table) => [
     // Both columns are normalised to lowercase before insert (see auth routes),

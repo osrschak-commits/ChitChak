@@ -210,6 +210,23 @@ class ApiClient {
     });
   }
 
+  /**
+   * Deletes the signed-in account, permanently.
+   *
+   * The password goes with it because the session alone is not proof enough for
+   * something irreversible. Throws with a readable message if the account still
+   * owns servers - those have to be handed over or deleted first.
+   */
+  async deleteAccount(password: string): Promise<void> {
+    await this.request<void>('/api/users/@me', {
+      method: 'DELETE',
+      body: JSON.stringify({ password }),
+    });
+    // The account is gone server-side; keeping its tokens would only produce a
+    // shell that 401s on its first request.
+    this.persist(null);
+  }
+
   /** Sets a new password from an emailed token, ending every existing session. */
   async resetPassword(token: string, password: string): Promise<void> {
     await this.request<void>('/api/auth/password/reset', {

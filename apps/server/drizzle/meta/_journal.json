@@ -43,6 +43,13 @@
       "when": 1788740176414,
       "tag": "0005_password_resets",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788746334266,
+      "tag": "0006_account_deletion",
+      "breakpoints": true
     }
   ]
 }
