@@ -18,6 +18,7 @@ const PACKS: Record<string, { price: () => string | undefined; keys?: number }> 
   subscription: { price: () => config.PADDLE_PRICE_SUBSCRIPTION },
   keys5: { price: () => config.PADDLE_PRICE_KEYS_5, keys: 5 },
   keys15: { price: () => config.PADDLE_PRICE_KEYS_15, keys: 15 },
+  keys40: { price: () => config.PADDLE_PRICE_KEYS_40, keys: 40 },
 };
 
 export async function billingRoutes(app: FastifyInstance): Promise<void> {

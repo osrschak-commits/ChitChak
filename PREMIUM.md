@@ -71,7 +71,7 @@ shop shows, keys already granted still spend, and only buying is unavailable.
    cards; nothing needs a real bank account until you go live.
 2. In the catalogue, create the products and prices:
    - a recurring monthly price for the subscription
-   - one-off prices for key packs (5 and 15)
+   - one-off prices for key packs (5, 15, 40 - any subset)
 3. **Notifications** → a destination pointing at
    `https://api.chitchak.com/api/webhooks/paddle`, subscribed to
    `subscription.*` and `transaction.completed`. Copy the secret key it gives
@@ -85,6 +85,7 @@ shop shows, keys already granted still spend, and only buying is unavailable.
    PADDLE_PRICE_SUBSCRIPTION=pri_...
    PADDLE_PRICE_KEYS_5=pri_...
    PADDLE_PRICE_KEYS_15=pri_...
+   PADDLE_PRICE_KEYS_40=pri_...   # any pack left unset simply is not offered
    ```
 
 5. Redeploy. `GET /api/premium/store` starts reporting `open: true` and the buy

@@ -48,6 +48,7 @@ const envSchema = z.object({
   PADDLE_PRICE_SUBSCRIPTION: blankIsUnset(z.string().min(3).optional()),
   PADDLE_PRICE_KEYS_5: blankIsUnset(z.string().min(3).optional()),
   PADDLE_PRICE_KEYS_15: blankIsUnset(z.string().min(3).optional()),
+  PADDLE_PRICE_KEYS_40: blankIsUnset(z.string().min(3).optional()),
 
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   ACCESS_TOKEN_TTL: z.coerce.number().int().positive().default(900),
