@@ -11,8 +11,9 @@
     "build": "node scripts/build.mjs",
     "build:web": "vite build --config vite.web.config.ts",
     "icon": "node scripts/make-icon.mjs",
-    "dist:win": "node scripts/make-icon.mjs && node scripts/build.mjs && electron-builder --win --config electron-builder.yml",
-    "dist:mac": "node scripts/make-icon.mjs && node scripts/build.mjs && electron-builder --mac --config electron-builder.yml",
+    "//dist": "--publish never is load-bearing. electron-builder publishes on its own when it sees a CI tag build, and the `publish` block in electron-builder.yml is a generic provider - which it publishes to over HTTP PUT. The update host is a read-only directory of files, so the PUT fails and takes the build down with it. Uploading is scripts/release.mjs's job, over SSH.",
+    "dist:win": "node scripts/make-icon.mjs && node scripts/build.mjs && electron-builder --win --config electron-builder.yml --publish never",
+    "dist:mac": "node scripts/make-icon.mjs && node scripts/build.mjs && electron-builder --mac --config electron-builder.yml --publish never",
     "typecheck": "tsc --noEmit"
   },
   "//": "livekit-client is pinned exactly, not with a caret. It negotiates an RTC protocol version with the SFU, and a client newer than the server in docker-compose.yml connects, silently falls back, and then reports 'reconnecting' forever while media actually flows. Upgrade this and the livekit-server image together.",
