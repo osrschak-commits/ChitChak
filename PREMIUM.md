@@ -72,15 +72,28 @@ shop shows, keys already granted still spend, and only buying is unavailable.
 2. In the catalogue, create the products and prices:
    - a recurring monthly price for the subscription
    - one-off prices for key packs (5, 15, 40 - any subset)
-3. **Notifications** → a destination pointing at
+3. **Checkout → Default payment link**: `https://chitchak.com/pay`
+
+   Paddle Billing has no fully hosted checkout. Creating a transaction returns
+   *this page's* URL with `?_ptxn=...` appended, and the page opens the overlay.
+   Without it set, every checkout is refused with
+   `transaction_default_checkout_url_not_set`.
+
+   That page needs a **client-side token** (Authentication → Client-side
+   tokens). It is public by design - it identifies the account to Paddle.js and
+   authorises nothing - and is served from the API rather than compiled into the
+   site, so rotating it needs no rebuild.
+
+4. **Notifications** → a destination pointing at
    `https://api.chitchak.com/api/webhooks/paddle`, subscribed to
    `subscription.*` and `transaction.completed`. Copy the secret key it gives
    you.
-4. Put them in `.env.production` on the server:
+5. Put them in `.env.production` on the server:
 
    ```
    PADDLE_ENV=production          # or sandbox while testing
    PADDLE_API_KEY=...
+   PADDLE_CLIENT_TOKEN=...      # public; used by the /pay page
    PADDLE_WEBHOOK_SECRET=...
    PADDLE_PRICE_SUBSCRIPTION=pri_...
    PADDLE_PRICE_KEYS_5=pri_...
@@ -88,7 +101,7 @@ shop shows, keys already granted still spend, and only buying is unavailable.
    PADDLE_PRICE_KEYS_40=pri_...   # any pack left unset simply is not offered
    ```
 
-5. Redeploy. `GET /api/premium/store` starts reporting `open: true` and the buy
+6. Redeploy. `GET /api/premium/store` starts reporting `open: true` and the buy
    buttons appear on their own.
 
 Going live also needs Paddle to approve the account — they check what is being

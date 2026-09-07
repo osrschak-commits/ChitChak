@@ -43,6 +43,12 @@ const envSchema = z.object({
    */
   PADDLE_ENV: z.enum(['sandbox', 'production']).default('sandbox'),
   PADDLE_API_KEY: blankIsUnset(z.string().min(10).optional()),
+  /**
+   * The client-side token, which is public by design: it identifies the account
+   * to Paddle.js in a browser and can do nothing on its own. Served to the
+   * payment page rather than compiled into it, so rotating it needs no rebuild.
+   */
+  PADDLE_CLIENT_TOKEN: blankIsUnset(z.string().min(10).optional()),
   PADDLE_WEBHOOK_SECRET: blankIsUnset(z.string().min(10).optional()),
   /** Price ids from the Paddle catalogue. */
   PADDLE_PRICE_SUBSCRIPTION: blankIsUnset(z.string().min(3).optional()),

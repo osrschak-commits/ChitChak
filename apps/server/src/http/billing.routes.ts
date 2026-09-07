@@ -130,6 +130,22 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
     },
   });
 
+  /**
+   * What the payment page needs to start Paddle.js.
+   *
+   * Unauthenticated on purpose. Somebody following a checkout link has arrived
+   * in a browser that may never have signed in, and the token is public - it
+   * identifies the account to Paddle and authorises nothing. Requiring a session
+   * here would break the only flow that uses it.
+   */
+  app.get('/api/premium/paddle-client', {
+    config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
+    handler: async () => ({
+      token: config.PADDLE_CLIENT_TOKEN ?? null,
+      environment: config.PADDLE_ENV,
+    }),
+  });
+
   /** What this server can actually sell, so the client knows what to show. */
   app.get('/api/premium/store', {
     preHandler: authenticate,
