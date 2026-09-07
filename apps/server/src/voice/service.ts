@@ -126,6 +126,78 @@ export async function joinVoiceChannel(
   return { credentials: { channelId, url: livekitUrl, token }, state };
 }
 
+/**
+ * Put somebody back in the channel they never actually left.
+ *
+ * A gateway restart closes every socket, and closing a socket clears its voice
+ * state - which is right when someone quits the app and wrong when the server
+ * is the thing going away. The SFU is a separate connection and survives it, so
+ * after a deploy everyone is still talking to each other in a room the database
+ * says is empty. Nothing recovers on its own: `voice:update` is an UPDATE, so
+ * once the row is gone even toggling your microphone cannot bring it back.
+ *
+ * So on reconnect a client that is still in a call says so, and this writes the
+ * row again and tells the guild. Deliberately not `joinVoiceChannel`: that
+ * mints a fresh SFU token, and connecting with it evicts the session that is
+ * currently carrying the conversation - tearing down a working call in order to
+ * fix a database row.
+ *
+ * Permission is rechecked rather than assumed. Time passed while the server was
+ * down, and someone whose access was removed in the meantime must not be able
+ * to resume their way back in.
+ */
+export async function resumeVoiceChannel(
+  userId: string,
+  channelId: string,
+): Promise<VoiceState | null> {
+  const channel = await requireGuildChannel(channelId);
+  if (channel.kind !== 'voice') return null;
+
+  await requireChannelPermission(
+    channelId,
+    userId,
+    Permission.CONNECT,
+    'You do not have permission to join that channel',
+  );
+
+  const membership = await db.query.guildMembers.findFirst({
+    where: and(eq(guildMembers.guildId, channel.guildId), eq(guildMembers.userId, userId)),
+  });
+  if (!membership) return null;
+
+  const existing = await db.query.voiceStates.findFirst({
+    where: eq(voiceStates.userId, userId),
+  });
+  // Already recorded in the right place - nothing to repair, and nothing worth
+  // telling the guild about.
+  if (existing?.channelId === channelId) return toVoiceState(existing);
+  // In a different channel now. Whatever this client remembers is out of date;
+  // the record wins.
+  if (existing) return null;
+
+  const [row] = await db
+    .insert(voiceStates)
+    .values({
+      userId,
+      guildId: channel.guildId,
+      channelId,
+      selfMuted: false,
+      selfDeafened: false,
+      serverMuted: false,
+      // The client sends its own mute and camera state along right afterwards.
+      selfVideo: false,
+      selfScreenShare: false,
+    })
+    .onConflictDoNothing()
+    .returning();
+
+  if (!row) return null;
+
+  const state = toVoiceState(row);
+  registry.publishToGuild(channel.guildId, { op: 'voice:state', d: state }, userId);
+  return state;
+}
+
 export async function leaveVoiceChannel(userId: string): Promise<VoiceState | null> {
   const [row] = await db.delete(voiceStates).where(eq(voiceStates.userId, userId)).returning();
   if (!row) return null;

@@ -763,6 +763,21 @@ function applyServerMessage(
               .filter((c) => c.guildId === guildId && c.kind === 'text')
               .sort((a, b) => a.position - b.position)[0];
 
+      /**
+       * Still in a call the server has forgotten about.
+       *
+       * A gateway restart clears every voice state, but the SFU connection is
+       * separate and survives it - so after a deploy people are still talking
+       * in a room the server believes is empty, and the call view says you are
+       * the only one here while you can hear somebody. Reasserting on every
+       * ready costs one frame and repairs it whatever caused the reconnect.
+       *
+       * Read before `set`, because the snapshot is about to replace the map
+       * this is comparing against.
+       */
+      const stillInCall = get().voiceChannelId;
+      const sfuHolding = get().voiceConnection === 'connected';
+
       set({
         user,
         guilds,
@@ -783,6 +798,14 @@ function applyServerMessage(
         selectedTextChannelId: textStillValid ?? firstText?.id ?? null,
         pendingGuildId: null,
       });
+
+      if (stillInCall && sfuHolding) {
+        gateway.send({ op: 'voice:resume', d: { channelId: stillInCall } });
+        // And the flags, which resume deliberately does not guess at. Without
+        // this a reconnect would show everyone an unmuted microphone belonging
+        // to somebody who has been muted the whole time.
+        pushVoiceState(get());
+      }
 
       const channelToLoad = get().selectedTextChannelId;
       if (channelToLoad) void get().loadMessages(channelToLoad);

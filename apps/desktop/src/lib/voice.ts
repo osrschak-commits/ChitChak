@@ -14,7 +14,7 @@ import {
   createLocalAudioTrack,
   createLocalVideoTrack,
 } from 'livekit-client';
-import type { Participant, RemoteTrack, RemoteTrackPublication } from 'livekit-client';
+import type { LocalTrack, Participant, RemoteTrack, RemoteTrackPublication } from 'livekit-client';
 
 /**
  * The voice engine: everything that touches actual media.
@@ -109,7 +109,16 @@ export class VoiceEngine {
   private room: Room | null = null;
   private micTrack: LocalAudioTrack | null = null;
   private cameraTrack: LocalVideoTrack | null = null;
-  private screenTracks: LocalVideoTrack[] = [];
+  /**
+   * Everything published for the current screen share - the picture and, when
+   * system audio was included, the sound.
+   *
+   * Both, not just the video. Holding only the video track meant stopping a
+   * share unpublished the picture and left the audio running: your machine went
+   * on broadcasting whatever it was playing to everyone in the room, with
+   * nothing on screen to say so, until you left the call.
+   */
+  private screenTracks: LocalTrack[] = [];
   /** One element per remote audio track, kept so they can be re-routed and cleaned up. */
   private audioElements = new Map<string, HTMLAudioElement>();
   private settings: AudioSettings = { ...defaultAudioSettings };
@@ -199,8 +208,8 @@ export class VoiceEngine {
        * autoSubscribe stays on for everything else: audio must arrive without
        * being asked for, and a camera is small. Only this one source is opt-in.
        */
-      .on(RoomEvent.TrackPublished, (publication) => {
-        if (publication.source === Track.Source.ScreenShare && !this.watching.has(publication.trackSid)) {
+      .on(RoomEvent.TrackPublished, (publication, participant) => {
+        if (this.isUnwatchedScreenTrack(publication, participant)) {
           publication.setSubscribed(false);
         }
         this.emitScreenShares();
@@ -351,7 +360,7 @@ export class VoiceEngine {
       const tracks = await room.localParticipant.createScreenTracks({ audio: withAudio });
       for (const track of tracks) {
         await room.localParticipant.publishTrack(track);
-        if (track instanceof LocalVideoTrack) this.screenTracks.push(track);
+        this.screenTracks.push(track);
       }
     } catch (error) {
       // The user dismissing the picker is a cancel, not a failure worth
@@ -364,7 +373,9 @@ export class VoiceEngine {
     // Ending the share from the browser's own "stop sharing" bar has to be
     // noticed, or our button stays lit for a share that no longer exists.
     for (const track of this.screenTracks) {
-      track.mediaStreamTrack.addEventListener('ended', () => void this.stopScreenShare());
+      if (track instanceof LocalVideoTrack) {
+        track.mediaStreamTrack.addEventListener('ended', () => void this.stopScreenShare());
+      }
     }
     this.emitVideoFeeds();
   }
@@ -607,16 +618,53 @@ export class VoiceEngine {
   watchScreenShare(trackSid: string): void {
     this.watching.add(trackSid);
     this.findScreenPublication(trackSid)?.setSubscribed(true);
+    this.setScreenAudioForOwnerOf(trackSid, true);
     this.emitScreenShares();
   }
 
   stopWatchingScreenShare(trackSid: string): void {
     this.watching.delete(trackSid);
     this.findScreenPublication(trackSid)?.setSubscribed(false);
+    this.setScreenAudioForOwnerOf(trackSid, false);
     this.emitScreenShares();
     // The feed is gone the moment the subscription is dropped, and waiting for
     // TrackUnsubscribed to say so leaves a dead tile on screen in between.
     this.emitVideoFeeds();
+  }
+
+  /**
+   * A part of somebody's screen share that this viewer has not asked to watch.
+   *
+   * Both halves, which is the point: a share publishes a video track and, when
+   * system audio was included, a second audio track. Testing only the video
+   * meant declining a stream still delivered its sound - you could not see what
+   * somebody was presenting but you could hear it, which is worse than either
+   * watching or not.
+   *
+   * Matched by the sharer rather than by track id, because the audio has its
+   * own sid that appears nowhere in the offer the viewer accepted.
+   */
+  private isUnwatchedScreenTrack(
+    publication: RemoteTrackPublication | { source: Track.Source; trackSid: string },
+    participant: Participant,
+  ): boolean {
+    const isScreen =
+      publication.source === Track.Source.ScreenShare ||
+      publication.source === Track.Source.ScreenShareAudio;
+    if (!isScreen) return false;
+    return !this.watchedUserIds().has(participant.identity);
+  }
+
+  /** Whose screens this viewer is currently taking. */
+  private watchedUserIds(): Set<string> {
+    const owners = new Set<string>();
+    for (const participant of this.room?.remoteParticipants.values() ?? []) {
+      for (const publication of participant.trackPublications.values()) {
+        if (publication.source !== Track.Source.ScreenShare) continue;
+        if (this.watching.has(publication.trackSid)) owners.add(participant.identity);
+      }
+    }
+    return owners;
   }
 
   private findScreenPublication(trackSid: string): RemoteTrackPublication | null {
@@ -625,6 +673,24 @@ export class VoiceEngine {
       if (publication) return publication as RemoteTrackPublication;
     }
     return null;
+  }
+
+  /**
+   * Follow the picture with the sound.
+   *
+   * The share's audio is a separate publication with its own sid, so it has to
+   * be found through the person sharing rather than through the track that was
+   * clicked.
+   */
+  private setScreenAudioForOwnerOf(trackSid: string, subscribed: boolean): void {
+    for (const participant of this.room?.remoteParticipants.values() ?? []) {
+      if (!participant.trackPublications.has(trackSid)) continue;
+      for (const publication of participant.trackPublications.values()) {
+        if (publication.source === Track.Source.ScreenShareAudio) {
+          (publication as RemoteTrackPublication).setSubscribed(subscribed);
+        }
+      }
+    }
   }
 
   /** Every screen on offer in the room, and whether this viewer takes it. */

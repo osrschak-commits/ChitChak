@@ -25,6 +25,7 @@ import {
   clearVoiceStateOnDisconnect,
   joinVoiceChannel,
   leaveVoiceChannel,
+  resumeVoiceChannel,
   updateSelfVoiceState,
 } from '../voice/service.js';
 import * as presence from './presence.js';
@@ -190,6 +191,21 @@ export class Session {
         // same user has no business receiving a token it did not request.
         this.send({ op: 'voice:credentials', d: credentials });
         this.send({ op: 'voice:state', d: state });
+        return;
+      }
+
+      /**
+       * "I am still in that call." Sent by a client whose socket came back to
+       * find the server had forgotten where it was - see resumeVoiceChannel.
+       */
+      case 'voice:resume': {
+        const channelId = message.d?.channelId;
+        if (typeof channelId !== 'string') {
+          this.sendError('invalid_payload', 'channelId is required');
+          return;
+        }
+        const resumed = await resumeVoiceChannel(this.userId, channelId);
+        if (resumed) this.send({ op: 'voice:state', d: resumed });
         return;
       }
 

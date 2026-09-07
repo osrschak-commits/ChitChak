@@ -41,6 +41,14 @@ export type ClientMessage =
   | { op: 'identify'; d: { token: string } }
   | { op: 'heartbeat'; d: { seq: number } }
   | { op: 'voice:join'; d: { channelId: Snowflake } }
+  /**
+   * "I am still in that call" - sent after a reconnect, not to join one.
+   *
+   * Separate from `voice:join` because joining mints a fresh SFU token, and
+   * connecting with it evicts the session currently carrying the conversation.
+   * This repairs the server's record without touching the media.
+   */
+  | { op: 'voice:resume'; d: { channelId: Snowflake } }
   | { op: 'voice:leave'; d: Record<string, never> }
   | { op: 'voice:update'; d: VoiceUpdatePayload }
   | { op: 'presence:update'; d: { status: PresenceStatus } }
