@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { mediaUrl } from '../lib/api.js';
+import { api, mediaUrl } from '../lib/api.js';
 import { outranks } from '../lib/permissions.js';
 import { usePermissions, useRanks } from '../hooks/usePermissions.js';
 import { fallbackAccent, useApp } from '../store/app.js';
@@ -54,6 +54,35 @@ export function ProfileCard({
 
   const ref = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState({ x, y });
+
+  /**
+   * Their level, fetched when the card opens.
+   *
+   * Null until it arrives, and the row simply does not appear - a card that
+   * shows "Level —" for a moment every time it opens is worse than one that
+   * grows a line. Your own comes from the store, which is already correct and
+   * live, so opening your own card never waits on the network.
+   */
+  const ownProgress = useApp((s) => s.progress);
+  const [level, setLevel] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (userId === selfId) {
+      setLevel(ownProgress.level);
+      return;
+    }
+    let current = true;
+    setLevel(null);
+    void api
+      .levelOf(userId)
+      .then((result) => current && setLevel(result.level))
+      .catch(() => {
+        /* Their level is the least of what this card is for. */
+      });
+    return () => {
+      current = false;
+    };
+  }, [userId, selfId, ownProgress.level]);
 
   const member = members.get(`${guildId}:${userId}`);
   const state = voiceStates.get(userId);
@@ -157,6 +186,13 @@ export function ProfileCard({
             )}
           </dd>
         </div>
+
+        {level !== null && (
+          <div className="plate__field">
+            <dt className="legend">Level</dt>
+            <dd className="mono plate__level">{level}</dd>
+          </div>
+        )}
 
         <div className="plate__field">
           <dt className="legend">Joined</dt>

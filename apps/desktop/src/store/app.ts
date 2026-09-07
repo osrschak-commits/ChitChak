@@ -19,6 +19,7 @@ import {
   VoiceEngine,
   defaultAudioSettings,
   type AudioSettings,
+  type ScreenShare,
   type VideoFeed,
   type VoiceConnectionState,
 } from '../lib/voice.js';
@@ -116,6 +117,8 @@ interface AppState {
   /** Continuous 0..1 audio level per user, sampled from the SFU. Drives the meters. */
   levels: Map<string, number>;
   videoFeeds: VideoFeed[];
+  /** Screens on offer in the current room, watched or not. */
+  screenShares: ScreenShare[];
   selfMuted: boolean;
   selfDeafened: boolean;
   cameraOn: boolean;
@@ -162,6 +165,9 @@ interface AppState {
   /** `sourceId` is null in a browser, where the browser runs its own picker. */
   startScreenShare(sourceId: string | null, withAudio?: boolean): Promise<void>;
   stopScreenShare(): Promise<void>;
+  /** Start or stop receiving somebody else's screen. */
+  watchScreen(trackSid: string): void;
+  stopWatchingScreen(trackSid: string): void;
   setTransmitMode(mode: TransmitMode): void;
   setPushToTalkActive(active: boolean): void;
   setAudioSettings(settings: Partial<AudioSettings>): Promise<void>;
@@ -231,6 +237,7 @@ function getEngine(): VoiceEngine {
     onLevelsChanged: (levels) => useApp.setState({ levels }),
     onConnectionStateChanged: (state) => useApp.setState({ voiceConnection: state }),
     onVideoFeedsChanged: (videoFeeds) => useApp.setState({ videoFeeds }),
+    onScreenSharesChanged: (screenShares) => useApp.setState({ screenShares }),
     onParticipantsChanged: () => {
       // Membership is authoritative from the gateway's voice states; the SFU's
       // view is only used to know that media is actually flowing.
@@ -355,6 +362,7 @@ export const useApp = create<AppState>((set, get) => ({
   speaking: new Set(),
   levels: new Map(),
   videoFeeds: [],
+  screenShares: [],
   selfMuted: false,
   selfDeafened: false,
   cameraOn: false,
@@ -541,6 +549,7 @@ export const useApp = create<AppState>((set, get) => ({
       speaking: new Set(),
       levels: new Map(),
       videoFeeds: [],
+      screenShares: [],
       cameraOn: false,
       screenShareOn: false,
       pushToTalkActive: false,
@@ -600,6 +609,14 @@ export const useApp = create<AppState>((set, get) => ({
     }
     set({ screenShareOn: getEngine().screenShareOn });
     pushVoiceState(get());
+  },
+
+  watchScreen(trackSid) {
+    getEngine().watchScreenShare(trackSid);
+  },
+
+  stopWatchingScreen(trackSid) {
+    getEngine().stopWatchingScreenShare(trackSid);
   },
 
   async stopScreenShare() {

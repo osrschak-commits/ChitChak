@@ -2811,3 +2811,58 @@ textarea::placeholder {
     transition: none;
   }
 }
+
+/* The one number on the card that is an achievement rather than a fact. */
+.plate__level {
+  color: var(--brass-300);
+  font-weight: 600;
+}
+
+/* ==========================================================================
+   Streams on offer
+
+   A screen nobody has taken up yet. It sits among the people because that is
+   where it belongs - it is something in the room, not a notification about it.
+   ========================================================================== */
+
+.offer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 16px 14px;
+  border-radius: var(--radius);
+  background: var(--graphite-800);
+  /* Dashed, because there is nothing behind it yet. */
+  border: 1px dashed var(--line-strong);
+  text-align: center;
+  min-height: 0;
+}
+
+.offer__mark {
+  color: var(--brass-400);
+  font-size: 13px;
+  line-height: 1;
+}
+
+.offer__who {
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+/* Sits opposite the stage label, so the two ends of the bar are "what this is"
+   and "how to leave it". */
+.call__stop-watching {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  background: rgba(9, 8, 11, 0.72);
+  backdrop-filter: blur(3px);
+}
+
+/* Not the signal colour: that is reserved for live audio, and this is video. */
+.tile__live {
+  color: var(--brass-400);
+}

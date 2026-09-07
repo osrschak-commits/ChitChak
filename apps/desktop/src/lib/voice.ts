@@ -36,11 +36,27 @@ export interface VideoFeed {
   detach(element: HTMLVideoElement): void;
 }
 
+/**
+ * Somebody's screen share, whether or not it is being watched.
+ *
+ * Screen shares are the one track type nobody receives by default. A camera is
+ * a face in a grid; a screen is a megabit or two of someone's IDE that everyone
+ * in the room would otherwise be paying for whether they were looking at it or
+ * not. So the room is told what is on offer, and each person chooses.
+ */
+export interface ScreenShare {
+  userId: string;
+  trackSid: string;
+  /** Whether this viewer has chosen to receive it. */
+  watching: boolean;
+}
+
 export interface VoiceCallbacks {
   onSpeakingChanged(speakingUserIds: string[]): void;
   onLevelsChanged(levels: Map<string, number>): void;
   onConnectionStateChanged(state: VoiceConnectionState): void;
   onVideoFeedsChanged(feeds: VideoFeed[]): void;
+  onScreenSharesChanged(shares: ScreenShare[]): void;
   onParticipantsChanged(userIds: string[]): void;
   onError(message: string): void;
 }
@@ -102,6 +118,15 @@ export class VoiceEngine {
   private levelTimer: ReturnType<typeof setInterval> | undefined;
   /** In-flight connect, shared by any caller that arrives while one is running. */
   private connecting: Promise<void> | null = null;
+  /**
+   * Screen shares this viewer has asked to watch, by track sid.
+   *
+   * Held here rather than read back off the publication because the two are not
+   * the same question: `isSubscribed` says whether the track has arrived, which
+   * lags the click by a moment and briefly flickers during a reconnect. This
+   * says what the person asked for, which is what the button should reflect.
+   */
+  private watching = new Set<string>();
 
   constructor(private readonly callbacks: VoiceCallbacks) {}
 
@@ -160,19 +185,42 @@ export class VoiceEngine {
       })
       .on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
         this.onTrackSubscribed(track, publication, participant);
+        this.emitScreenShares();
       })
       .on(RoomEvent.TrackUnsubscribed, (_track, publication) => {
         this.detachRemoteAudio(publication.trackSid);
         this.emitVideoFeeds();
+        this.emitScreenShares();
+      })
+      /**
+       * Published, but not yet subscribed - the one moment a screen share can
+       * be declined before any of it has been sent.
+       *
+       * autoSubscribe stays on for everything else: audio must arrive without
+       * being asked for, and a camera is small. Only this one source is opt-in.
+       */
+      .on(RoomEvent.TrackPublished, (publication) => {
+        if (publication.source === Track.Source.ScreenShare && !this.watching.has(publication.trackSid)) {
+          publication.setSubscribed(false);
+        }
+        this.emitScreenShares();
+      })
+      .on(RoomEvent.TrackUnpublished, (publication) => {
+        this.watching.delete(publication.trackSid);
+        this.emitScreenShares();
       })
       .on(RoomEvent.LocalTrackPublished, () => this.emitVideoFeeds())
       .on(RoomEvent.LocalTrackUnpublished, () => this.emitVideoFeeds())
       .on(RoomEvent.TrackMuted, () => this.emitVideoFeeds())
       .on(RoomEvent.TrackUnmuted, () => this.emitVideoFeeds())
-      .on(RoomEvent.ParticipantConnected, () => this.emitParticipants())
+      .on(RoomEvent.ParticipantConnected, () => {
+        this.emitParticipants();
+        this.emitScreenShares();
+      })
       .on(RoomEvent.ParticipantDisconnected, () => {
         this.emitParticipants();
         this.emitVideoFeeds();
+        this.emitScreenShares();
       })
       .on(RoomEvent.Reconnecting, () => this.callbacks.onConnectionStateChanged('reconnecting'))
       .on(RoomEvent.Reconnected, () => this.callbacks.onConnectionStateChanged('connected'))
@@ -223,10 +271,15 @@ export class VoiceEngine {
       this.room = null;
     }
     this.transmitting = false;
+    // Leaving a room forgets what was being watched in it. Carrying the choice
+    // into the next room would silently subscribe someone to a stranger's
+    // screen on the strength of a click in a different channel.
+    this.watching.clear();
     this.callbacks.onConnectionStateChanged('disconnected');
     this.callbacks.onSpeakingChanged([]);
     this.callbacks.onLevelsChanged(new Map());
     this.callbacks.onVideoFeedsChanged([]);
+    this.callbacks.onScreenSharesChanged([]);
     this.callbacks.onParticipantsChanged([]);
   }
 
@@ -519,6 +572,13 @@ export class VoiceEngine {
         const source =
           publication.source === Track.Source.ScreenShare ? ('screen' as const) : ('camera' as const);
 
+        // Somebody else's screen appears only if it was asked for. Reading the
+        // intent rather than whether the track happens to still be attached:
+        // dropping a subscription does not clear `publication.track` straight
+        // away, so a viewer who stopped watching kept a frozen frame on screen
+        // next to the offer to start watching it again.
+        if (source === 'screen' && !isLocal && !this.watching.has(publication.trackSid)) continue;
+
         feeds.push({
           userId: participant.identity,
           trackSid: publication.trackSid,
@@ -534,6 +594,63 @@ export class VoiceEngine {
     // at, and it should not move as cameras come and go around it.
     feeds.sort((a, b) => (a.source === b.source ? 0 : a.source === 'screen' ? -1 : 1));
     this.callbacks.onVideoFeedsChanged(feeds);
+  }
+
+  /**
+   * Start receiving somebody's screen.
+   *
+   * Idempotent, and safe to call for a share that has since ended - the sid
+   * simply matches nothing. The intent is recorded either way, so a share that
+   * is republished after a reconnect comes back to a viewer who had asked for
+   * it rather than making them click again.
+   */
+  watchScreenShare(trackSid: string): void {
+    this.watching.add(trackSid);
+    this.findScreenPublication(trackSid)?.setSubscribed(true);
+    this.emitScreenShares();
+  }
+
+  stopWatchingScreenShare(trackSid: string): void {
+    this.watching.delete(trackSid);
+    this.findScreenPublication(trackSid)?.setSubscribed(false);
+    this.emitScreenShares();
+    // The feed is gone the moment the subscription is dropped, and waiting for
+    // TrackUnsubscribed to say so leaves a dead tile on screen in between.
+    this.emitVideoFeeds();
+  }
+
+  private findScreenPublication(trackSid: string): RemoteTrackPublication | null {
+    for (const participant of this.room?.remoteParticipants.values() ?? []) {
+      const publication = participant.trackPublications.get(trackSid);
+      if (publication) return publication as RemoteTrackPublication;
+    }
+    return null;
+  }
+
+  /** Every screen on offer in the room, and whether this viewer takes it. */
+  private emitScreenShares(): void {
+    const room = this.room;
+    if (!room) {
+      this.callbacks.onScreenSharesChanged([]);
+      return;
+    }
+
+    const shares: ScreenShare[] = [];
+    for (const participant of room.remoteParticipants.values()) {
+      for (const publication of participant.trackPublications.values()) {
+        if (publication.source !== Track.Source.ScreenShare) continue;
+        // A muted publication is a share that has been paused rather than
+        // stopped; there is nothing to watch and offering it would be a button
+        // that does nothing.
+        if (publication.isMuted) continue;
+        shares.push({
+          userId: participant.identity,
+          trackSid: publication.trackSid,
+          watching: this.watching.has(publication.trackSid),
+        });
+      }
+    }
+    this.callbacks.onScreenSharesChanged(shares);
   }
 
   private emitParticipants(): void {

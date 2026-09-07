@@ -26,6 +26,9 @@ export function CallView() {
   const voiceConnection = useApp((s) => s.voiceConnection);
   const selfId = useApp((s) => s.user?.id);
   const members = useApp((s) => s.members);
+  const screenShares = useApp((s) => s.screenShares);
+  const watchScreen = useApp((s) => s.watchScreen);
+  const stopWatchingScreen = useApp((s) => s.stopWatchingScreen);
 
   /** A feed the viewer clicked to enlarge. Overrides the automatic stage. */
   const [spotlightSid, setSpotlightSid] = useState<string | null>(null);
@@ -38,6 +41,18 @@ export function CallView() {
   const occupants = [...voiceStates.values()].filter((v) => v.channelId === voiceChannelId);
 
   const screenFeeds = videoFeeds.filter((f) => f.source === 'screen');
+  /**
+   * Screens being offered that this person has not taken up.
+   *
+   * Nothing is being received for these - that is the point - so there is no
+   * feed to render, only an invitation.
+   */
+  const onOffer = screenShares.filter((share) => !share.watching);
+
+  const nameOf = (userId: string) => {
+    const who = members.get(`${channel?.guildId}:${userId}`);
+    return who?.nickname ?? who?.user.displayName ?? 'Someone';
+  };
   // What is on the stage: whatever was clicked, otherwise a screen share, which
   // takes the stage on its own because that is what people are here to look at.
   // A spotlight survives until the feed behind it goes away.
@@ -94,6 +109,18 @@ export function CallView() {
             <span className="call__stage-label">
               {stage.source === 'screen' ? `${stageName} is presenting` : stageName}
             </span>
+
+            {stage.source === 'screen' && !stage.isLocal && (
+              <button
+                className="btn btn--ghost btn--sm call__stop-watching"
+                onClick={() => {
+                  stopWatchingScreen(stage.trackSid);
+                  setSpotlightSid(null);
+                }}
+              >
+                Stop watching
+              </button>
+            )}
           </div>
         )}
 
@@ -110,6 +137,18 @@ export function CallView() {
               onEnlarge={(feed) => setSpotlightSid(feed.trackSid)}
               {...person.bindMenuOnly(state.userId)}
             />
+          ))}
+
+          {onOffer.map((share) => (
+            <div key={share.trackSid} className="offer">
+              <span className="offer__mark" aria-hidden="true">
+                ▶
+              </span>
+              <span className="offer__who">{nameOf(share.userId)} is streaming</span>
+              <button className="btn btn--sm" onClick={() => watchScreen(share.trackSid)}>
+                Watch
+              </button>
+            </div>
           ))}
 
           {occupants.length === 1 && !stage && (
@@ -161,12 +200,16 @@ function PersonTile({
   const levels = useApp((s) => s.levels);
   const speaking = useApp((s) => s.speaking);
   const videoFeeds = useApp((s) => s.videoFeeds);
+  const screenShares = useApp((s) => s.screenShares);
   const { resolve } = usePermissions();
 
   const member = members.get(`${state.guildId}:${state.userId}`);
   const name = member?.nickname ?? member?.user.displayName ?? 'Unknown';
   const camera = videoFeeds.find((f) => f.userId === state.userId && f.source === 'camera');
   const screen = videoFeeds.find((f) => f.userId === state.userId && f.source === 'screen');
+  // From the offers rather than the feeds: somebody is streaming whether or not
+  // this viewer took it up, and their tile should say so either way.
+  const streaming = screenShares.some((share) => share.userId === state.userId);
   const level = state.selfMuted ? 0 : (levels.get(state.userId) ?? 0);
   const isSpeaking = speaking.has(state.userId) && !state.selfMuted;
 
@@ -224,6 +267,7 @@ function PersonTile({
           color={resolve(state.userId).color}
         />
         <span className="tile__flags">
+          {streaming && <span className="tile__live" title="Sharing their screen">live</span>}
           {state.serverMuted && <span title="Muted by a moderator">blocked</span>}
           {state.selfDeafened && <span title="Deafened">deaf</span>}
           {state.selfMuted && !state.selfDeafened && !state.serverMuted && (

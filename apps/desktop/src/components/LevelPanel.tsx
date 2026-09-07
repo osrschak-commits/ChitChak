@@ -5,10 +5,10 @@ import { useApp } from '../store/app.js';
 /**
  * Your level, and the tasks behind it.
  *
- * Only ever your own. There is deliberately no way to see anyone else's - a
- * ranking of your friends is a different product from a place your friends
- * talk, and the moment a number is comparable it stops being a record and
- * starts being a target.
+ * The level is public - it sits on your card, where anyone can see it. The rest
+ * of this is not: the XP total and the task list are a record of what you have
+ * and have not got round to, and there is deliberately nowhere to read anyone
+ * else's. A leaderboard is a different product from a place your friends talk.
  */
 export function LevelPanel() {
   const progress = useApp((s) => s.progress);

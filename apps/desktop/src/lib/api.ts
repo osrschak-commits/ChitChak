@@ -237,6 +237,11 @@ class ApiClient {
     return this.request('/api/tasks');
   }
 
+  /** Somebody else's level, for their card. The level only - see the route. */
+  levelOf(userId: string): Promise<{ level: number }> {
+    return this.request(`/api/users/${userId}/level`);
+  }
+
   // --- Friends --------------------------------------------------------------
 
   /**

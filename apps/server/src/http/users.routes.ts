@@ -25,7 +25,7 @@ import {
 import { registry } from '../gateway/registry.js';
 import { errors } from '../lib/errors.js';
 import { verifyPassword } from '../lib/password.js';
-import { progress, progressFor } from '../services/progress.js';
+import { levelOf, progress, progressFor } from '../services/progress.js';
 import { TASKS, type Task, completedTaskIds } from '../services/tasks.js';
 import { toPublicUser, toSelfUser } from '../services/serialize.js';
 import { authenticate, requireUser } from './authenticate.js';
@@ -316,6 +316,26 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       );
 
       return { tasks: catalogue, progress: await progressFor(userId) };
+    },
+  });
+
+  /**
+   * Somebody else's level.
+   *
+   * The level only, never the XP or the tasks. A level is a fact about how long
+   * someone has been around and what they have done here, which is reasonable
+   * to show on their card; their exact total and which tasks they have finished
+   * is a list of what they have and have not got round to, which is theirs.
+   *
+   * Fetched when a card opens rather than carried on every user payload: it
+   * would otherwise be a join on every member list, gate list and message
+   * author lookup in the app, to display a number nobody is looking at.
+   */
+  app.get<{ Params: { userId: string } }>('/api/users/:userId/level', {
+    preHandler: authenticate,
+    handler: async (request) => {
+      requireUser(request);
+      return { level: await levelOf(request.params.userId) };
     },
   });
 
