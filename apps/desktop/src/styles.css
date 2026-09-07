@@ -3230,3 +3230,139 @@ textarea::placeholder {
   color: var(--text-faint);
   line-height: 1.4;
 }
+
+/* ==========================================================================
+   Brass, and the shop
+
+   Everything sold here is decoration. The interface says so, because an app
+   where money buys authority over people is a different app.
+   ========================================================================== */
+
+.brass {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.brass__keys {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.brass__count {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--brass-300);
+}
+
+.brass__unit {
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.brass__status {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.brass__badge {
+  align-self: flex-start;
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--brass-400);
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 2px 9px;
+}
+
+.brass__badge--off {
+  color: var(--text-faint);
+}
+
+.shop {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.shopitem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+}
+
+.shopitem:hover {
+  background: var(--graphite-800);
+}
+
+.shopitem--worn {
+  background: var(--graphite-800);
+  box-shadow: inset 2px 0 0 var(--brass-500);
+}
+
+/* The swatch is the product: a plate is its finish, a badge is its glyph. */
+.shopitem__swatch {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shopitem__swatch--badge {
+  background: var(--graphite-750);
+  color: var(--brass-300);
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+
+.shopitem__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin-right: auto;
+}
+
+.shopitem__name {
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+
+.shopitem__blurb {
+  font-size: 11px;
+  color: var(--text-faint);
+  line-height: 1.4;
+}
+
+/* A worn plate: a wash of its finish across the top of the card, so the thing
+   somebody paid for is visible without taking over the card it decorates. */
+.plate__finish {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 54px;
+  opacity: 0.18;
+  pointer-events: none;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  -webkit-mask-image: linear-gradient(to bottom, #000, transparent);
+  mask-image: linear-gradient(to bottom, #000, transparent);
+}
+
+.plate__badge {
+  margin-left: 7px;
+  font-size: 11px;
+  color: var(--brass-300);
+  letter-spacing: 1px;
+  vertical-align: middle;
+}

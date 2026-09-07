@@ -323,9 +323,9 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /**
-   * Somebody else's level.
+   * Somebody else's level, and what they are wearing.
    *
-   * The level only, never the XP or the tasks. A level is a fact about how long
+   * The level and their cosmetics, never the XP or the tasks. A level is a fact about how long
    * someone has been around and what they have done here, which is reasonable
    * to show on their card; their exact total and which tasks they have finished
    * is a list of what they have and have not got round to, which is theirs.
@@ -338,7 +338,13 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     preHandler: authenticate,
     handler: async (request) => {
       requireUser(request);
-      return { level: await levelOf(request.params.userId) };
+      const [level, worn] = await Promise.all([
+        levelOf(request.params.userId),
+        cosmetics.wornBy(request.params.userId),
+      ]);
+      // `level` is kept at the top level because clients before 0.1.14 read it
+      // there, and an old client asking for a level should keep getting one.
+      return { level, ...worn };
     },
   });
 

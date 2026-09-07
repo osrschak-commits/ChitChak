@@ -15,6 +15,41 @@ import type {
   SelfUser,
 } from '@chitchak/protocol';
 
+/** What somebody's card shows beyond their name. */
+export interface Flair {
+  level: number;
+  /** A CSS background for the card's plate, or null. */
+  plate: string | null;
+  /** A glyph shown beside their name, or null. */
+  badge: string | null;
+}
+
+export interface CosmeticItem {
+  id: string;
+  name: string;
+  slot: 'plate' | 'badge';
+  blurb: string;
+  price: number;
+  /** How to draw it - a gradient for a plate, a glyph for a badge. */
+  value: string;
+  owned: boolean;
+  equipped: boolean;
+}
+
+export interface PremiumState {
+  subscription: { status: string; active: boolean; renewsAt: string | null };
+  keys: number;
+  keysPerPeriod: number;
+  items: CosmeticItem[];
+}
+
+export interface KeyEntry {
+  amount: number;
+  reason: string;
+  reference: string | null;
+  at: string;
+}
+
 /** One row of the task list. Mirrors what GET /api/tasks returns. */
 export interface TaskSummary {
   id: string;
@@ -242,6 +277,32 @@ class ApiClient {
     return this.request<Message[]>(`/api/channels/${channelId}/messages/search?${query}`);
   }
 
+  // --- Premium --------------------------------------------------------------
+
+  /** Catalogue, ownership, balance and subscription, in one request. */
+  premium(): Promise<PremiumState> {
+    return this.request('/api/premium');
+  }
+
+  buyCosmetic(cosmeticId: string): Promise<{ keys: number }> {
+    return this.request('/api/premium/buy', {
+      method: 'POST',
+      body: JSON.stringify({ cosmeticId }),
+    });
+  }
+
+  /** `cosmeticId: null` takes off whatever is in that slot. */
+  equipCosmetic(cosmeticId: string | null, slot: string): Promise<{ worn: Record<string, string | null> }> {
+    return this.request('/api/premium/equip', {
+      method: 'POST',
+      body: JSON.stringify({ cosmeticId, slot }),
+    });
+  }
+
+  keyHistory(): Promise<{ entries: KeyEntry[] }> {
+    return this.request('/api/premium/keys');
+  }
+
   // --- Levels ---------------------------------------------------------------
 
   /**
@@ -255,8 +316,13 @@ class ApiClient {
     return this.request('/api/tasks');
   }
 
-  /** Somebody else's level, for their card. The level only - see the route. */
-  levelOf(userId: string): Promise<{ level: number }> {
+  /**
+   * Somebody else's level and what they are wearing, for their card.
+   *
+   * Not their XP or their tasks - see the route. Fetched when a card opens
+   * rather than carried on every user payload.
+   */
+  flairOf(userId: string): Promise<Flair> {
     return this.request(`/api/users/${userId}/level`);
   }
 

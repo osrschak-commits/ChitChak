@@ -3,6 +3,7 @@ import { ApiRequestError, api } from '../lib/api.js';
 import { prepareSquareImage } from '../lib/image.js';
 import { useApp } from '../store/app.js';
 import { LevelPanel } from './LevelPanel.js';
+import { PremiumPanel } from './PremiumPanel.js';
 import { Avatar } from './primitives.js';
 
 /**
@@ -243,6 +244,8 @@ export function ProfileDialog({ onClose }: { onClose(): void }) {
           </div>
 
           <LevelPanel />
+
+          <PremiumPanel />
 
           <div className="section">
             <h3 className="section__title">Account</h3>

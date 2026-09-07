@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { api, mediaUrl } from '../lib/api.js';
+import { api, mediaUrl, type Flair } from '../lib/api.js';
 import { outranks } from '../lib/permissions.js';
 import { usePermissions, useRanks } from '../hooks/usePermissions.js';
 import { fallbackAccent, useApp } from '../store/app.js';
@@ -64,25 +64,26 @@ export function ProfileCard({
    * live, so opening your own card never waits on the network.
    */
   const ownProgress = useApp((s) => s.progress);
-  const [level, setLevel] = useState<number | null>(null);
+  const [flair, setFlair] = useState<Flair | null>(null);
 
   useEffect(() => {
-    if (userId === selfId) {
-      setLevel(ownProgress.level);
-      return;
-    }
     let current = true;
-    setLevel(null);
+    setFlair(null);
+    // Fetched even for yourself: the level is in the store but what you are
+    // wearing is not, and a card that shows everyone's plate except your own
+    // would be a strange thing to look at.
     void api
-      .levelOf(userId)
-      .then((result) => current && setLevel(result.level))
+      .flairOf(userId)
+      .then((result) => current && setFlair(result))
       .catch(() => {
-        /* Their level is the least of what this card is for. */
+        /* Decoration. The card is worth showing without it. */
       });
     return () => {
       current = false;
     };
-  }, [userId, selfId, ownProgress.level]);
+  }, [userId, ownProgress.level]);
+
+  const level = flair?.level ?? (userId === selfId ? ownProgress.level : null);
 
   const member = members.get(`${guildId}:${userId}`);
   const state = voiceStates.get(userId);
@@ -137,8 +138,13 @@ export function ProfileCard({
       role="dialog"
       aria-label={`Profile for ${displayName}`}
     >
-      {/* The rail carries their colour, the same device the room cards use. */}
-      <span className="plate__rail" style={{ background: accent }} />
+      {/* The rail carries their colour, the same device the room cards use -
+          unless they are wearing a plate, which is the whole point of one. */}
+      <span className="plate__rail" style={{ background: flair?.plate ?? accent }} />
+
+      {flair?.plate && (
+        <span className="plate__finish" style={{ background: flair.plate }} aria-hidden="true" />
+      )}
 
       <div className="plate__head">
         <span
@@ -155,6 +161,11 @@ export function ProfileCard({
         <div className="plate__titles">
           <div className="plate__name" style={target.color ? { color: target.color } : undefined}>
             {displayName}
+            {flair?.badge && (
+              <span className="plate__badge mono" title="Wearing a badge">
+                {flair.badge}
+              </span>
+            )}
           </div>
           <div className="plate__handle mono">@{member.user.username}</div>
           <div className="plate__live">
