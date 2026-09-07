@@ -1,4 +1,5 @@
-import { BrowserWindow } from 'electron';
+import { BrowserWindow, nativeImage } from 'electron';
+import appIcon from '../build/icon.png';
 import monoFont from '@fontsource/ibm-plex-mono/files/ibm-plex-mono-latin-600-normal.woff2';
 
 /**
@@ -186,6 +187,9 @@ export function createSplash(): Splash {
     alwaysOnTop: true,
     skipTaskbar: false,
     title: 'ChitChak',
+    // The splash is the first thing in the taskbar on a cold start, so it needs
+    // the icon too - otherwise launching the app briefly shows Electron's.
+    icon: nativeImage.createFromDataURL(appIcon),
     webPreferences: { contextIsolation: true, nodeIntegration: false },
   });
 

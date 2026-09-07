@@ -103,12 +103,34 @@ export interface Progress {
 }
 
 /** Credentials for the SFU. Short-lived and scoped to exactly one room. */
+/**
+ * How good the video this person may publish is allowed to be.
+ *
+ * Sent with the credentials rather than decided by the client, because it
+ * depends on a subscription and the client is not the authority on that.
+ *
+ * It is applied at capture, which is an honest limit rather than an enforced
+ * one: LiveKit's token can say *which* sources may be published but not at what
+ * resolution, so a modified client could send more. That is a deliberate place
+ * to stop. What it would gain is bandwidth, not standing - it cannot see, say
+ * or do anything it could not before, which is the line this whole system is
+ * built on.
+ */
+export interface VideoQuality {
+  width: number;
+  height: number;
+  frameRate: number;
+  /** Bits per second. What the SFU is asked to carry. */
+  maxBitrate: number;
+}
+
 export interface VoiceCredentials {
   channelId: Snowflake;
   /** WebSocket URL of the SFU, e.g. ws://localhost:7880 */
   url: string;
   /** JWT the client passes to the SFU. Grants publish+subscribe on this room only. */
   token: string;
+  video: VideoQuality;
 }
 
 export type ServerMessage =

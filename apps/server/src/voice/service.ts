@@ -1,4 +1,4 @@
-import type { VoiceCredentials, VoiceState, VoiceUpdatePayload } from '@chitchak/protocol';
+import type { VideoQuality, VoiceCredentials, VoiceState, VoiceUpdatePayload } from '@chitchak/protocol';
 import { Permission, has } from '@chitchak/protocol';
 import { and, count, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
@@ -6,6 +6,7 @@ import { channels, guildMembers, users, voiceStates } from '../db/schema.js';
 import { registry } from '../gateway/registry.js';
 import { errors } from '../lib/errors.js';
 import { requireChannelPermission, requireGuildChannel } from '../services/permissions.js';
+import { standingOf } from '../services/subscriptions.js';
 import { noteScreenShare } from './xp-ticker.js';
 import { toVoiceState } from '../services/serialize.js';
 import { createVoiceToken, ensureRoom, livekitUrl, removeParticipant } from './livekit.js';
@@ -123,7 +124,10 @@ export async function joinVoiceChannel(
   // credentials response, so they are excluded to avoid a duplicate apply.
   registry.publishToGuild(channel.guildId, { op: 'voice:state', d: state }, userId);
 
-  return { credentials: { channelId, url: livekitUrl, token }, state };
+  return {
+    credentials: { channelId, url: livekitUrl, token, video: await videoQualityFor(userId) },
+    state,
+  };
 }
 
 /**
@@ -196,6 +200,39 @@ export async function resumeVoiceChannel(
   const state = toVoiceState(row);
   registry.publishToGuild(channel.guildId, { op: 'voice:state', d: state }, userId);
   return state;
+}
+
+/**
+ * What a subscription is worth in pixels.
+ *
+ * The free tier is not a punishment - 720p30 is a perfectly good screen share,
+ * and most people watching are looking at a window a third of their screen.
+ * What a subscription buys is the difference that shows when somebody is
+ * presenting something detailed, or playing something fast.
+ */
+const FREE_VIDEO: VideoQuality = {
+  width: 1280,
+  height: 720,
+  frameRate: 30,
+  maxBitrate: 1_800_000,
+};
+
+const SUBSCRIBER_VIDEO: VideoQuality = {
+  width: 1920,
+  height: 1080,
+  frameRate: 60,
+  maxBitrate: 5_000_000,
+};
+
+async function videoQualityFor(userId: string): Promise<VideoQuality> {
+  try {
+    return (await standingOf(userId)).active ? SUBSCRIBER_VIDEO : FREE_VIDEO;
+  } catch (error) {
+    // A subscription lookup that fails must not stop somebody joining a call.
+    // The free tier is the safe answer: it works for everybody.
+    console.error('[voice] could not read a subscription for video quality', { userId, error });
+    return FREE_VIDEO;
+  }
 }
 
 export async function leaveVoiceChannel(userId: string): Promise<VoiceState | null> {

@@ -5,10 +5,12 @@ import {
   desktopCapturer,
   globalShortcut,
   ipcMain,
+  nativeImage,
   nativeTheme,
   shell,
   systemPreferences,
 } from 'electron';
+import appIcon from '../build/icon.png';
 import { createSplash, type Splash } from './splash.js';
 import { createTray, type TrayHandle } from './tray.js';
 import { bootUpdate, initUpdater, installAndRestart } from './updater.js';
@@ -93,6 +95,21 @@ function createWindow(splash: Splash | null): void {
     backgroundColor: '#1a1b20',
     show: false,
     autoHideMenuBar: true,
+    /**
+     * The window's own icon, which is what the taskbar shows for a running app.
+     *
+     * Without it Electron supplies its own - the atom - and the app ends up
+     * with one icon on the desktop and a different one in the taskbar. The
+     * packaged .exe keeps Electron's icon in its resources because
+     * `signAndEditExecutable` is off (see electron-builder.yml: rewriting it
+     * needs Windows Developer Mode on the build machine), so setting it here is
+     * what actually makes the two agree.
+     *
+     * Inlined rather than read from a path, for the same reason as the tray:
+     * `build/` is electron-builder's resources directory and is not inside the
+     * packaged app.
+     */
+    icon: nativeImage.createFromDataURL(appIcon),
     webPreferences: {
       preload: path.join(dirname, 'preload.cjs'),
       // The renderer runs untrusted-ish content (message text, display names).

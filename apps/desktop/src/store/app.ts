@@ -843,9 +843,12 @@ function applyServerMessage(
     }
 
     case 'voice:credentials': {
-      const { url, token, channelId } = message.d;
+      const { url, token, channelId, video } = message.d;
       set({ voiceChannelId: channelId, cameraOn: false, screenShareOn: false });
       const engineToJoin = getEngine();
+      // Before connecting, so a share started immediately after joining is
+      // already at the right quality rather than the default.
+      engineToJoin.setVideoQuality(video);
       // Before connecting, so the levels are already in place when the first
       // audio track arrives rather than a moment after everyone is audible.
       engineToJoin.setParticipantVolumes(

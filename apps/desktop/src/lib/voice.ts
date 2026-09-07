@@ -15,6 +15,7 @@ import {
   createLocalVideoTrack,
 } from 'livekit-client';
 import type { LocalTrack, Participant, RemoteTrack, RemoteTrackPublication } from 'livekit-client';
+import type { VideoQuality } from '@chitchak/protocol';
 
 /**
  * The voice engine: everything that touches actual media.
@@ -144,6 +145,20 @@ export class VoiceEngine {
    * says what the person asked for, which is what the button should reflect.
    */
   private watching = new Set<string>();
+
+  /**
+   * How good the video this person may publish is allowed to be.
+   *
+   * Handed over with the credentials, because it depends on a subscription and
+   * the client is not the authority on that. Defaults to the free tier so that
+   * nothing here can accidentally publish more than it should by being asked
+   * before the answer arrives.
+   */
+  private video: VideoQuality = { width: 1280, height: 720, frameRate: 30, maxBitrate: 1_800_000 };
+
+  setVideoQuality(quality: VideoQuality): void {
+    this.video = quality;
+  }
 
   constructor(private readonly callbacks: VoiceCallbacks) {}
 
@@ -338,6 +353,9 @@ export class VoiceEngine {
         deviceId: exactDevice(this.settings.videoDeviceId),
         // 720p is the sweet spot for a call tile: sharp at the sizes these are
         // actually rendered, and a third of the bitrate of 1080p.
+        // A camera is a face, and a face does not need a subscriber's pixels -
+        // 720p is plenty and costs everybody less. The entitlement is spent on
+        // screen shares, where detail is the whole point.
         resolution: { width: 1280, height: 720, frameRate: 30 },
       });
     } catch (error) {
@@ -370,9 +388,29 @@ export class VoiceEngine {
       // Audio only when asked for: loopback capture takes everything the
       // machine is playing, which is rarely what someone sharing a window
       // intends to broadcast.
-      const tracks = await room.localParticipant.createScreenTracks({ audio: withAudio });
+      const tracks = await room.localParticipant.createScreenTracks({
+        audio: withAudio,
+        resolution: {
+          width: this.video.width,
+          height: this.video.height,
+          frameRate: this.video.frameRate,
+        },
+      });
       for (const track of tracks) {
-        await room.localParticipant.publishTrack(track);
+        // Told to the SFU as well as to the capture: a browser that hands back
+        // more than was asked for - and they do, when the display is larger -
+        // would otherwise be forwarded at whatever it felt like producing.
+        await room.localParticipant.publishTrack(
+          track,
+          track instanceof LocalVideoTrack
+            ? {
+                videoEncoding: {
+                  maxBitrate: this.video.maxBitrate,
+                  maxFramerate: this.video.frameRate,
+                },
+              }
+            : undefined,
+        );
         this.screenTracks.push(track);
       }
     } catch (error) {
