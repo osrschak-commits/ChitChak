@@ -14,6 +14,7 @@ import type { WebSocket } from 'ws';
 import { db } from '../db/client.js';
 import { channels } from '../db/schema.js';
 import { isAppError } from '../lib/errors.js';
+import { sessionIsStillValid } from '../lib/session-validity.js';
 import { verifyAccessToken } from '../lib/tokens.js';
 import { buildReadySnapshot, guildIdsForUser } from '../services/snapshot.js';
 import { createMessage } from '../services/messages.js';
@@ -278,6 +279,14 @@ export class Session {
     if (!claims) {
       this.sendError('invalid_token', 'Access token is invalid or expired');
       this.close(GatewayCloseCode.AuthenticationFailed, 'invalid token');
+      return;
+    }
+
+    // Same check the HTTP side makes: the signature can be perfect and the
+    // account still be deleted, or every session revoked since it was issued.
+    if (!(await sessionIsStillValid(claims))) {
+      this.sendError('invalid_token', 'Session is no longer valid, please sign in again');
+      this.close(GatewayCloseCode.AuthenticationFailed, 'revoked token');
       return;
     }
 

@@ -21,9 +21,18 @@ const AUDIENCE = 'chitchak-client';
 export interface AccessTokenClaims {
   userId: string;
   username: string;
+  /**
+   * When this token was issued, in seconds. Compared against the user's
+   * `tokensValidFrom` so that a password reset or an account deletion can
+   * invalidate tokens that are still inside their lifetime - the one thing a
+   * stateless token cannot do for itself.
+   */
+  issuedAt: number;
 }
 
-export async function signAccessToken(claims: AccessTokenClaims): Promise<string> {
+export async function signAccessToken(
+  claims: Omit<AccessTokenClaims, 'issuedAt'>,
+): Promise<string> {
   return new SignJWT({ username: claims.username })
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setSubject(claims.userId)
@@ -41,8 +50,14 @@ export async function verifyAccessToken(token: string): Promise<AccessTokenClaim
       audience: AUDIENCE,
       algorithms: ['HS256'],
     });
-    if (typeof payload.sub !== 'string' || typeof payload.username !== 'string') return null;
-    return { userId: payload.sub, username: payload.username };
+    if (
+      typeof payload.sub !== 'string' ||
+      typeof payload.username !== 'string' ||
+      typeof payload.iat !== 'number'
+    ) {
+      return null;
+    }
+    return { userId: payload.sub, username: payload.username, issuedAt: payload.iat };
   } catch {
     // Expired, wrong signature, malformed - all indistinguishable to the caller
     // on purpose. The client's response is the same either way: re-authenticate.

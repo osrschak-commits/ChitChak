@@ -1,5 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { errors } from '../lib/errors.js';
+import { sessionIsStillValid } from '../lib/session-validity.js';
 import { verifyAccessToken } from '../lib/tokens.js';
 
 declare module 'fastify' {
@@ -24,6 +25,13 @@ export async function authenticate(request: FastifyRequest, _reply: FastifyReply
 
   const claims = await verifyAccessToken(header.slice('Bearer '.length).trim());
   if (!claims) throw errors.unauthorized('Access token is invalid or expired');
+
+  // A valid signature is not the whole question: the account behind it may have
+  // been deleted, or had every session revoked by a password reset, since this
+  // token was minted.
+  if (!(await sessionIsStillValid(claims))) {
+    throw errors.unauthorized('Session is no longer valid, please sign in again');
+  }
 
   request.user = claims;
 }
