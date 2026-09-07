@@ -15,6 +15,12 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob: %VITE_IMG_SRC%; media-src 'self' blob:; connect-src 'self' %VITE_CONNECT_SRC%"
     />
+    <!--
+      The same renderer is also the web client at /app, where a browser tab
+      without an icon is conspicuous. Relative, like every other asset here, so
+      it survives both file:// in Electron and a path prefix on the site.
+    -->
+    <link rel="icon" type="image/png" href="./build/icon.png" />
     <title>ChitChak</title>
   </head>
   <body>

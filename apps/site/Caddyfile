@@ -22,7 +22,7 @@
 	# Everything an update actually changes. no-cache means "revalidate", not
 	# "do not store": the browser still gets a 304 when nothing moved, and a
 	# deploy is visible immediately instead of whenever a cache decides.
-	@entry path / /index.html /styles.css /download.js /icon.svg /app /app/ /app/index.html /pay /pay.html
+	@entry path / /index.html /styles.css /download.js /icon.png /app /app/ /app/index.html /pay /pay.html
 	header @entry Cache-Control "no-cache"
 
 	# Paddle's default payment link is configured once in their dashboard, so the

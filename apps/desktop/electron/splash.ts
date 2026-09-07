@@ -69,11 +69,33 @@ const page = `<!doctype html>
   }
 
   .mark {
+    display: flex;
+    align-items: center;
+    gap: 11px;
     font-family: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
     font-size: 13px;
     font-weight: 600;
     letter-spacing: 0.28em;
     color: ${BRASS};
+  }
+
+  .mark img {
+    width: 26px;
+    height: 26px;
+    /*
+     * Fades up rather than appearing.
+     *
+     * This window is shown the instant it can be, which on a fast start is
+     * before anything else exists - so the logo arriving softly reads as the
+     * app waking up, where a hard cut reads as a flicker. It ends fully
+     * visible, so a still frame of the splash is never a blank square.
+     */
+    animation: rise 620ms cubic-bezier(0.2, 0, 0, 1) both;
+  }
+
+  @keyframes rise {
+    from { opacity: 0; transform: scale(0.86); }
+    to   { opacity: 1; transform: none; }
   }
 
   .foot { display: flex; flex-direction: column; gap: 11px; }
@@ -128,12 +150,13 @@ const page = `<!doctype html>
 
   @media (prefers-reduced-motion: reduce) {
     .track--waiting .fill { animation-duration: 2600ms; }
+    .mark img { animation: none; }
   }
 </style>
 </head>
 <body>
   <div class="panel">
-    <div class="mark">CHITCHAK</div>
+    <div class="mark"><img src="${appIcon}" alt="" />CHITCHAK</div>
     <div class="foot">
       <div class="status">
         <span id="say">Starting…</span>

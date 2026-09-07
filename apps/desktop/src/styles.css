@@ -1442,12 +1442,31 @@ textarea::placeholder {
 }
 
 .auth__mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.28em;
   color: var(--brass-400);
   margin-bottom: 22px;
+}
+
+/*
+ * The logo, in CSS rather than markup.
+ *
+ * It is decoration - the word beside it already names the app, and a screen
+ * reader announcing the mark twice helps nobody. Putting it here also means the
+ * five places that render `auth__mark` did not each need editing, and cannot
+ * drift apart later.
+ */
+.auth__mark::before {
+  content: '';
+  width: 22px;
+  height: 22px;
+  flex: none;
+  background: url('../build/icon.png') center / contain no-repeat;
 }
 
 .auth__title {

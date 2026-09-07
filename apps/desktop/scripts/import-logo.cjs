@@ -20,10 +20,48 @@
  */
 const { writeFileSync, existsSync } = require('node:fs');
 const path = require('node:path');
-const { app, nativeImage } = require('electron');
+
+const electron = require('electron');
+
+/**
+ * Start again, properly, if we are not actually in Electron.
+ *
+ * `require('electron')` returns the module inside Electron and the *path to the
+ * Electron binary* outside it - which is what happens under plain `node`, and
+ * also under `electron` itself when ELECTRON_RUN_AS_NODE is set, as several
+ * editors and task runners do to their child processes. Both cases used to end
+ * at "Cannot read properties of undefined (reading 'whenReady')", which says
+ * nothing about the cause.
+ *
+ * The string we were handed is the binary, so re-exec it with the flag cleared.
+ */
+if (typeof electron === 'string') {
+  const { spawnSync } = require('node:child_process');
+  const env = { ...process.env };
+  delete env.ELECTRON_RUN_AS_NODE;
+  const run = spawnSync(electron, [__filename, ...process.argv.slice(2)], {
+    stdio: 'inherit',
+    env,
+  });
+  process.exit(run.status ?? 1);
+}
+
+const { app, nativeImage } = electron;
 
 const source = path.resolve(process.argv[2] ?? 'build/logo-source.png');
 const outDir = path.resolve(__dirname, '..', 'build');
+
+/**
+ * The website's copy, written here rather than in the site's own build.
+ *
+ * The site is static files served by Caddy - there is no build step to hang
+ * this off, and the alternative is remembering to copy a file across whenever
+ * the logo changes. A forgotten copy means the site quietly keeps the old mark,
+ * which is exactly the sort of thing nobody notices for a month.
+ *
+ * Skipped without complaint if the site is not checked out beside us.
+ */
+const siteIcon = path.resolve(__dirname, '..', '..', 'site', 'public', 'icon.png');
 
 /** Rendered size -> the icns types that expect exactly those pixels. */
 const ICNS_TYPES = {
@@ -38,6 +76,86 @@ const ICNS_TYPES = {
 
 /** Sizes Windows actually picks between, smallest first. */
 const ICO_SIZES = [16, 24, 32, 48, 64, 128, 256];
+
+/**
+ * How much of each edge is left clear, as a fraction of the icon's width.
+ *
+ * The source art is trimmed to the mark and re-padded to this, rather than
+ * used as drawn. A logo exported for a website is usually generous with
+ * whitespace, and an icon is the one place that reads as a mistake: every
+ * icon beside it in a taskbar or a dock is drawn to fill its square, so
+ * padding shows up as *this app's* icon being small and faint rather than as
+ * breathing room. Seven percent is roughly what the platform icons use.
+ */
+const MARGIN = 0.07;
+
+/**
+ * The tight box around everything that is not transparent.
+ *
+ * The threshold is not zero: exported art tends to carry a halo of nearly
+ * transparent pixels around the edge, and treating those as content puts the
+ * padding straight back.
+ */
+function opaqueBounds(image) {
+  const { width, height } = image.getSize();
+  const px = image.getBitmap();
+  let minX = width;
+  let minY = height;
+  let maxX = -1;
+  let maxY = -1;
+
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (px[(y * width + x) * 4 + 3] > 8) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+
+  if (maxX < 0) return null;
+  return { x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1 };
+}
+
+/**
+ * The mark, scaled to fit and centred on a transparent square.
+ *
+ * Scaled from the trimmed original at every size rather than from one padded
+ * copy - resizing twice is how small icons end up soft, and the small ones are
+ * the sizes anybody actually looks at.
+ *
+ * The aspect ratio is kept, so a mark that is not square is centred rather
+ * than stretched. Composing by hand because `nativeImage` can resize and crop
+ * but not place one image on another; a transparent buffer with the pixels
+ * copied into the middle of it is the whole operation.
+ */
+function square(mark, size) {
+  const inner = Math.max(1, Math.round(size * (1 - 2 * MARGIN)));
+  const source = mark.getSize();
+  const scale = inner / Math.max(source.width, source.height);
+
+  const resized = mark.resize({
+    width: Math.max(1, Math.round(source.width * scale)),
+    height: Math.max(1, Math.round(source.height * scale)),
+    // 'best' rather than the default: these are scaled a long way, and the
+    // cheap filter leaves the small sizes visibly ragged.
+    quality: 'best',
+  });
+
+  const { width, height } = resized.getSize();
+  const pixels = resized.getBitmap();
+  const canvas = Buffer.alloc(size * size * 4); // zeroed, so transparent
+  const left = Math.round((size - width) / 2);
+  const top = Math.round((size - height) / 2);
+
+  for (let y = 0; y < height; y++) {
+    pixels.copy(canvas, ((top + y) * size + left) * 4, y * width * 4, (y + 1) * width * 4);
+  }
+
+  return nativeImage.createFromBuffer(canvas, { width: size, height: size }).toPNG();
+}
 
 function encodeIco(pngBySize) {
   const sizes = ICO_SIZES.filter((size) => pngBySize.has(size));
@@ -106,26 +224,30 @@ app.whenReady().then(() => {
   }
 
   const { width, height } = original.getSize();
-  console.log(`source: ${width}x${height}`);
-  if (width !== height) {
-    // Not fatal - the resize will squash it - but it is almost never intended,
-    // and an icon that is subtly wrong on every surface is hard to notice and
-    // annoying to trace.
-    console.warn('warning: the source is not square, so every icon will be stretched');
+  const bounds = opaqueBounds(original);
+  if (!bounds) {
+    console.error(`${source} is entirely transparent`);
+    app.exit(1);
+    return;
   }
+
+  console.log(`source: ${width}x${height}, mark: ${bounds.width}x${bounds.height}`);
+
+  // Worth saying out loud. Trimming is right far more often than not, but it
+  // does mean the icons are not pixel-for-pixel what the designer exported,
+  // and that is a surprise best had here rather than in a shipped installer.
+  const fill = Math.round((100 * Math.max(bounds.width, bounds.height)) / Math.max(width, height));
+  if (fill < 95) {
+    console.log(`trimmed ${100 - fill}% padding, re-padded to ${Math.round(MARGIN * 100)}% a side`);
+  }
+
+  const mark = original.crop(bounds);
 
   const wanted = [...new Set([...ICO_SIZES, ...Object.keys(ICNS_TYPES).map(Number), 512])].sort(
     (a, b) => a - b,
   );
 
-  const pngBySize = new Map(
-    wanted.map((size) => [
-      size,
-      // 'best' rather than the default: these are scaled down a long way, and
-      // the cheap filter leaves the small sizes visibly ragged.
-      original.resize({ width: size, height: size, quality: 'best' }).toPNG(),
-    ]),
-  );
+  const pngBySize = new Map(wanted.map((size) => [size, square(mark, size)]));
 
   // electron-builder refuses a PNG icon below 512x512, so this doubles as the
   // fallback it accepts.
@@ -134,5 +256,13 @@ app.whenReady().then(() => {
   writeFileSync(path.join(outDir, 'icon.icns'), encodeIcns(pngBySize));
 
   console.log(`wrote icon.png (512), icon.ico (${ICO_SIZES.join(', ')}), icon.icns`);
+
+  // 256 rather than 512: it is a favicon and a 26px header mark, and the site
+  // is the one place where the bytes are on somebody else's connection.
+  if (existsSync(path.dirname(siteIcon))) {
+    writeFileSync(siteIcon, pngBySize.get(256));
+    console.log('wrote the site icon (256)');
+  }
+
   app.exit(0);
 });

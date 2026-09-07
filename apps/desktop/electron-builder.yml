@@ -45,6 +45,16 @@ win:
   # installer, Start Menu entry and desktop shortcut all still use ours. To get
   # the inner icon too, turn on Windows Developer Mode (Settings > System > For
   # developers), which grants the symlink privilege, and set this back to true.
+  #
+  # Developer Mode alone is not enough on the machine that is already logged in.
+  # SeCreateSymbolicLinkPrivilege is written into the access token at logon, so a
+  # session that started before the toggle never receives it and the build fails
+  # the same way it did with the toggle off. Sign out and back in, then check:
+  #
+  #   whoami /priv | findstr Symbolic
+  #
+  # If that prints nothing, leave this false - flipping it only converts a
+  # missing icon into a failed build.
   signAndEditExecutable: false
 
 nsis:
