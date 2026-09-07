@@ -160,10 +160,111 @@ export function initUpdater(resolveWindow: () => BrowserWindow | null): void {
     });
   };
 
-  // Not immediately on launch: the first seconds are spent connecting to the
-  // gateway and joining channels, and a 90 MB download alongside that makes the
-  // app feel slow for no reason.
-  setTimeout(check, 15_000);
+  // Not immediately on launch: `bootUpdate` has already looked, before the
+  // window existed, and anything it found is either installed or deliberately
+  // deferred. This is the first of the periodic checks, catching a version
+  // published while the app has been sitting open.
+  setTimeout(check, CHECK_INTERVAL_MS);
   const timer = setInterval(check, CHECK_INTERVAL_MS);
   app.on('will-quit', () => clearInterval(timer));
+}
+
+/** How long to wait for the update host before starting the app anyway. */
+const BOOT_CHECK_TIMEOUT_MS = 8_000;
+/** And how long a started download may go without progress before it is abandoned. */
+const BOOT_STALL_TIMEOUT_MS = 45_000;
+
+export type BootOutcome =
+  /** Nothing to do - start the app. */
+  | { kind: 'proceed' }
+  /** An update is installing and the app is about to restart into it. */
+  | { kind: 'installing'; version: string };
+
+/**
+ * The update check that happens before the app appears.
+ *
+ * This is the one place an update is allowed to make somebody wait, and it is
+ * the right place: nobody is mid-sentence at launch, and a download that runs
+ * behind a window that looks finished is one people quit halfway through - the
+ * previous behaviour, where an update found at 15 seconds only landed if you
+ * happened to close the app cleanly afterwards.
+ *
+ * Every failure ends in `proceed`. Offline, update host down, no answer,
+ * download stalled - none of those are reasons to keep somebody out of an app
+ * that works perfectly well as it is. The periodic check will try again later.
+ *
+ * @param report Called as the phase changes, for the splash to display.
+ */
+export async function bootUpdate(
+  report: (phase: 'checking' | 'downloading' | 'installing', percent?: number) => void,
+): Promise<BootOutcome> {
+  // Nothing to update from in development, and electron-updater throws rather
+  // than no-opping when there is no packaged version to compare against.
+  if (!app.isPackaged) return { kind: 'proceed' };
+
+  // macOS cannot install what it cannot verify, and this build is unsigned.
+  // Making people wait at a splash for a download that must then be dragged
+  // over by hand would be the worst of both; the in-app banner handles it.
+  if (isMac) return { kind: 'proceed' };
+
+  autoUpdater.autoDownload = true;
+
+  return new Promise<BootOutcome>((resolve) => {
+    let settled = false;
+    let version = '';
+    let timer: NodeJS.Timeout;
+
+    const finish = (outcome: BootOutcome) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      autoUpdater.removeListener('update-available', onAvailable);
+      autoUpdater.removeListener('update-not-available', onNothing);
+      autoUpdater.removeListener('download-progress', onProgress);
+      autoUpdater.removeListener('update-downloaded', onDownloaded);
+      autoUpdater.removeListener('error', onError);
+      resolve(outcome);
+    };
+
+    // Restarted whenever something happens, so the deadline is "nothing has
+    // happened for a while" rather than a budget for the whole download - which
+    // on a slow connection would abandon an update that was going fine.
+    const waitFor = (ms: number) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => finish({ kind: 'proceed' }), ms);
+    };
+
+    const onAvailable = (info: { version: string }) => {
+      version = info.version;
+      // The download has not reported anything yet; give it the stall budget
+      // rather than the short check one.
+      waitFor(BOOT_STALL_TIMEOUT_MS);
+      report('downloading');
+    };
+    const onNothing = () => finish({ kind: 'proceed' });
+    const onProgress = (progress: { percent: number }) => {
+      waitFor(BOOT_STALL_TIMEOUT_MS);
+      report('downloading', Math.round(progress.percent));
+    };
+    const onDownloaded = (info: { version: string }) => {
+      report('installing', 100);
+      finish({ kind: 'installing', version: info.version || version });
+    };
+    const onError = () => finish({ kind: 'proceed' });
+
+    autoUpdater.on('update-available', onAvailable);
+    autoUpdater.on('update-not-available', onNothing);
+    autoUpdater.on('download-progress', onProgress);
+    autoUpdater.on('update-downloaded', onDownloaded);
+    autoUpdater.on('error', onError);
+
+    report('checking');
+    waitFor(BOOT_CHECK_TIMEOUT_MS);
+    void autoUpdater.checkForUpdates().catch(() => finish({ kind: 'proceed' }));
+  });
+}
+
+/** Install what `bootUpdate` downloaded, and come back up on the new version. */
+export function installAndRestart(): void {
+  autoUpdater.quitAndInstall(true, true);
 }

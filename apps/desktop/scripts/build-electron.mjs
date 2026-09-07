@@ -21,6 +21,11 @@ export async function buildElectron({ minify = false } = {}) {
     format: 'cjs',
     target: 'node20',
     external: ['electron'],
+    // The splash window is a data: URL with no file system behind it, so its
+    // font has to travel inside the bundle. 15 KB, and the alternative is a
+    // splash that falls back to whatever monospace font the machine happens to
+    // have for the first second of every launch.
+    loader: { '.woff2': 'dataurl' },
     sourcemap: true,
     minify,
     logLevel: 'warning',

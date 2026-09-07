@@ -9,7 +9,8 @@ import {
   shell,
   systemPreferences,
 } from 'electron';
-import { initUpdater } from './updater.js';
+import { createSplash, type Splash } from './splash.js';
+import { bootUpdate, initUpdater, installAndRestart } from './updater.js';
 
 const isMac = process.platform === 'darwin';
 const isWindows = process.platform === 'win32';
@@ -22,6 +23,9 @@ const isWindows = process.platform === 'win32';
  */
 
 const isDev = !app.isPackaged;
+
+/** How long to let a boot-time install take before opening the app regardless. */
+const INSTALL_GIVE_UP_MS = 20_000;
 
 // Remote debugging in development only. Lets the renderer be inspected and
 // driven from outside the window - the difference between diagnosing a
@@ -55,7 +59,7 @@ let mainWindow: BrowserWindow | null = null;
  */
 let pushToTalkAccelerator = isMac ? 'Alt+Space' : 'F8';
 
-function createWindow(): void {
+function createWindow(splash: Splash | null): void {
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -76,8 +80,17 @@ function createWindow(): void {
     },
   });
 
-  // Avoid the white flash before React paints.
-  mainWindow.once('ready-to-show', () => mainWindow?.show());
+  // Avoid the white flash before React paints - and only then take the splash
+  // away, so the handover is one window replacing another rather than a gap
+  // with nothing on screen.
+  mainWindow.once('ready-to-show', () => {
+    // Dropped before the real window is shown: an always-on-top splash that is
+    // still up when the app appears floats over it for a frame, and over
+    // anything the person alt-tabs to if the show ever fails.
+    splash?.window.setAlwaysOnTop(false);
+    mainWindow?.show();
+    splash?.close();
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -289,10 +302,45 @@ app.whenReady().then(() => {
   // OS draws match the window it is drawing around.
   nativeTheme.themeSource = 'dark';
 
-  createWindow();
-  installPermissionHandlers();
+  /**
+   * Something on screen first, then the slow part.
+   *
+   * The splash is created before anything that can block, because the whole
+   * point of it is the seconds before the app can be shown - a splash that
+   * appears after the wait has been spent is decoration.
+   */
+  const splash = createSplash();
+
+  void bootUpdate((phase, percent) => splash.set(phase, percent))
+    .catch(() => ({ kind: 'proceed' as const }))
+    .then((outcome) => {
+      const start = () => {
+        if (mainWindow) return;
+        splash.set('loading');
+        createWindow(splash);
+        // Both read `mainWindow`, so neither can run before it exists.
+        installPermissionHandlers();
+        initUpdater(() => mainWindow);
+      };
+
+      if (outcome.kind === 'installing') {
+        // The app is about to be replaced and relaunched. Leave the splash up
+        // saying so - closing it here would leave a few seconds of nothing at
+        // all, which reads as a crash.
+        splash.set('installing', 100);
+        setImmediate(installAndRestart);
+        // If the installer does not take, open the app anyway. Whatever went
+        // wrong with the update, being unable to start is a far worse outcome
+        // than running the old version for another day - and a splash that
+        // never resolves is indistinguishable from a hang.
+        setTimeout(start, INSTALL_GIVE_UP_MS);
+        return;
+      }
+
+      start();
+    });
+
   registerPushToTalk(pushToTalkAccelerator);
-  initUpdater(() => mainWindow);
 
   /**
    * Screens and windows available to share, with preview thumbnails.
@@ -364,7 +412,9 @@ app.whenReady().then(() => {
   ipcMain.handle('ptt:get-key', () => pushToTalkAccelerator);
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    // No splash: this is a dock click on a running app, not a cold start, so
+    // there is nothing to wait through.
+    if (BrowserWindow.getAllWindows().length === 0) createWindow(null);
   });
 });
 
