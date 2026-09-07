@@ -3,6 +3,8 @@ import { AuthScreen } from './components/AuthScreen.js';
 import { CallView } from './components/CallView.js';
 import { ChatPanel } from './components/ChatPanel.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
+import { FriendsPanel } from './components/FriendsPanel.js';
+import { FriendsSidebar } from './components/FriendsSidebar.js';
 import { GuildDialog } from './components/GuildDialog.js';
 import { ProfileDialog } from './components/ProfileDialog.js';
 import { ResetPasswordScreen, takeResetTokenFromUrl } from './components/ResetPasswordScreen.js';
@@ -38,6 +40,8 @@ export function App() {
   const gatewayStatus = useApp((s) => s.gatewayStatus);
   const selectedGuildId = useApp((s) => s.selectedGuildId);
   const mainView = useApp((s) => s.mainView);
+  const scope = useApp((s) => s.scope);
+  const selectedDmChannelId = useApp((s) => s.selectedDmChannelId);
   const voiceChannelId = useApp((s) => s.voiceChannelId);
 
   useEffect(() => {
@@ -107,12 +111,16 @@ export function App() {
         {/* Boundaries per region: a bug in the channel list should not take the
             call down with it, and vice versa. */}
         <ErrorBoundary scope="channel list">
-          <Sidebar
-            onOpenServerSettings={(tab) => {
-              setSettingsTab(tab);
-              setOverlay('server-settings');
-            }}
-          />
+          {scope === 'friends' ? (
+            <FriendsSidebar />
+          ) : (
+            <Sidebar
+              onOpenServerSettings={(tab) => {
+                setSettingsTab(tab);
+                setOverlay('server-settings');
+              }}
+            />
+          )}
         </ErrorBoundary>
 
         {/* A call and a text channel are separate places, not a call stacked on
@@ -120,6 +128,10 @@ export function App() {
         <ErrorBoundary scope={mainView === 'call' ? 'call view' : 'chat'}>
           {mainView === 'call' && voiceChannelId ? (
             <CallView />
+          ) : scope === 'friends' && selectedDmChannelId === null ? (
+            // A conversation renders through the ordinary chat panel: a DM is an
+            // ordinary channel, and deserves the same reading experience.
+            <FriendsPanel />
           ) : (
             <ChatPanel onEditProfile={() => setOverlay('profile')} />
           )}

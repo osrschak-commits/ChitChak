@@ -9,6 +9,7 @@ import type {
   GuildMember,
   Invite,
   Message,
+  PublicUser,
   Rank,
   SelfUser,
 } from '@chitchak/protocol';
@@ -208,6 +209,59 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ email }),
     });
+  }
+
+  // --- Friends --------------------------------------------------------------
+
+  /**
+   * Ask someone to be your friend, by exact username.
+   *
+   * Returns `accepted` rather than `pending` when they had already asked you -
+   * asking back is consent, so the server treats it as an acceptance and hands
+   * over the conversation.
+   */
+  sendFriendRequest(username: string): Promise<{
+    state: 'pending' | 'accepted';
+    user: PublicUser;
+    channel?: Channel;
+  }> {
+    return this.request('/api/friends/requests', {
+      method: 'POST',
+      body: JSON.stringify({ username }),
+    });
+  }
+
+  acceptFriendRequest(userId: string): Promise<{ user: PublicUser; channel: Channel }> {
+    return this.request(`/api/friends/requests/${userId}/accept`, { method: 'POST' });
+  }
+
+  /** Declines an incoming request, or cancels one you sent. */
+  async dismissFriendRequest(userId: string): Promise<void> {
+    await this.request<void>(`/api/friends/requests/${userId}`, { method: 'DELETE' });
+  }
+
+  async unfriend(userId: string): Promise<void> {
+    await this.request<void>(`/api/friends/${userId}`, { method: 'DELETE' });
+  }
+
+  /** Opens the conversation with a friend. Idempotent - safe to call every time. */
+  openDm(userId: string): Promise<Channel> {
+    return this.request(`/api/friends/${userId}/dm`, { method: 'POST' });
+  }
+
+  async blockUser(userId: string): Promise<void> {
+    await this.request<void>('/api/blocks', {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    });
+  }
+
+  async unblockUser(userId: string): Promise<void> {
+    await this.request<void>(`/api/blocks/${userId}`, { method: 'DELETE' });
+  }
+
+  listBlocked(): Promise<PublicUser[]> {
+    return this.request('/api/blocks');
   }
 
   /**

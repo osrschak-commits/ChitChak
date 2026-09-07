@@ -15,7 +15,20 @@ const GROUPING_WINDOW_MS = 5 * 60 * 1000;
 
 export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
   const channels = useApp((s) => s.channels);
-  const selectedTextChannelId = useApp((s) => s.selectedTextChannelId);
+  const selectedGuildChannelId = useApp((s) => s.selectedTextChannelId);
+  const selectedDmChannelId = useApp((s) => s.selectedDmChannelId);
+  const scope = useApp((s) => s.scope);
+  const dmChannels = useApp((s) => s.dmChannels);
+  const people = useApp((s) => s.people);
+
+  /**
+   * The channel being read, from whichever surface is open.
+   *
+   * A DM and a guild channel are the same kind of thing to everything below
+   * this line - the difference is only which selection points at it.
+   */
+  const selectedTextChannelId =
+    scope === 'friends' ? selectedDmChannelId : selectedGuildChannelId;
   const selectedGuildId = useApp((s) => s.selectedGuildId);
   const messages = useApp((s) => s.messages);
   const members = useApp((s) => s.members);
@@ -26,6 +39,7 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
   const dismissVoiceError = useApp((s) => s.dismissVoiceError);
   const guilds = useApp((s) => s.guilds);
   const selfId = useApp((s) => s.user?.id);
+  const self = useApp((s) => s.user);
   const { canInChannel, resolve } = usePermissions();
 
   const [draft, setDraft] = useState('');
@@ -36,10 +50,30 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
   const channel = selectedTextChannelId ? channels.get(selectedTextChannelId) : undefined;
   const history = selectedTextChannelId ? (messages.get(selectedTextChannelId) ?? []) : [];
 
-  const mayManageMessages = selectedTextChannelId
+  const isDm = Boolean(selectedTextChannelId && dmChannels.has(selectedTextChannelId));
+
+  /**
+   * What to call the open channel.
+   *
+   * A DM's stored name is a placeholder - the conversation is named by the
+   * other person, whose display name is theirs to change.
+   */
+  const dmPartner = selectedTextChannelId
+    ? people.get(dmChannels.get(selectedTextChannelId) ?? '')
+    : undefined;
+  const title = isDm ? (dmPartner?.displayName ?? 'Conversation') : (channel?.name ?? '');
+
+  // Ranks and overwrites do not exist in a DM. You may always write in one -
+  // the server checks the friendship - and you may only delete your own, which
+  // is what MANAGE_MESSAGES being false already means here.
+  const mayManageMessages = isDm
+    ? false
+    : selectedTextChannelId
     ? canInChannel(selectedTextChannelId, Permission.MANAGE_MESSAGES)
     : false;
-  const maySend = selectedTextChannelId
+  const maySend = isDm
+    ? true
+    : selectedTextChannelId
     ? canInChannel(selectedTextChannelId, Permission.SEND_MESSAGES)
     : false;
 
@@ -64,10 +98,11 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
       {channel ? (
         <header className="pane__header">
           <span className="chan__glyph" aria-hidden="true">
-            #
+            {isDm ? '◈' : '#'}
           </span>
-          <span className="pane__title">{channel.name}</span>
-          {channel.topic && <span className="pane__topic">{channel.topic}</span>}
+          <span className="pane__title">{title}</span>
+          {!isDm && channel.topic && <span className="pane__topic">{channel.topic}</span>}
+          {isDm && dmPartner && <span className="pane__topic mono">{dmPartner.username}</span>}
         </header>
       ) : (
         <header className="pane__header">
@@ -103,9 +138,11 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
             {history.length === 0 && (
               <div className="empty">
                 <div className="empty__inner">
-                  <h2 className="empty__title">#{channel.name}</h2>
+                  <h2 className="empty__title">{isDm ? title : `#${channel.name}`}</h2>
                   <p className="empty__body">
-                    {channel.topic ?? 'This is the beginning of the channel. Say something.'}
+                    {isDm
+                      ? `This is the start of your conversation with ${title}. Only the two of you can see it.`
+                      : (channel.topic ?? 'This is the beginning of the channel. Say something.')}
                   </p>
                 </div>
               </div>
@@ -114,7 +151,14 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
             {history.map((message, index) => {
               const previous = history[index - 1];
               const author = members.get(`${selectedGuildId}:${message.authorId}`);
-              const name = author?.nickname ?? author?.user.displayName ?? 'Unknown';
+              // A DM has no guild membership to look an author up in, so the
+              // profile comes from the people the friends list already knows -
+              // or from `user`, since one of the two is always you.
+              const authorProfile =
+                author?.user ??
+                (message.authorId === selfId ? self : undefined) ??
+                people.get(message.authorId);
+              const name = author?.nickname ?? authorProfile?.displayName ?? 'Unknown';
               const grouped =
                 previous !== undefined &&
                 previous.authorId === message.authorId &&
@@ -137,7 +181,7 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
                       >
                         <Avatar
                           user={
-                            author?.user ?? {
+                            authorProfile ?? {
                               id: message.authorId,
                               displayName: name,
                               avatarUrl: null,
@@ -219,7 +263,9 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
               disabled={!maySend}
               placeholder={
                 maySend
-                  ? `Message #${channel.name}`
+                  ? isDm
+                    ? `Message ${title}`
+                    : `Message #${channel.name}`
                   : 'Your rank cannot send messages in this channel'
               }
               maxLength={4000}

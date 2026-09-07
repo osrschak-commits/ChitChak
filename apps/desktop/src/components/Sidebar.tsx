@@ -46,7 +46,10 @@ export function Sidebar({
 
   const { textChannels, voiceChannels } = useMemo(() => {
     const all = [...channels.values()]
-      .filter((c) => c.guildId === selectedGuildId)
+      // `c.guildId !== null` is not redundant: a DM's guildId is null, and so
+      // is selectedGuildId for someone with no servers, so equality alone would
+      // list every private conversation as a channel of the server they are not in.
+      .filter((c) => c.guildId !== null && c.guildId === selectedGuildId)
       .sort((a, b) => a.position - b.position || a.name.localeCompare(b.name));
     return {
       textChannels: all.filter((c) => c.kind === 'text'),

@@ -5,6 +5,7 @@ import type {
   GuildMember,
   Message,
   PresenceStatus,
+  PublicUser,
   Rank,
   SelfUser,
   ServerMessage,
@@ -48,6 +49,33 @@ interface AppState {
   gatewayStatus: GatewayStatus;
 
   guilds: Guild[];
+
+  /**
+   * Which surface the window is showing: a server, or the friends list.
+   *
+   * A separate flag rather than `selectedGuildId === null`, which already means
+   * "no servers yet" and would make an empty account indistinguishable from
+   * someone who deliberately opened their friends.
+   */
+  scope: 'guild' | 'friends';
+
+  /** Accepted friends, and the requests waiting in each direction. Ids only. */
+  friends: Set<string>;
+  incomingRequests: Set<string>;
+  outgoingRequests: Set<string>;
+  blocked: Set<string>;
+  /**
+   * People who appear in no shared server - friends, requesters, blocked.
+   *
+   * Guild members are looked up through `members`, which is keyed per guild.
+   * A friend you share no server with has no entry there, so their profile has
+   * to live somewhere; this is that somewhere.
+   */
+  people: Map<string, PublicUser>;
+  /** DM channel id -> the other person. The channel itself is in `channels`. */
+  dmChannels: Map<string, string>;
+  /** The open conversation, when `scope` is 'friends'. */
+  selectedDmChannelId: string | null;
   channels: Map<string, Channel>;
   members: Map<string, GuildMember>;
   ranks: Map<string, Rank>;
@@ -93,6 +121,18 @@ interface AppState {
   markAuthenticated(): void;
   signOut(): Promise<void>;
   selectGuild(guildId: string): void;
+  /** Open the friends surface, leaving any server selection where it was. */
+  openFriends(): void;
+  selectDmChannel(channelId: string): void;
+  sendFriendRequest(username: string): Promise<void>;
+  acceptFriendRequest(userId: string): Promise<void>;
+  /** Declines an incoming request or cancels one you sent - the same call. */
+  dismissRequest(userId: string): Promise<void>;
+  unfriend(userId: string): Promise<void>;
+  blockPerson(userId: string): Promise<void>;
+  unblockPerson(userId: string): Promise<void>;
+  /** Opens the conversation with a friend, creating it if this is the first. */
+  openDm(userId: string): Promise<void>;
   selectTextChannel(channelId: string): void;
   setMainView(view: 'chat' | 'call'): void;
   /** Refresh membership after creating or joining a server, then open it. */
@@ -120,6 +160,46 @@ interface AppState {
 }
 
 const memberKey = (guildId: string, userId: string) => `${guildId}:${userId}`;
+
+/** A copy without one member. Sets are replaced, never mutated, so React re-renders. */
+function without(set: Set<string>, id: string): Set<string> {
+  const next = new Set(set);
+  next.delete(id);
+  return next;
+}
+
+/**
+ * Drop every trace of a relationship with someone.
+ *
+ * Unfriending, being unfriended and blocking all end in the same place: they
+ * leave the lists, and the conversation goes with them - it cannot be posted to
+ * any more, so leaving it in the sidebar would only offer a dead end.
+ */
+function forgetPerson(
+  state: AppState,
+  userId: string,
+): Partial<AppState> {
+  const dmChannels = new Map(state.dmChannels);
+  const channels = new Map(state.channels);
+  let closedChannelId: string | null = null;
+
+  for (const [channelId, otherId] of dmChannels) {
+    if (otherId !== userId) continue;
+    dmChannels.delete(channelId);
+    channels.delete(channelId);
+    closedChannelId = channelId;
+  }
+
+  return {
+    friends: without(state.friends, userId),
+    incomingRequests: without(state.incomingRequests, userId),
+    outgoingRequests: without(state.outgoingRequests, userId),
+    dmChannels,
+    channels,
+    selectedDmChannelId:
+      state.selectedDmChannelId === closedChannelId ? null : state.selectedDmChannelId,
+  };
+}
 
 /**
  * The voice engine is deliberately module-scoped rather than stored in state:
@@ -197,6 +277,14 @@ function signedOutState() {
     authenticated: false,
     user: null,
     guilds: [] as Guild[],
+    scope: 'guild' as const,
+    friends: new Set<string>(),
+    incomingRequests: new Set<string>(),
+    outgoingRequests: new Set<string>(),
+    blocked: new Set<string>(),
+    people: new Map<string, PublicUser>(),
+    dmChannels: new Map<string, string>(),
+    selectedDmChannelId: null,
     channels: new Map<string, Channel>(),
     members: new Map<string, GuildMember>(),
     ranks: new Map<string, Rank>(),
@@ -218,6 +306,14 @@ export const useApp = create<AppState>((set, get) => ({
   gatewayStatus: 'idle',
 
   guilds: [],
+  scope: 'guild',
+  friends: new Set(),
+  incomingRequests: new Set(),
+  outgoingRequests: new Set(),
+  blocked: new Set(),
+  people: new Map(),
+  dmChannels: new Map(),
+  selectedDmChannelId: null,
   channels: new Map(),
   members: new Map(),
   ranks: new Map(),
@@ -267,12 +363,86 @@ export const useApp = create<AppState>((set, get) => ({
     set(signedOutState());
   },
 
+  openFriends() {
+    set({ scope: 'friends', mainView: 'chat' });
+  },
+
+  selectDmChannel(channelId) {
+    set({ scope: 'friends', selectedDmChannelId: channelId, mainView: 'chat' });
+    void get().loadMessages(channelId);
+  },
+
+  async sendFriendRequest(username) {
+    const result = await api.sendFriendRequest(username);
+    // Optimistic only in the sense of not waiting for the gateway echo: the
+    // server has already committed, and the event that follows is idempotent.
+    set((s) => {
+      const people = new Map(s.people).set(result.user.id, result.user);
+      if (result.state === 'accepted') {
+        return {
+          people,
+          friends: new Set(s.friends).add(result.user.id),
+          incomingRequests: without(s.incomingRequests, result.user.id),
+        };
+      }
+      return { people, outgoingRequests: new Set(s.outgoingRequests).add(result.user.id) };
+    });
+  },
+
+  async acceptFriendRequest(userId) {
+    await api.acceptFriendRequest(userId);
+    // The friend:accept event carries the conversation and does the rest; this
+    // just stops the request sitting in the list while it arrives.
+    set((s) => ({
+      incomingRequests: without(s.incomingRequests, userId),
+      friends: new Set(s.friends).add(userId),
+    }));
+  },
+
+  async dismissRequest(userId) {
+    await api.dismissFriendRequest(userId);
+    set((s) => ({
+      incomingRequests: without(s.incomingRequests, userId),
+      outgoingRequests: without(s.outgoingRequests, userId),
+    }));
+  },
+
+  async unfriend(userId) {
+    await api.unfriend(userId);
+    set((s) => forgetPerson(s, userId));
+  },
+
+  async blockPerson(userId) {
+    await api.blockUser(userId);
+    set((s) => ({ ...forgetPerson(s, userId), blocked: new Set(s.blocked).add(userId) }));
+  },
+
+  async unblockPerson(userId) {
+    await api.unblockUser(userId);
+    set((s) => ({ blocked: without(s.blocked, userId) }));
+  },
+
+  async openDm(userId) {
+    const channel = await api.openDm(userId);
+    set((s) => ({
+      channels: new Map(s.channels).set(channel.id, channel),
+      dmChannels: new Map(s.dmChannels).set(channel.id, userId),
+      scope: 'friends',
+      selectedDmChannelId: channel.id,
+      mainView: 'chat',
+    }));
+    void get().loadMessages(channel.id);
+  },
   selectGuild(guildId) {
     const firstText = [...get().channels.values()]
       .filter((c) => c.guildId === guildId && c.kind === 'text')
       .sort((a, b) => a.position - b.position)[0];
 
-    set({ selectedGuildId: guildId, selectedTextChannelId: firstText?.id ?? null });
+    set({
+      selectedGuildId: guildId,
+      selectedTextChannelId: firstText?.id ?? null,
+      scope: 'guild',
+    });
     if (firstText) void get().loadMessages(firstText.id);
   },
 
@@ -475,8 +645,22 @@ function applyServerMessage(
 ): void {
   switch (message.op) {
     case 'ready': {
-      const { user, guilds, channels, members, ranks, overwrites, voiceStates, presences } =
-        message.d;
+      const {
+        user,
+        guilds,
+        channels,
+        members,
+        ranks,
+        overwrites,
+        voiceStates,
+        presences,
+        friends,
+        incomingRequests,
+        outgoingRequests,
+        blocked,
+        users: people,
+        dmChannels,
+      } = message.d;
       const channelMap = new Map(channels.map((c) => [c.id, c]));
 
       // A server just created or joined wins; otherwise keep the current
@@ -491,11 +675,22 @@ function applyServerMessage(
           : (guilds[0]?.id ?? null);
 
       const previousText = get().selectedTextChannelId;
+      // `guildId` is null for someone with no servers, and so is a DM's - so a
+      // bare equality check matches every conversation they have, and a plain
+      // `filter` below would offer one as the server's first text channel.
+      // Both comparisons therefore require a real guild on the channel.
       const textStillValid =
-        previousText && channelMap.get(previousText)?.guildId === guildId ? previousText : null;
-      const firstText = channels
-        .filter((c) => c.guildId === guildId && c.kind === 'text')
-        .sort((a, b) => a.position - b.position)[0];
+        previousText &&
+        guildId !== null &&
+        channelMap.get(previousText)?.guildId === guildId
+          ? previousText
+          : null;
+      const firstText =
+        guildId === null
+          ? undefined
+          : channels
+              .filter((c) => c.guildId === guildId && c.kind === 'text')
+              .sort((a, b) => a.position - b.position)[0];
 
       set({
         user,
@@ -506,6 +701,12 @@ function applyServerMessage(
         overwrites: new Map(overwrites.map((o) => [`${o.channelId}:${o.rankId}`, o])),
         voiceStates: new Map(voiceStates.map((v) => [v.userId, v])),
         presences: new Map(presences.map((p) => [p.userId, p.status])),
+        friends: new Set(friends),
+        incomingRequests: new Set(incomingRequests),
+        outgoingRequests: new Set(outgoingRequests),
+        blocked: new Set(blocked),
+        people: new Map(people.map((person) => [person.id, person])),
+        dmChannels: new Map(dmChannels.map((dm) => [dm.channelId, dm.userId])),
         selectedGuildId: guildId,
         selectedTextChannelId: textStillValid ?? firstText?.id ?? null,
         pendingGuildId: null,
@@ -571,6 +772,35 @@ function applyServerMessage(
       if (updated.id === get().user?.id) {
         set((s) => ({ user: s.user ? { ...s.user, ...updated } : s.user }));
       }
+      return;
+    }
+
+    case 'friend:request': {
+      const { user: person } = message.d;
+      set((s) => ({
+        people: new Map(s.people).set(person.id, person),
+        incomingRequests: new Set(s.incomingRequests).add(person.id),
+      }));
+      return;
+    }
+
+    case 'friend:accept': {
+      const { user: person, dmChannel } = message.d;
+      set((s) => ({
+        people: new Map(s.people).set(person.id, person),
+        friends: new Set(s.friends).add(person.id),
+        incomingRequests: without(s.incomingRequests, person.id),
+        outgoingRequests: without(s.outgoingRequests, person.id),
+        // The conversation arrives with the acceptance, so it is ready to open
+        // the moment the friendship appears.
+        channels: new Map(s.channels).set(dmChannel.id, dmChannel),
+        dmChannels: new Map(s.dmChannels).set(dmChannel.id, person.id),
+      }));
+      return;
+    }
+
+    case 'friend:remove': {
+      set((s) => forgetPerson(s, message.d.userId));
       return;
     }
 

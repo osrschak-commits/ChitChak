@@ -25,6 +25,9 @@ export function TopBar({
   const guilds = useApp((s) => s.guilds);
   const selectedGuildId = useApp((s) => s.selectedGuildId);
   const selectGuild = useApp((s) => s.selectGuild);
+  const openFriends = useApp((s) => s.openFriends);
+  const scope = useApp((s) => s.scope);
+  const requestCount = useApp((s) => s.incomingRequests.size);
   const members = useApp((s) => s.members);
   const user = useApp((s) => s.user);
 
@@ -65,8 +68,19 @@ export function TopBar({
           aria-haspopup="menu"
           onClick={() => setOpen((v) => !v)}
         >
-          <GuildBadge guild={guild} size={20} />
-          <span className="switcher__name">{guild?.name ?? 'No server'}</span>
+          {scope === 'friends' ? (
+            <FriendsBadge size={20} />
+          ) : (
+            <GuildBadge guild={guild} size={20} />
+          )}
+          <span className="switcher__name">
+            {scope === 'friends' ? 'Friends' : (guild?.name ?? 'No server')}
+          </span>
+          {/* On the closed button too, not only inside the menu: a request
+              nobody can see until they go looking is a request nobody answers. */}
+          {requestCount > 0 && scope !== 'friends' && (
+            <span className="switcher__badge mono">{requestCount}</span>
+          )}
           <span className="switcher__chevron" aria-hidden="true">
             ▼
           </span>
@@ -74,11 +88,28 @@ export function TopBar({
 
         {open && (
           <div className="switcher__menu" role="menu">
+            <button
+              role="menuitem"
+              className={`switcher__item ${scope === 'friends' ? 'switcher__item--active' : ''}`}
+              onClick={() => {
+                openFriends();
+                setOpen(false);
+              }}
+            >
+              <FriendsBadge size={24} />
+              <span className="switcher__name">Friends</span>
+              {requestCount > 0 && <span className="switcher__badge mono">{requestCount}</span>}
+            </button>
+
+            {guilds.length > 0 && <div className="switcher__divider" />}
+
             {guilds.map((item) => (
               <button
                 key={item.id}
                 role="menuitem"
-                className={`switcher__item ${item.id === selectedGuildId ? 'switcher__item--active' : ''}`}
+                className={`switcher__item ${
+                  scope === 'guild' && item.id === selectedGuildId ? 'switcher__item--active' : ''
+                }`}
                 onClick={() => {
                   selectGuild(item.id);
                   setOpen(false);
@@ -208,4 +239,33 @@ function monogram(name: string): string {
     .slice(0, 2)
     .map((word) => word[0]?.toUpperCase() ?? '')
     .join('');
+}
+
+
+/**
+ * The Friends entry's mark.
+ *
+ * Deliberately not a server icon: Friends is not a server, and giving it a
+ * lookalike badge would suggest it behaves like one.
+ */
+function FriendsBadge({ size }: { size: number }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        width: size,
+        height: size,
+        display: 'grid',
+        placeItems: 'center',
+        borderRadius: 6,
+        background: 'var(--graphite-700)',
+        color: 'var(--brass-400)',
+        fontSize: Math.round(size * 0.62),
+        lineHeight: 1,
+        flexShrink: 0,
+      }}
+    >
+      ◈
+    </span>
+  );
 }
