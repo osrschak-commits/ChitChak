@@ -2856,13 +2856,52 @@ textarea::placeholder {
 }
 
 /* Sits opposite the stage label, so the two ends of the bar are "what this is"
-   and "how to leave it". */
-.call__stop-watching {
+   and "what you can do about it". */
+.call__watching {
   position: absolute;
   right: 12px;
   bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 6px 5px 10px;
+  border-radius: var(--radius);
   background: rgba(9, 8, 11, 0.72);
   backdrop-filter: blur(3px);
+}
+
+.streamvol {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.streamvol__mute {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  cursor: pointer;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1;
+}
+
+.streamvol__mute:hover {
+  color: var(--text-bright);
+}
+
+.streamvol__slider {
+  width: 92px;
+  accent-color: var(--brass-500);
+  cursor: pointer;
+}
+
+.streamvol__value {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  min-width: 24px;
+  text-align: right;
 }
 
 /* Not the signal colour: that is reserved for live audio, and this is video. */

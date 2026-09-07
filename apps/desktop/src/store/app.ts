@@ -130,6 +130,8 @@ interface AppState {
   audioSettings: AudioSettings;
   /** Per-person listening level, 0-100, keyed by user id. Yours alone. */
   userVolumes: Record<string, number>;
+  /** How loud each person's screen share is, separately from their voice. */
+  streamVolumes: Record<string, number>;
   voiceError: string | null;
 
   boot(): Promise<void>;
@@ -176,6 +178,8 @@ interface AppState {
   setAudioSettings(settings: Partial<AudioSettings>): Promise<void>;
   /** How loud one person is for you, 0-100. Remembered across restarts. */
   setUserVolume(userId: string, percent: number): void;
+  /** How loud somebody's stream is for you. 0 is muted. */
+  setStreamVolume(userId: string, percent: number): void;
   applySelfUser(user: SelfUser): void;
   dismissVoiceError(): void;
 }
@@ -386,6 +390,7 @@ export const useApp = create<AppState>((set, get) => ({
   pushToTalkActive: false,
   audioSettings: loadAudioSettings(),
   userVolumes: loadUserVolumes(),
+  streamVolumes: loadUserVolumes('chitchak.stream-volumes'),
   voiceError: null,
 
   async boot() {
@@ -692,6 +697,23 @@ export const useApp = create<AppState>((set, get) => ({
     voiceEngine()?.setParticipantVolume(userId, clamped / 100);
   },
 
+  setStreamVolume(userId, percent) {
+    const clamped = Math.max(0, Math.min(100, Math.round(percent)));
+    const streamVolumes = { ...get().streamVolumes };
+    // 100 means "no change", so storing it would grow the map forever - and
+    // dropping it makes resetting somebody genuinely forget them.
+    if (clamped === 100) delete streamVolumes[userId];
+    else streamVolumes[userId] = clamped;
+
+    set({ streamVolumes });
+    try {
+      localStorage.setItem('chitchak.stream-volumes', JSON.stringify(streamVolumes));
+    } catch {
+      // The level still applies to this call; it just will not be remembered.
+    }
+    voiceEngine()?.setScreenVolume(userId, clamped / 100);
+  },
+
   applySelfUser(user) {
     set({ user });
   },
@@ -828,6 +850,9 @@ function applyServerMessage(
       // audio track arrives rather than a moment after everyone is audible.
       engineToJoin.setParticipantVolumes(
         new Map(Object.entries(get().userVolumes).map(([id, percent]) => [id, percent / 100])),
+      );
+      engineToJoin.setScreenVolumes(
+        new Map(Object.entries(get().streamVolumes).map(([id, percent]) => [id, percent / 100])),
       );
       void engineToJoin
         .connect(url, token, get().audioSettings)
@@ -1110,9 +1135,9 @@ function applyServerMessage(
   }
 }
 
-function loadUserVolumes(): Record<string, number> {
+function loadUserVolumes(key = 'chitchak.volumes'): Record<string, number> {
   try {
-    const raw = localStorage.getItem('chitchak.volumes');
+    const raw = localStorage.getItem(key);
     const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
     // Anything that is not a percentage is dropped rather than trusted: a bad
     // value here reaches an audio element, and an out-of-range one throws.

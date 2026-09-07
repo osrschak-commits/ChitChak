@@ -29,6 +29,8 @@ export function CallView() {
   const screenShares = useApp((s) => s.screenShares);
   const watchScreen = useApp((s) => s.watchScreen);
   const stopWatchingScreen = useApp((s) => s.stopWatchingScreen);
+  const streamVolumes = useApp((s) => s.streamVolumes);
+  const setStreamVolume = useApp((s) => s.setStreamVolume);
 
   /** A feed the viewer clicked to enlarge. Overrides the automatic stage. */
   const [spotlightSid, setSpotlightSid] = useState<string | null>(null);
@@ -121,15 +123,27 @@ export function CallView() {
             </span>
 
             {stage.source === 'screen' && !stage.isLocal && (
-              <button
-                className="btn btn--ghost btn--sm call__stop-watching"
-                onClick={() => {
-                  stopWatchingScreen(stage.trackSid);
-                  setSpotlightSid(null);
-                }}
-              >
-                Stop watching
-              </button>
+              <div className="call__watching">
+                {/* Only when there is sound to adjust. A slider that does
+                    nothing is worse than no slider: it makes a silent share
+                    look like a broken one. */}
+                {screenShares.some((share) => share.userId === stage.userId && share.hasAudio) && (
+                  <StreamVolume
+                    percent={streamVolumes[stage.userId] ?? 100}
+                    onChange={(percent) => setStreamVolume(stage.userId, percent)}
+                  />
+                )}
+
+                <button
+                  className="btn btn--ghost btn--sm"
+                  onClick={() => {
+                    stopWatchingScreen(stage.trackSid);
+                    setSpotlightSid(null);
+                  }}
+                >
+                  Stop watching
+                </button>
+              </div>
             )}
           </div>
         )}
@@ -295,6 +309,62 @@ function PersonTile({
         </span>
       </div>
     </div>
+  );
+}
+
+/**
+ * How loud somebody's stream is, for you.
+ *
+ * Separate from their voice on purpose: a game or a video is background you
+ * want under the conversation, and turning it down should not quieten the
+ * person telling you about it.
+ *
+ * The speaker is the mute, and it restores the level you were last at rather
+ * than jumping to full - unmuting something you had set to 20% and having it
+ * arrive at 100 is a worse surprise than any it saves.
+ */
+function StreamVolume({
+  percent,
+  onChange,
+}: {
+  percent: number;
+  onChange(percent: number): void;
+}) {
+  const [beforeMute, setBeforeMute] = useState(100);
+  const muted = percent === 0;
+
+  return (
+    <span className="streamvol">
+      <button
+        type="button"
+        className="streamvol__mute"
+        title={muted ? 'Unmute this stream' : 'Mute this stream'}
+        aria-label={muted ? 'Unmute this stream' : 'Mute this stream'}
+        onClick={() => {
+          if (muted) {
+            onChange(beforeMute || 100);
+          } else {
+            setBeforeMute(percent);
+            onChange(0);
+          }
+        }}
+      >
+        {muted ? '⊘' : '◂))'}
+      </button>
+
+      <input
+        type="range"
+        className="streamvol__slider"
+        min={0}
+        max={100}
+        value={percent}
+        onChange={(event) => onChange(Number(event.target.value))}
+        aria-label="Stream volume"
+        title={`Stream volume: ${percent}%`}
+      />
+
+      <span className="streamvol__value mono">{percent}</span>
+    </span>
   );
 }
 

@@ -435,9 +435,19 @@ export class VoiceEngine {
    */
   private volumes = new Map<string, number>();
 
+  /**
+   * How loud each person's *stream* is, separately from their voice.
+   *
+   * Two dials rather than one because they are two different sounds coming from
+   * the same person: a game or a video is background you want under the
+   * conversation, and turning it down should not turn down the person telling
+   * you about it. One slider for both meant the only way to quieten a loud
+   * stream was to quieten its owner.
+   */
+  private screenVolumes = new Map<string, number>();
+
   setParticipantVolume(userId: string, volume: number): void {
-    const clamped = Math.max(0, Math.min(1, volume));
-    this.volumes.set(userId, clamped);
+    this.volumes.set(userId, clampVolume(volume));
     this.applyVolume(userId);
   }
 
@@ -447,11 +457,40 @@ export class VoiceEngine {
     for (const userId of this.volumes.keys()) this.applyVolume(userId);
   }
 
+  setScreenVolume(userId: string, volume: number): void {
+    this.screenVolumes.set(userId, clampVolume(volume));
+    this.applyVolume(userId);
+  }
+
+  setScreenVolumes(volumes: Map<string, number>): void {
+    this.screenVolumes = new Map(volumes);
+    for (const userId of this.screenVolumes.keys()) this.applyVolume(userId);
+  }
+
+  /**
+   * Set both of somebody's levels, track by track.
+   *
+   * Per track rather than `participant.setVolume`, which applies one number to
+   * everything they are publishing - it would set the voice level and then
+   * immediately overwrite the stream's with the same value, which is the whole
+   * thing this is trying to avoid.
+   */
   private applyVolume(userId: string): void {
     const participant = this.room?.getParticipantByIdentity(userId);
-    if (participant instanceof RemoteParticipant) {
-      participant.setVolume(this.volumes.get(userId) ?? 1);
+    if (!(participant instanceof RemoteParticipant)) return;
+
+    for (const publication of participant.trackPublications.values()) {
+      const track = publication.track;
+      if (!(track instanceof RemoteAudioTrack)) continue;
+      track.setVolume(this.volumeFor(userId, publication.source));
     }
+  }
+
+  /** Which of the two dials applies to a given track. */
+  private volumeFor(userId: string, source: Track.Source): number {
+    return source === Track.Source.ScreenShareAudio
+      ? (this.screenVolumes.get(userId) ?? 1)
+      : (this.volumes.get(userId) ?? 1);
   }
 
   async applySettings(settings: AudioSettings): Promise<void> {
@@ -554,7 +593,7 @@ export class VoiceEngine {
       // Their saved level, applied to the track that just arrived. Without this
       // the setting only takes effect on people already talking when it was
       // changed, and silently resets for everyone who joins later.
-      track.setVolume(this.volumes.get(participant.identity) ?? 1);
+      track.setVolume(this.volumeFor(participant.identity, publication.source));
       // Kept out of the layout: it exists to play audio, not to be seen.
       element.style.display = 'none';
       document.body.appendChild(element);
@@ -760,6 +799,16 @@ export class VoiceEngine {
     ];
     this.callbacks.onParticipantsChanged(identities);
   }
+}
+
+/**
+ * 0..1, and never above.
+ *
+ * The ceiling is not arbitrary: below the surface this reaches
+ * `HTMLMediaElement.volume`, which *throws* above 1.0 rather than clamping.
+ */
+function clampVolume(volume: number): number {
+  return Math.max(0, Math.min(1, volume));
 }
 
 /** `setSinkId` is not in every TypeScript DOM lib yet and is absent on some browsers. */
