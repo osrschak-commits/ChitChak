@@ -174,20 +174,6 @@ textarea::placeholder {
   -webkit-app-region: no-drag;
 }
 
-.wordmark {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.22em;
-  color: var(--brass-400);
-  padding-right: 12px;
-  margin-right: 2px;
-  border-right: 1px solid var(--line);
-  align-self: stretch;
-  display: flex;
-  align-items: center;
-}
-
 /* Server switcher replaces the icon rail entirely. */
 .switcher {
   position: relative;
@@ -3438,4 +3424,19 @@ textarea::placeholder {
 .staff__input:focus {
   outline: none;
   border-color: var(--brass-500);
+}
+
+/* Which of the two switchers you are actually looking at. */
+.switcher__button--on {
+  color: var(--text-bright);
+}
+
+.switcher__button--on .switcher__name {
+  color: var(--brass-300);
+}
+
+/* The bar starts with the switchers now, so it needs its own left inset -
+   the wordmark used to provide it. */
+.topbar > .switcher:first-child {
+  margin-left: 14px;
 }
