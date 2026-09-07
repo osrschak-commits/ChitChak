@@ -3,6 +3,22 @@
 Two things: a subscription, and a currency called **chak keys**. A subscription
 includes 2 keys each period; more can be bought outright in the store.
 
+## Two kinds of thing
+
+**Plates** — the finish on your profile card — come with a subscription. They are
+never owned: being subscribed is the entitlement, so there is no purchase, and
+when a subscription lapses the plate simply stops applying. Nothing is taken
+away, and the choice is remembered, so resubscribing puts it back rather than
+making somebody pick again. That also means no scheduled job: whether a plate
+applies is a question asked when somebody is drawn, not a state to maintain.
+
+**Badges** are bought with keys and kept for ever, subscription or not.
+
+Plates were briefly buyable with keys. When they became a subscriber perk the
+keys already spent on them were refunded rather than quietly devalued -
+`refund-plates.ts`, idempotent, one entry per purchase. Making an early buyer's
+purchase worthless is a way to teach people that buying early is a mistake.
+
 ## What keys can and cannot buy
 
 Keys buy decoration. Nothing else.

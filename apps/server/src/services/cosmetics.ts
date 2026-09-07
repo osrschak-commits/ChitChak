@@ -3,6 +3,7 @@ import { db } from '../db/client.js';
 import { ownedCosmetics } from '../db/schema.js';
 import { errors } from '../lib/errors.js';
 import * as keys from './keys.js';
+import { standingOf } from './subscriptions.js';
 
 /**
  * The cosmetics catalogue.
@@ -28,8 +29,21 @@ export interface Cosmetic {
   slot: Slot;
   /** Shown in the shop, under the name. */
   blurb: string;
-  /** In chak keys. */
+  /**
+   * In chak keys. Zero for anything a subscription includes, which is not the
+   * same as free - see `requiresSubscription`.
+   */
   price: number;
+  /**
+   * Included with a subscription rather than bought.
+   *
+   * These are never owned. Being subscribed is the entitlement, so there is no
+   * purchase, no ownership row, and nothing to take away when a subscription
+   * lapses - it simply stops applying, and comes back if they subscribe again.
+   * That is also why lapsing needs no scheduled job: it is a question asked at
+   * the moment somebody is drawn, not a state to keep up to date.
+   */
+  requiresSubscription?: boolean;
   /**
    * How the client draws it. Deliberately data rather than a class name: the
    * client decides how to render a finish, but which finish is the server's.
@@ -44,7 +58,8 @@ export const COSMETICS: Cosmetic[] = [
     name: 'Brass plate',
     slot: 'plate',
     blurb: 'The warm metal the rest of the app is trimmed with.',
-    price: 2,
+    price: 0,
+    requiresSubscription: true,
     value: 'linear-gradient(135deg, #d9a45b, #8a6a33)',
   },
   {
@@ -52,7 +67,8 @@ export const COSMETICS: Cosmetic[] = [
     name: 'Signal plate',
     slot: 'plate',
     blurb: 'The colour reserved everywhere else for live audio.',
-    price: 3,
+    price: 0,
+    requiresSubscription: true,
     value: 'linear-gradient(135deg, #4fd6c4, #2b7f76)',
   },
   {
@@ -60,7 +76,8 @@ export const COSMETICS: Cosmetic[] = [
     name: 'Graphite plate',
     slot: 'plate',
     blurb: 'Machined, dark, and quiet about it.',
-    price: 2,
+    price: 0,
+    requiresSubscription: true,
     value: 'linear-gradient(135deg, #3a3742, #17161a)',
   },
   {
@@ -68,7 +85,8 @@ export const COSMETICS: Cosmetic[] = [
     name: 'Oxblood plate',
     slot: 'plate',
     blurb: 'Deep red, the colour of an old mixing desk.',
-    price: 4,
+    price: 0,
+    requiresSubscription: true,
     value: 'linear-gradient(135deg, #7d2f34, #3a1417)',
   },
 
@@ -130,6 +148,9 @@ export async function ownedBy(userId: string): Promise<Owned[]> {
 export async function buy(userId: string, cosmeticId: string): Promise<void> {
   const item = COSMETICS_BY_ID.get(cosmeticId);
   if (!item) throw errors.notFound('No such item');
+  if (item.requiresSubscription) {
+    throw errors.invalid('That comes with a subscription rather than being bought');
+  }
 
   const claimed = await db
     .insert(ownedCosmetics)
@@ -160,18 +181,29 @@ export async function buy(userId: string, cosmeticId: string): Promise<void> {
  * wearing a badge" is not a thing anyone should have to be told.
  */
 export async function equip(userId: string, cosmeticId: string | null, slot: Slot): Promise<void> {
-  const owned = await ownedBy(userId);
-
   if (cosmeticId !== null) {
     const item = COSMETICS_BY_ID.get(cosmeticId);
     if (!item) throw errors.notFound('No such item');
     if (item.slot !== slot) throw errors.invalid('That does not go there');
-    if (!owned.some((row) => row.cosmeticId === cosmeticId)) {
+
+    if (item.requiresSubscription) {
+      const standing = await standingOf(userId);
+      if (!standing.active) throw errors.forbidden('That comes with a subscription');
+    } else if (!(await owns(userId, cosmeticId))) {
       throw errors.forbidden('You do not own that');
     }
   }
 
-  const inSlot = owned
+  /**
+   * A row per worn thing, whether or not it was bought.
+   *
+   * Subscription items are not owned, but wearing one still has to be recorded
+   * somewhere - so the row exists to remember the choice, and `wornBy` decides
+   * whether it currently applies. That keeps a lapsed subscriber's plate
+   * remembered rather than forgotten, so resubscribing puts it back rather than
+   * making them pick again.
+   */
+  const inSlot = (await ownedBy(userId))
     .filter((row) => COSMETICS_BY_ID.get(row.cosmeticId)?.slot === slot)
     .map((row) => row.cosmeticId);
 
@@ -184,14 +216,31 @@ export async function equip(userId: string, cosmeticId: string | null, slot: Slo
     }
     if (cosmeticId !== null) {
       await tx
-        .update(ownedCosmetics)
-        .set({ equipped: true })
-        .where(and(eq(ownedCosmetics.userId, userId), eq(ownedCosmetics.cosmeticId, cosmeticId)));
+        .insert(ownedCosmetics)
+        .values({ userId, cosmeticId, equipped: true })
+        .onConflictDoUpdate({
+          target: [ownedCosmetics.userId, ownedCosmetics.cosmeticId],
+          set: { equipped: true },
+        });
     }
   });
 }
 
-/** What somebody is wearing, for everyone else to draw. */
+async function owns(userId: string, cosmeticId: string): Promise<boolean> {
+  const row = await db.query.ownedCosmetics.findFirst({
+    where: and(eq(ownedCosmetics.userId, userId), eq(ownedCosmetics.cosmeticId, cosmeticId)),
+  });
+  return Boolean(row);
+}
+
+/**
+ * What somebody is wearing, for everyone else to draw.
+ *
+ * A subscription item is only worn while the subscription is current. Asking
+ * here rather than clearing rows when one lapses means there is no scheduled
+ * job to get wrong, nothing to be out of date, and the choice survives - a
+ * lapsed subscriber's plate reappears the moment they subscribe again.
+ */
 export async function wornBy(userId: string): Promise<Record<Slot, string | null>> {
   const rows = await db
     .select()
@@ -199,9 +248,19 @@ export async function wornBy(userId: string): Promise<Record<Slot, string | null
     .where(and(eq(ownedCosmetics.userId, userId), eq(ownedCosmetics.equipped, true)));
 
   const worn: Record<Slot, string | null> = { plate: null, badge: null };
-  for (const row of rows) {
-    const item = COSMETICS_BY_ID.get(row.cosmeticId);
-    if (item) worn[item.slot] = item.value;
+  if (rows.length === 0) return worn;
+
+  const items = rows
+    .map((row) => COSMETICS_BY_ID.get(row.cosmeticId))
+    .filter((item): item is Cosmetic => Boolean(item));
+
+  // Only asked when something worn actually depends on it.
+  const needsSubscription = items.some((item) => item.requiresSubscription);
+  const subscribed = needsSubscription ? (await standingOf(userId)).active : false;
+
+  for (const item of items) {
+    if (item.requiresSubscription && !subscribed) continue;
+    worn[item.slot] = item.value;
   }
   return worn;
 }

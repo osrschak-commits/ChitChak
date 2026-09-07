@@ -3373,3 +3373,46 @@ textarea::placeholder {
   flex-wrap: wrap;
   margin-top: 14px;
 }
+
+.shopitem__locked {
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding: 0 6px;
+}
+
+/* ==========================================================================
+   Dialog tabs
+   ========================================================================== */
+
+.tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 22px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+
+.tabs__tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: 10px 12px 9px;
+  cursor: pointer;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: -1px;
+}
+
+.tabs__tab:hover {
+  color: var(--text-secondary);
+}
+
+.tabs__tab--on {
+  color: var(--brass-400);
+  border-bottom-color: var(--brass-500);
+}

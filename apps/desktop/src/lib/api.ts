@@ -30,10 +30,14 @@ export interface CosmeticItem {
   slot: 'plate' | 'badge';
   blurb: string;
   price: number;
+  /** Included with a subscription rather than bought with keys. */
+  requiresSubscription?: boolean;
   /** How to draw it - a gradient for a plate, a glyph for a badge. */
   value: string;
   owned: boolean;
   equipped: boolean;
+  /** Whether it can be worn right now - bought, or included and subscribed. */
+  available: boolean;
 }
 
 export interface PremiumState {

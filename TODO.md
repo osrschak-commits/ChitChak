@@ -68,3 +68,23 @@ history of past names, would settle it.
 The web client runs in a phone browser but is laid out for a keyboard and a wide
 window. Either a responsive pass over the existing client, or a real mobile app.
 The site currently says "coming", which is a promise with a clock on it.
+
+## Paddle live approval
+
+Sandbox works end to end. Going live needs Paddle to review the account, which
+is a wait rather than a switch - start it well before you want to launch.
+
+When approved:
+1. Generate **live** credentials (API key, client-side token, webhook secret) and
+   recreate the catalogue in live mode - sandbox ids do not carry over.
+2. Point the live notification destination at
+   `https://api.chitchak.com/api/webhooks/paddle`.
+3. Set the live default payment link to `https://chitchak.com/pay`.
+4. Update the `PADDLE_*` values in `.env.production`, set
+   `PADDLE_ENV=production`, redeploy.
+5. Regenerate the sandbox API key - the current one passed through a chat log.
+
+Also outstanding: the subscription is described as including premium features
+and currently grants 2 keys and the plates. Either say that plainly or build the
+features - bigger uploads, more custom emoji, higher stream quality, longer
+history are the candidates that do not buy authority over anyone.

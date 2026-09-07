@@ -20,8 +20,8 @@ const SLOT_NAMES: Record<string, string> = {
 };
 
 const SLOT_BLURBS: Record<string, string> = {
-  plate: 'The finish on your profile card.',
-  badge: 'A small mark beside your name.',
+  plate: 'The finish on your profile card. Included with a subscription.',
+  badge: 'A small mark beside your name. Bought with keys, and yours to keep.',
 };
 
 export function PremiumPanel() {
@@ -215,10 +215,14 @@ function ShopItem({
         <span className="shopitem__blurb">{item.blurb}</span>
       </div>
 
-      {item.owned ? (
+      {item.available ? (
         <button className="btn btn--ghost btn--sm" disabled={busy} onClick={onWear}>
           {busy ? '…' : item.equipped ? 'Take off' : 'Wear'}
         </button>
+      ) : item.requiresSubscription ? (
+        // Nothing to buy and nothing to click. Saying what would unlock it is
+        // more use than a disabled button that explains nothing.
+        <span className="shopitem__locked mono">Subscribers</span>
       ) : (
         <button className="btn btn--sm" disabled={busy} onClick={onBuy}>
           {busy ? '…' : `${item.price} ${item.price === 1 ? 'key' : 'keys'}`}

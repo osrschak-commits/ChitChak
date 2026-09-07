@@ -24,7 +24,24 @@ const ACCENTS = [
   '#9aa3ad',
 ];
 
+/**
+ * Which part of "you" is on screen.
+ *
+ * Three, because they are three different errands: changing how you look,
+ * seeing what you have done, and buying things. Before this they were one long
+ * scroll, and Account - which is where deleting your account lives - sat at the
+ * bottom of a shop.
+ */
+type Tab = 'profile' | 'progress' | 'premium';
+
+const TABS: Array<{ id: Tab; label: string }> = [
+  { id: 'profile', label: 'Profile' },
+  { id: 'progress', label: 'Levels' },
+  { id: 'premium', label: 'Brass' },
+];
+
 export function ProfileDialog({ onClose }: { onClose(): void }) {
+  const [tab, setTab] = useState<Tab>('profile');
   const user = useApp((s) => s.user);
   const applySelfUser = useApp((s) => s.applySelfUser);
   const signOut = useApp((s) => s.signOut);
@@ -139,9 +156,28 @@ export function ProfileDialog({ onClose }: { onClose(): void }) {
           </button>
         </div>
 
+        <div className="tabs" role="tablist">
+          {TABS.map((entry) => (
+            <button
+              key={entry.id}
+              role="tab"
+              aria-selected={tab === entry.id}
+              className={`tabs__tab ${tab === entry.id ? 'tabs__tab--on' : ''}`}
+              onClick={() => setTab(entry.id)}
+            >
+              {entry.label}
+            </button>
+          ))}
+        </div>
+
         <div className="modal__body">
           {error && <div className="notice">{error}</div>}
 
+          {tab === 'progress' && <LevelPanel />}
+          {tab === 'premium' && <PremiumPanel />}
+
+          {tab === 'profile' && (
+          <>
           <div className="section">
             <h3 className="section__title">Picture</h3>
             <div className="picker">
@@ -243,10 +279,6 @@ export function ProfileDialog({ onClose }: { onClose(): void }) {
             </div>
           </div>
 
-          <LevelPanel />
-
-          <PremiumPanel />
-
           <div className="section">
             <h3 className="section__title">Account</h3>
             <div className="row">
@@ -324,18 +356,28 @@ export function ProfileDialog({ onClose }: { onClose(): void }) {
               </div>
             )}
           </div>
+          </>
+          )}
         </div>
 
-        <div className="modal__foot">
-          {savedAt && !dirty && (
-            <span className="legend" style={{ marginRight: 'auto' }}>
-              Saved
-            </span>
-          )}
-          <button className="btn btn--primary" disabled={busy || !dirty} onClick={() => void save()}>
-            {busy ? 'Saving…' : 'Save changes'}
-          </button>
-        </div>
+        {/* Only where there is something to save. Levels and the shop apply
+            immediately, and a Save button under them would imply otherwise. */}
+        {tab === 'profile' && (
+          <div className="modal__foot">
+            {savedAt && !dirty && (
+              <span className="legend" style={{ marginRight: 'auto' }}>
+                Saved
+              </span>
+            )}
+            <button
+              className="btn btn--primary"
+              disabled={busy || !dirty}
+              onClick={() => void save()}
+            >
+              {busy ? 'Saving…' : 'Save changes'}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

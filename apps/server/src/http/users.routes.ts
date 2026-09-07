@@ -377,6 +377,15 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
           ...item,
           owned: ownedIds.has(item.id),
           equipped: ownedIds.get(item.id)?.equipped ?? false,
+          /**
+           * Whether it can be worn right now.
+           *
+           * Two different questions collapsed into the one the interface
+           * actually asks. A badge is available once bought; a plate is
+           * available while subscribed, and stops being so when that lapses
+           * without anybody having lost anything they paid for.
+           */
+          available: item.requiresSubscription ? standing.active : ownedIds.has(item.id),
         })),
       };
     },
