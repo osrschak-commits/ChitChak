@@ -64,6 +64,13 @@
       "when": 1788754753061,
       "tag": "0008_levels",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1788796592093,
+      "tag": "0009_message_search",
+      "breakpoints": true
     }
   ]
 }

@@ -124,6 +124,115 @@ export async function listMessages(input: {
   return rows.reverse().map(toMessage);
 }
 
+/** How many results one search returns. Deliberately smaller than a history page. */
+const SEARCH_PAGE_SIZE = 25;
+const MAX_SEARCH_PAGE_SIZE = 50;
+
+/**
+ * Find messages in one channel.
+ *
+ * One channel at a time, on purpose. Searching a whole server sounds more
+ * useful than it is: results from channels you half-remember, in a list where
+ * every row has to explain where it came from. Searching where you already are
+ * is the thing people actually do, and it is a single index lookup rather than
+ * a permission check per channel per query.
+ *
+ * `websearch_to_tsquery` rather than `to_tsquery`, for two reasons. It takes
+ * what a person would type - quoted phrases, `or`, a leading `-` to exclude -
+ * without any of it having to be explained. And it cannot be made to throw:
+ * `to_tsquery` raises a syntax error on input as ordinary as `c++` or a bare
+ * `&`, which in a search box means someone typing normally gets a 500.
+ */
+export async function searchMessages(input: {
+  userId: string;
+  channelId: string;
+  query: string;
+  authorId?: string | undefined;
+  before?: string | undefined;
+  limit?: number | undefined;
+}): Promise<Message[]> {
+  // The same check the channel's history goes through. Search must never be a
+  // way to read a channel you cannot open.
+  await requireChannelAccess(input.channelId, input.userId, Permission.VIEW_CHANNEL);
+
+  const query = input.query.trim();
+  // An empty box is not a search for everything - but "everything this person
+  // said here" is a real question, so an author on its own is enough to ask.
+  if (query.length === 0 && !input.authorId) return [];
+
+  const limit = Math.min(Math.max(input.limit ?? SEARCH_PAGE_SIZE, 1), MAX_SEARCH_PAGE_SIZE);
+
+  let cursor: { createdAt: Date; id: string } | null = null;
+  if (input.before) {
+    const anchor = await db.query.messages.findFirst({ where: eq(messages.id, input.before) });
+    if (anchor && anchor.channelId === input.channelId) {
+      cursor = { createdAt: anchor.createdAt, id: anchor.id };
+    }
+  }
+
+  const filters = [sql`channel_id = ${input.channelId}`];
+  if (query.length > 0) {
+    // Spelled exactly as the index expression in 0009_message_search.sql. Any
+    // difference here - a different dictionary, a cast - and Postgres cannot
+    // use the index and reads every message in the channel instead.
+    filters.push(
+      sql`to_tsvector('english', content) @@ websearch_to_tsquery('english', ${query})`,
+    );
+  }
+  if (input.authorId) filters.push(sql`author_id = ${input.authorId}`);
+  if (cursor) {
+    // The timestamp goes in as an ISO string with an explicit cast. A Date
+    // inside a raw fragment reaches the driver as a Date, which it cannot bind,
+    // and the rejection is thrown from deep inside the connection.
+    filters.push(
+      sql`(created_at, id) < (${cursor.createdAt.toISOString()}::timestamptz, ${cursor.id})`,
+    );
+  }
+
+  /**
+   * The match is materialised before anything is sorted, and that is the whole
+   * point of writing this by hand.
+   *
+   * Left as one flat query, Postgres walks the channel backwards through time
+   * and tests each message as it goes, because it has no way to estimate how
+   * many messages match a text search and assumes it will fill a page quickly.
+   * For a common word it is right and the query is instant. For a rare one -
+   * which is what people actually search for - it is wrong, and it reads the
+   * entire channel: measured at 200,000 messages, 491ms for a single hit, and
+   * growing with the channel rather than with the number of results.
+   *
+   * Forcing the search to finish first costs the common case something and
+   * saves the rare one an order of magnitude: the same two searches came out at
+   * 48ms and 17ms. Both are imperceptible, and neither grows with the size of
+   * the channel any more - only with the number of things actually found.
+   */
+  const rows = await db.execute<{
+    id: string;
+    channel_id: string;
+    author_id: string;
+    content: string;
+    created_at: Date;
+    edited_at: Date | null;
+  }>(sql`
+    with hits as materialized (
+      select id from messages where ${sql.join(filters, sql` and `)}
+    )
+    select m.id, m.channel_id, m.author_id, m.content, m.created_at, m.edited_at
+    from messages m join hits on hits.id = m.id
+    order by m.created_at desc, m.id desc
+    limit ${limit}
+  `);
+
+  return rows.map((row) => ({
+    id: row.id,
+    channelId: row.channel_id,
+    authorId: row.author_id,
+    content: row.content,
+    createdAt: new Date(row.created_at).toISOString(),
+    editedAt: row.edited_at ? new Date(row.edited_at).toISOString() : null,
+  }));
+}
+
 /** Editing is author-only. No permission lets you rewrite someone else's words. */
 export async function editMessage(input: {
   userId: string;

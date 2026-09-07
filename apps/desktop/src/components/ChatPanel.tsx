@@ -2,6 +2,7 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { Permission } from '@chitchak/protocol';
 import { usePermissions } from '../hooks/usePermissions.js';
 import { usePersonPopover } from '../hooks/usePersonPopover.js';
+import { SearchPanel } from './SearchPanel.js';
 import { useApp } from '../store/app.js';
 import { Avatar, MemberName } from './primitives.js';
 
@@ -107,6 +108,26 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
     : undefined;
   const title = isDm ? (dmPartner?.displayName ?? 'Conversation') : (channel?.name ?? '');
 
+  const [searching, setSearching] = useState(false);
+
+  // Ctrl+F is what people press. Closing again is Escape, handled in the panel.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f') {
+        event.preventDefault();
+        setSearching(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // A search is about the channel it was opened in; carrying it to the next one
+  // would show results from a conversation you are no longer looking at.
+  useEffect(() => {
+    setSearching(false);
+  }, [channel?.id]);
+
   // Ranks and overwrites do not exist in a DM. You may always write in one -
   // the server checks the friendship - and you may only delete your own, which
   // is what MANAGE_MESSAGES being false already means here.
@@ -147,6 +168,15 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
           <span className="pane__title">{title}</span>
           {!isDm && channel.topic && <span className="pane__topic">{channel.topic}</span>}
           {isDm && dmPartner && <span className="pane__topic mono">{dmPartner.username}</span>}
+
+          <button
+            className="pane__search"
+            onClick={() => setSearching((open) => !open)}
+            aria-pressed={searching}
+            title="Search this channel (Ctrl+F)"
+          >
+            Search
+          </button>
         </header>
       ) : (
         <header className="pane__header">
@@ -161,6 +191,14 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
             ✕
           </button>
         </div>
+      )}
+
+      {channel && searching && (
+        <SearchPanel
+          channelId={channel.id}
+          channelName={title}
+          onClose={() => setSearching(false)}
+        />
       )}
 
       {!channel ? (

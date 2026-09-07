@@ -44,7 +44,7 @@ import {
   toInvite,
   toPublicUser,
 } from '../services/serialize.js';
-import { deleteMessage, editMessage, listMessages } from '../services/messages.js';
+import { deleteMessage, editMessage, listMessages, searchMessages } from '../services/messages.js';
 import { buildMember } from '../services/snapshot.js';
 import { deleteRoom } from '../voice/livekit.js';
 import { authenticate, requireUser } from './authenticate.js';
@@ -392,6 +392,21 @@ export async function guildRoutes(app: FastifyInstance): Promise<void> {
       });
     },
   );
+
+  app.get<{
+    Params: { channelId: string };
+    Querystring: { q?: string; authorId?: string; before?: string; limit?: string };
+  }>('/api/channels/:channelId/messages/search', async (request) => {
+    const { userId } = requireUser(request);
+    return searchMessages({
+      userId,
+      channelId: request.params.channelId,
+      query: request.query.q ?? '',
+      authorId: request.query.authorId,
+      before: request.query.before,
+      limit: request.query.limit ? Number(request.query.limit) : undefined,
+    });
+  });
 
   // --- Messages ------------------------------------------------------------
 

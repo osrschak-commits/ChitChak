@@ -224,6 +224,24 @@ class ApiClient {
     });
   }
 
+  /**
+   * Search one channel.
+   *
+   * The query goes to the server as typed: quoted phrases, `or`, and a leading
+   * `-` to exclude all work, because Postgres' websearch parser understands
+   * them and there is no reason to teach the client a second syntax.
+   */
+  searchMessages(
+    channelId: string,
+    options: { q: string; authorId?: string; before?: string; limit?: number },
+  ): Promise<Message[]> {
+    const query = new URLSearchParams({ q: options.q });
+    if (options.authorId) query.set('authorId', options.authorId);
+    if (options.before) query.set('before', options.before);
+    if (options.limit) query.set('limit', String(options.limit));
+    return this.request<Message[]>(`/api/channels/${channelId}/messages/search?${query}`);
+  }
+
   // --- Levels ---------------------------------------------------------------
 
   /**
