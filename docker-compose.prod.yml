@@ -83,6 +83,18 @@ services:
       # reset is recoverable by hand rather than impossible.
       SMTP_URL: ${SMTP_URL:-}
       MAIL_FROM: ${MAIL_FROM:-}
+      # Optional, and named one by one like everything else here: a variable in
+      # .env.production is only read by compose for substitution, so anything
+      # not listed in this block never reaches the container. Leave them unset
+      # and the shop still shows and keys already granted still spend - only
+      # buying is unavailable.
+      PADDLE_ENV: ${PADDLE_ENV:-sandbox}
+      PADDLE_API_KEY: ${PADDLE_API_KEY:-}
+      PADDLE_WEBHOOK_SECRET: ${PADDLE_WEBHOOK_SECRET:-}
+      PADDLE_PRICE_SUBSCRIPTION: ${PADDLE_PRICE_SUBSCRIPTION:-}
+      PADDLE_PRICE_KEYS_5: ${PADDLE_PRICE_KEYS_5:-}
+      PADDLE_PRICE_KEYS_15: ${PADDLE_PRICE_KEYS_15:-}
+      PADDLE_PRICE_KEYS_40: ${PADDLE_PRICE_KEYS_40:-}
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
