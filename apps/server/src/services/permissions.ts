@@ -8,6 +8,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { channelOverwrites, channels, guildMembers, guilds, memberRanks, ranks } from '../db/schema.js';
 import { errors } from '../lib/errors.js';
+import { isPlatformStaff } from './staff.js';
 import { dmParticipants } from './dms.js';
 import { areFriends } from './friends.js';
 
@@ -120,6 +121,25 @@ export async function requirePermission(
   permission: number,
   message?: string,
 ): Promise<MemberContext> {
+  /**
+   * Platform staff, in a server they may not even be a member of.
+   *
+   * `memberContext` throws for a non-member, so this cannot go after it - the
+   * whole point is being able to act in a server nobody invited you to. The
+   * context returned is synthetic and says so: not the owner, no ranks, and a
+   * position above everyone so the hierarchy check passes.
+   */
+  if (isPlatformStaff(userId)) {
+    return {
+      guildId,
+      userId,
+      isOwner: false,
+      permissions: ALL_PERMISSIONS,
+      position: Number.MAX_SAFE_INTEGER,
+      rankIds: [],
+    };
+  }
+
   const context = await memberContext(guildId, userId);
   if (!has(context.permissions, permission)) {
     throw errors.forbidden(message ?? 'You do not have permission to do that');
@@ -241,8 +261,14 @@ export async function requireOutranks(
 
   const guild = await db.query.guilds.findFirst({ where: eq(guilds.id, actor.guildId) });
   if (guild?.ownerId === targetUserId) {
-    throw errors.forbidden('The server owner cannot be moderated');
+    // Staff are the exception, and have to be: a server whose owner is the
+    // problem is exactly the case an ordinary hierarchy cannot answer.
+    if (!isPlatformStaff(actor.userId)) {
+      throw errors.forbidden('The server owner cannot be moderated');
+    }
+    return;
   }
+  if (isPlatformStaff(actor.userId)) return;
   if (actor.isOwner) return;
 
   const target = await memberContext(actor.guildId, targetUserId);

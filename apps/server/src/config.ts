@@ -56,6 +56,20 @@ const envSchema = z.object({
   PADDLE_PRICE_KEYS_15: blankIsUnset(z.string().min(3).optional()),
   PADDLE_PRICE_KEYS_40: blankIsUnset(z.string().min(3).optional()),
 
+  /**
+   * Who may moderate anywhere, and hand out black cards.
+   *
+   * Comma-separated user **ids**, not usernames. A username can be released and
+   * registered again by somebody else, and that would hand them the platform.
+   * An id belongs to one account for ever.
+   *
+   * Set at deploy rather than stored in the database, so the answer to "who can
+   * act on anyone" is a line in a config file rather than a row that a bug or an
+   * injection could write. Empty by default: a fresh deployment has no staff at
+   * all, which is the right thing for a server somebody else is running.
+   */
+  PLATFORM_ADMINS: blankIsUnset(z.string().optional()),
+
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   ACCESS_TOKEN_TTL: z.coerce.number().int().positive().default(900),
   REFRESH_TOKEN_TTL: z.coerce.number().int().positive().default(60 * 60 * 24 * 30),

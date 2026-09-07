@@ -3416,3 +3416,26 @@ textarea::placeholder {
   color: var(--brass-400);
   border-bottom-color: var(--brass-500);
 }
+
+.staff__give {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.staff__input {
+  flex: 1;
+  max-width: 260px;
+  background: var(--graphite-900);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+}
+
+.staff__input:focus {
+  outline: none;
+  border-color: var(--brass-500);
+}

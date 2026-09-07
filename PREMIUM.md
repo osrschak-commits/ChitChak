@@ -140,6 +140,25 @@ Verified by trying: no signature, a wrong secret, a minute-old timestamp, a body
 edited after signing, a malformed header, and a truncated signature. All six
 refused, and nothing reached the ledger.
 
+## Black cards
+
+A year of Brass, given rather than sold — for the people who helped, the people
+who were here first, and the occasional apology.
+
+Deliberately a *subscription* rather than a separate kind of account: everything
+downstream already knows what a subscription means, and a second sort of
+entitlement would mean every check asking twice. The provider is recorded as
+`blackcard` rather than `paddle`, so a year nobody paid for is never mistaken for
+revenue.
+
+Issuing one extends whatever the person already has rather than replacing it,
+and grants 24 keys — a year's worth at once, because there is no billing here and
+no scheduler to imitate one twelve times.
+
+Only platform staff can issue them, and every card is recorded in
+`staff_actions` before it is issued, so an action that fails halfway still leaves
+a trace of having been attempted.
+
 ## Statuses
 
 `none` · `active` · `past_due` · `cancelled`

@@ -84,7 +84,13 @@ When approved:
    `PADDLE_ENV=production`, redeploy.
 5. Regenerate the sandbox API key - the current one passed through a chat log.
 
-Also outstanding: the subscription is described as including premium features
-and currently grants 2 keys and the plates. Either say that plainly or build the
+Also outstanding: the subscription grants 2 keys, the plates, and 1080p60
+streams. Still to build: custom emoji (subscriber-uploaded), and file uploads
+with a larger cap for subscribers — uploads do not exist at all yet, so that one
+is a missing core feature with a premium tier on the limit rather than a premium
+feature.
+
+Previously noted, now partly done: the subscription is described as including
+premium features and currently grants 2 keys and the plates. Either say that plainly or build the
 features - bigger uploads, more custom emoji, higher stream quality, longer
 history are the candidates that do not buy authority over anyone.

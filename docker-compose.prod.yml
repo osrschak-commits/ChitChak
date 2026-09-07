@@ -60,6 +60,10 @@ services:
       # Optional. Set it and registration requires the code; leave it empty and
       # anyone who can reach the API can create an account.
       SIGNUP_CODE: ${SIGNUP_CODE:-}
+      # Who may moderate anywhere and hand out black cards. User ids, comma
+      # separated. Empty by default - a deployment nobody has configured has no
+      # staff at all, which is the right thing for a server run by somebody else.
+      PLATFORM_ADMINS: ${PLATFORM_ADMINS:-}
       ACCESS_TOKEN_TTL: 900
       REFRESH_TOKEN_TTL: 2592000
       # What the client is told to connect to, and what the server itself uses

@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ApiRequestError, api } from '../lib/api.js';
 import { prepareSquareImage } from '../lib/image.js';
 import { useApp } from '../store/app.js';
 import { LevelPanel } from './LevelPanel.js';
 import { PremiumPanel } from './PremiumPanel.js';
+import { StaffPanel } from './StaffPanel.js';
 import { Avatar } from './primitives.js';
 
 /**
@@ -32,7 +33,7 @@ const ACCENTS = [
  * scroll, and Account - which is where deleting your account lives - sat at the
  * bottom of a shop.
  */
-type Tab = 'profile' | 'progress' | 'premium';
+type Tab = 'profile' | 'progress' | 'premium' | 'staff';
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: 'profile', label: 'Profile' },
@@ -42,6 +43,27 @@ const TABS: Array<{ id: Tab; label: string }> = [
 
 export function ProfileDialog({ onClose }: { onClose(): void }) {
   const [tab, setTab] = useState<Tab>('profile');
+
+  /**
+   * Whether to offer the staff tab at all.
+   *
+   * Asked of the server rather than assumed from anything the client knows.
+   * Hiding the tab is a courtesy for everyone else; the routes behind it check
+   * again, and would refuse a hand-crafted request just the same.
+   */
+  const [staff, setStaff] = useState(false);
+  useEffect(() => {
+    let live = true;
+    void api
+      .amIStaff()
+      .then((result) => live && setStaff(result.staff))
+      .catch(() => {
+        /* Not staff, or the server is old. Either way, no tab. */
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
   const user = useApp((s) => s.user);
   const applySelfUser = useApp((s) => s.applySelfUser);
   const signOut = useApp((s) => s.signOut);
@@ -157,7 +179,7 @@ export function ProfileDialog({ onClose }: { onClose(): void }) {
         </div>
 
         <div className="tabs" role="tablist">
-          {TABS.map((entry) => (
+          {[...TABS, ...(staff ? [{ id: 'staff' as Tab, label: 'Staff' }] : [])].map((entry) => (
             <button
               key={entry.id}
               role="tab"
@@ -175,6 +197,7 @@ export function ProfileDialog({ onClose }: { onClose(): void }) {
 
           {tab === 'progress' && <LevelPanel />}
           {tab === 'premium' && <PremiumPanel />}
+          {tab === 'staff' && staff && <StaffPanel />}
 
           {tab === 'profile' && (
           <>

@@ -186,6 +186,8 @@ export type GatewayErrorCode =
   | 'not_identified'
   | 'rate_limited'
   | 'unknown_channel'
+  /** Something was asked for that does not exist. Not always a channel. */
+  | 'not_found'
   | 'forbidden'
   | 'channel_full'
   | 'invalid_payload'

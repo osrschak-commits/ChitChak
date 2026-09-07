@@ -652,6 +652,32 @@ export const ownedCosmetics = pgTable(
   ],
 );
 
+/**
+ * What platform staff did, and to whom.
+ *
+ * Power that reaches across every server needs a record, and it needs one that
+ * is not the same log that rotates away in a week. This is small - who, what, to
+ * whom, when - and it is written before the action rather than after, so an
+ * action that fails halfway still leaves a trace of having been attempted.
+ */
+export const staffActions = pgTable(
+  'staff_actions',
+  {
+    id: id(),
+    actorId: text('actor_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** 'black_card' | 'moderate' - kept as text so a new kind needs no migration. */
+    action: text('action').notNull(),
+    /** Who it was done to, where that makes sense. */
+    subjectId: text('subject_id'),
+    /** Anything worth being able to read back later. */
+    detail: text('detail'),
+    createdAt: createdAt(),
+  },
+  (table) => [index('staff_actions_actor_idx').on(table.actorId)],
+);
+
 export type ChannelRow = typeof channels.$inferSelect;
 export type MessageRow = typeof messages.$inferSelect;
 export type VoiceStateRow = typeof voiceStates.$inferSelect;
@@ -660,3 +686,4 @@ export type BanRow = typeof bans.$inferSelect;
 export type SubscriptionRow = typeof subscriptions.$inferSelect;
 export type KeyLedgerRow = typeof keyLedger.$inferSelect;
 export type OwnedCosmeticRow = typeof ownedCosmetics.$inferSelect;
+export type StaffActionRow = typeof staffActions.$inferSelect;

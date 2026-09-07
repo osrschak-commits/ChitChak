@@ -31,7 +31,15 @@ export class AppError extends Error {
 export const errors = {
   unauthorized: (message = 'Authentication required') => new AppError(401, 'invalid_token', message),
   forbidden: (message = 'You do not have access to that') => new AppError(403, 'forbidden', message),
-  notFound: (message = 'Not found') => new AppError(404, 'unknown_channel', message),
+  /**
+   * `not_found`, not `unknown_channel`.
+   *
+   * Every 404 in the app used to claim to be about a channel, including "no such
+   * message", "no such item", and "nobody here is called that". The code is
+   * meant to be the machine-readable half of the answer, and one that is wrong
+   * most of the time is worse than none.
+   */
+  notFound: (message = 'Not found') => new AppError(404, 'not_found', message),
   channelFull: (message = 'That voice channel is full') => new AppError(409, 'channel_full', message),
   invalid: (message: string, details?: Record<string, string>) =>
     new AppError(422, 'invalid_payload', message, details),

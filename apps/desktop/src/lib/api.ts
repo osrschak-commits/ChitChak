@@ -281,6 +281,25 @@ class ApiClient {
     return this.request<Message[]>(`/api/channels/${channelId}/messages/search?${query}`);
   }
 
+  // --- Staff ----------------------------------------------------------------
+
+  /** Whether this account may act across every server. */
+  amIStaff(): Promise<{ staff: boolean }> {
+    return this.request('/api/admin/me');
+  }
+
+  /** A year of Brass, given rather than sold. */
+  issueBlackCard(username: string): Promise<{ username: string; cardId: string }> {
+    return this.request('/api/admin/black-card', {
+      method: 'POST',
+      body: JSON.stringify({ username }),
+    });
+  }
+
+  listBlackCards(): Promise<{ cards: Array<{ at: string; actor: string; subject: string | null; detail: string | null }> }> {
+    return this.request('/api/admin/black-cards');
+  }
+
   // --- Premium --------------------------------------------------------------
 
   /** Catalogue, ownership, balance and subscription, in one request. */
