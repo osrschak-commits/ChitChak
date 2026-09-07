@@ -4,6 +4,7 @@ import { GatewayCloseCode } from '@chitchak/protocol';
 import Fastify from 'fastify';
 import { config, isProduction } from './config.js';
 import { closeDatabase, sql } from './db/client.js';
+import { connectRateLimitRedis, disconnectRateLimitRedis, rateLimitRedis } from './lib/rate-limit-store.js';
 import { gatewayPlugin } from './gateway/index.js';
 import * as presence from './gateway/presence.js';
 import { registry } from './gateway/registry.js';
@@ -39,13 +40,40 @@ await app.register(cors, {
   credentials: true,
 });
 
+// Connected before the plugin is registered rather than lazily on first use:
+// the client refuses to queue commands while offline, so a limiter handed an
+// unconnected one would error on its first request instead of counting it.
+await connectRateLimitRedis();
+
 await app.register(rateLimit, {
   global: true,
   max: 300,
   timeWindow: '1 minute',
-  // Rate limit state is per-instance. Move this to the Redis store before
-  // running more than one API process, or the effective limit multiplies.
   keyGenerator: (request) => request.user?.userId ?? request.ip,
+  /**
+   * Counted in Redis, not in process memory.
+   *
+   * In memory the tally is per-instance, so running two API processes multiplies
+   * every limit by two and nothing says so - the limits simply stop being the
+   * limits. The endpoints this protects are the ones worth attacking: sign-in,
+   * password reset, and friend requests, which reach someone who did not ask to
+   * hear from you.
+   */
+  redis: rateLimitRedis,
+  // Its own key prefix: presence and the gateway registry share this Redis, and
+  // a limiter key colliding with a presence key would be a confusing way to
+  // find that out.
+  nameSpace: 'chitchak:ratelimit:',
+  /**
+   * If Redis is unreachable, allow the request rather than refusing it.
+   *
+   * This is a deliberate choice to fail open. The alternative is that a Redis
+   * blip stops anyone signing in, which is a worse and much more likely outcome
+   * than a few minutes of unmetered requests. It does mean rate limiting is
+   * absent exactly when the system is already unwell, so a Redis outage is worth
+   * alerting on for that reason as well as its own.
+   */
+  skipOnError: true,
 });
 
 /**
@@ -116,6 +144,7 @@ async function shutdown(signal: string): Promise<void> {
     await app.close();
     await registry.stop();
     await presence.stopPresence();
+    await disconnectRateLimitRedis();
     await closeDatabase();
     process.exit(0);
   } catch (error) {

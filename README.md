@@ -227,9 +227,12 @@ membership at identify time, so a guild joined mid-session does not route events
 until the socket reconnects. The client reloads after joining to force this.
 The fix is a `guild:join` event that updates the live session's routing set.
 
-**Rate limiting is per-instance.** `@fastify/rate-limit` keeps counters in
-process memory, so running more than one API instance multiplies the effective
-limit. Point it at the Redis store before scaling out — Redis is already there.
+**Rate limiting counts in Redis**, not in process memory, so the configured
+limit is the limit however many API instances are running. It fails open: if
+Redis is unreachable the request is allowed rather than refused, on the grounds
+that a Redis blip stopping everyone signing in is worse than a few minutes of
+unmetered requests — which does mean limits are absent exactly when the system
+is already unwell.
 
 **Tokens are in `localStorage`.** Fine for a dev build, but any renderer-side
 script injection can read them. Electron's `safeStorage` API encrypts against the
