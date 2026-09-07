@@ -5,7 +5,7 @@ import { db } from '../db/client.js';
 import { channels, guildMembers, users, voiceStates } from '../db/schema.js';
 import { registry } from '../gateway/registry.js';
 import { errors } from '../lib/errors.js';
-import { requireChannelPermission } from '../services/permissions.js';
+import { requireChannelPermission, requireGuildChannel } from '../services/permissions.js';
 import { toVoiceState } from '../services/serialize.js';
 import { createVoiceToken, ensureRoom, livekitUrl, removeParticipant } from './livekit.js';
 
@@ -23,8 +23,9 @@ export async function joinVoiceChannel(
   userId: string,
   channelId: string,
 ): Promise<{ credentials: VoiceCredentials; state: VoiceState }> {
-  const channel = await db.query.channels.findFirst({ where: eq(channels.id, channelId) });
-  if (!channel) throw errors.notFound('No such channel');
+  // Voice lives in guilds only: a DM has no voice channel, and requireGuildChannel
+  // reports one as missing rather than confirming it exists.
+  const channel = await requireGuildChannel(channelId);
   if (channel.kind !== 'voice') throw errors.invalid('That channel is not a voice channel');
 
   // CONNECT is checked against the channel, not the guild, so a rank can be

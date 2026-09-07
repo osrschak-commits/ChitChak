@@ -28,6 +28,7 @@ const id = () => text('id').primaryKey();
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
 export const channelKind = pgEnum('channel_kind', ['text', 'voice']);
+export const friendshipState = pgEnum('friendship_state', ['pending', 'accepted']);
 export const presenceStatus = pgEnum('presence_status', ['online', 'idle', 'dnd', 'offline']);
 
 export const users = pgTable(
@@ -123,6 +124,69 @@ export const passwordResets = pgTable(
   ],
 );
 
+/**
+ * Friendship, as one row per pair for all time.
+ *
+ * The ids are stored sorted - userA is always the lower - so the pair is the
+ * primary key and a second row for the same two people cannot exist. That is
+ * not tidiness: it is what makes the simultaneous case safe. If two people add
+ * each other in the same second, both inserts race for one key, one wins, and
+ * the loser's unique violation is read as "you both asked" and accepted
+ * immediately. Storing a row per direction instead would leave two rows that
+ * nothing keeps in agreement.
+ *
+ * The cost is that queries cannot say `where userId = me`; they say
+ * `where userA = me or userB = me`, which is why both columns are indexed.
+ */
+export const friendships = pgTable(
+  'friendships',
+  {
+    userA: text('user_a')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    userB: text('user_b')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    state: friendshipState('state').notNull(),
+    /** Which of the two sent it. The only place direction is recorded. */
+    requestedBy: text('requested_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: createdAt(),
+    respondedAt: timestamp('responded_at', { withTimezone: true }),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userA, table.userB] }),
+    index('friendships_a_idx').on(table.userA),
+    index('friendships_b_idx').on(table.userB),
+  ],
+);
+
+/**
+ * Blocking, which is one-way and therefore not the same shape as friendship.
+ *
+ * Both people can block each other independently, so this is a row per
+ * direction - the opposite of the table above, deliberately. Blocking someone
+ * deletes any friendship or pending request between the two in the same
+ * transaction and stops a new one being created.
+ */
+export const blocks = pgTable(
+  'blocks',
+  {
+    blockerId: text('blocker_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    blockedId: text('blocked_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.blockerId, table.blockedId] }),
+    index('blocks_blocked_idx').on(table.blockedId),
+  ],
+);
+
 export const guilds = pgTable('guilds', {
   id: id(),
   name: text('name').notNull(),
@@ -178,9 +242,17 @@ export const channels = pgTable(
   'channels',
   {
     id: id(),
-    guildId: text('guild_id')
-      .notNull()
-      .references(() => guilds.id, { onDelete: 'cascade' }),
+    /**
+     * Null for a direct message.
+     *
+     * A DM is a text channel that belongs to no guild, rather than a parallel
+     * kind of thing with its own table. That one decision is what lets
+     * messages, editing, deletion, history paging and typing indicators work
+     * for DMs without a line of new code - they all key on channelId and never
+     * ask what the channel is attached to. What it costs is a branch anywhere
+     * permissions are resolved, since a DM has no ranks to resolve through.
+     */
+    guildId: text('guild_id').references(() => guilds.id, { onDelete: 'cascade' }),
     name: text('name').notNull(),
     kind: channelKind('kind').notNull(),
     topic: text('topic'),
@@ -190,6 +262,39 @@ export const channels = pgTable(
     createdAt: createdAt(),
   },
   (table) => [index('channels_guild_idx').on(table.guildId, table.position)],
+);
+
+/**
+ * The channel two people talk in, one per pair.
+ *
+ * Same sorted-pair primary key as friendships, for the same reason: both people
+ * opening the conversation at the same moment must not create two channels for
+ * it, and a unique key is the only way to be sure of that under concurrency.
+ *
+ * A separate table rather than columns on `channels` because these two fields
+ * are meaningless for the other 99% of channels, and because the pair
+ * constraint has to live somewhere it can be enforced.
+ */
+export const dmChannels = pgTable(
+  'dm_channels',
+  {
+    userA: text('user_a')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    userB: text('user_b')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    channelId: text('channel_id')
+      .notNull()
+      .references(() => channels.id, { onDelete: 'cascade' }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userA, table.userB] }),
+    uniqueIndex('dm_channels_channel_idx').on(table.channelId),
+    index('dm_channels_a_idx').on(table.userA),
+    index('dm_channels_b_idx').on(table.userB),
+  ],
 );
 
 export const messages = pgTable(

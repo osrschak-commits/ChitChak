@@ -50,6 +50,13 @@
       "when": 1788746334266,
       "tag": "0006_account_deletion",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788749358957,
+      "tag": "0007_friends_and_dms",
+      "breakpoints": true
     }
   ]
 }

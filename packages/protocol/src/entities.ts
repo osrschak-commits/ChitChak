@@ -39,7 +39,12 @@ export interface Guild {
 
 export interface Channel {
   id: Snowflake;
-  guildId: Snowflake;
+  /**
+   * Null for a direct message, which is a text channel belonging to no guild.
+   * Clients decide how to render a channel from this: a DM is titled by the
+   * other person, and has no topic, position or permissions of its own.
+   */
+  guildId: Snowflake | null;
   name: string;
   kind: ChannelKind;
   /** One line describing what the channel is for. Shown in its header. */

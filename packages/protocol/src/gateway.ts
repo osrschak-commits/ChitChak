@@ -62,6 +62,24 @@ export interface ReadyPayload {
   overwrites: ChannelOverwrite[];
   voiceStates: VoiceState[];
   presences: Array<{ userId: Snowflake; status: PresenceStatus }>;
+  /**
+   * Everyone this user is friends with, and the requests waiting either way.
+   *
+   * Ids only - the people themselves arrive in `users`, because a friend you
+   * share no server with is otherwise someone the client has never heard of.
+   */
+  friends: Snowflake[];
+  incomingRequests: Snowflake[];
+  outgoingRequests: Snowflake[];
+  /** People blocked by this user. Only ever sent to the blocker. */
+  blocked: Snowflake[];
+  /**
+   * Friends and pending requesters who appear in no shared guild. Without them
+   * the client would have a list of ids it cannot render a name for.
+   */
+  users: PublicUser[];
+  /** One per open conversation. `channels` carries the channel itself. */
+  dmChannels: Array<{ channelId: Snowflake; userId: Snowflake }>;
 }
 
 /** Credentials for the SFU. Short-lived and scoped to exactly one room. */
@@ -100,7 +118,18 @@ export type ServerMessage =
   | { op: 'message:update'; d: Message }
   | { op: 'message:delete'; d: { channelId: Snowflake; messageId: Snowflake } }
   /** A profile changed. Sent to every guild the user shares with the recipient. */
-  | { op: 'user:update'; d: PublicUser };
+  | { op: 'user:update'; d: PublicUser }
+  /** Someone asked to be your friend. Sent to the recipient only. */
+  | { op: 'friend:request'; d: { user: PublicUser } }
+  /** A request was accepted. Sent to both, carrying the other person. */
+  | { op: 'friend:accept'; d: { user: PublicUser; dmChannel: Channel } }
+  /**
+   * No longer connected, whatever the reason - unfriended, declined, cancelled
+   * or blocked. Deliberately one event: the client only needs to drop them from
+   * the list, and spelling out which of the four happened would tell the other
+   * person more than they are owed.
+   */
+  | { op: 'friend:remove'; d: { userId: Snowflake } };
 
 export type GatewayErrorCode =
   | 'invalid_token'

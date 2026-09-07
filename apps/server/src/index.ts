@@ -12,6 +12,7 @@ import { guildRoutes } from './http/guilds.routes.js';
 import { imageRoutes } from './http/images.routes.js';
 import { moderationRoutes } from './http/moderation.routes.js';
 import { rankRoutes } from './http/ranks.routes.js';
+import { friendRoutes } from './http/friends.routes.js';
 import { userRoutes } from './http/users.routes.js';
 import { isAppError } from './lib/errors.js';
 
@@ -85,6 +86,7 @@ app.get('/health', async () => {
 await app.register(authRoutes);
 await app.register(imageRoutes);
 await app.register(userRoutes);
+await app.register(friendRoutes);
 await app.register(guildRoutes);
 await app.register(rankRoutes);
 await app.register(moderationRoutes);

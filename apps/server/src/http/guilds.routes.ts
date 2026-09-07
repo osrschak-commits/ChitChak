@@ -33,6 +33,7 @@ import { decodeDataUrl } from '../lib/images.js';
 import {
   memberContext,
   requireChannelPermission,
+  requireGuildChannel,
   requirePermission,
 } from '../services/permissions.js';
 import {
@@ -271,16 +272,13 @@ export async function guildRoutes(app: FastifyInstance): Promise<void> {
     if (!row) throw errors.invalid('Could not create channel');
 
     const channel = toChannel(row);
-    registry.publishToGuild(channel.guildId, { op: 'channel:create', d: channel });
+    registry.publishToGuild(request.params.guildId, { op: 'channel:create', d: channel });
     return reply.code(201).send(channel);
   });
 
   app.patch<{ Params: { channelId: string } }>('/api/channels/:channelId', async (request) => {
     const { userId } = requireUser(request);
-    const existing = await db.query.channels.findFirst({
-      where: eq(channels.id, request.params.channelId),
-    });
-    if (!existing) throw errors.notFound('No such channel');
+    const existing = await requireGuildChannel(request.params.channelId);
     await assertOwner(existing.guildId, userId);
 
     const parsed = updateChannelSchema.safeParse(request.body);
@@ -308,16 +306,13 @@ export async function guildRoutes(app: FastifyInstance): Promise<void> {
     if (!row) throw errors.notFound('No such channel');
 
     const channel = toChannel(row);
-    registry.publishToGuild(channel.guildId, { op: 'channel:update', d: channel });
+    registry.publishToGuild(existing.guildId, { op: 'channel:update', d: channel });
     return channel;
   });
 
   app.delete<{ Params: { channelId: string } }>('/api/channels/:channelId', async (request, reply) => {
     const { userId } = requireUser(request);
-    const channel = await db.query.channels.findFirst({
-      where: eq(channels.id, request.params.channelId),
-    });
-    if (!channel) throw errors.notFound('No such channel');
+    const channel = await requireGuildChannel(request.params.channelId);
     await requirePermission(channel.guildId, userId, Permission.MANAGE_CHANNELS);
 
     const remaining = await db
@@ -373,7 +368,7 @@ export async function guildRoutes(app: FastifyInstance): Promise<void> {
         .where(eq(channels.guildId, request.params.guildId));
       const payload = updated.map(toChannel).sort(compareChannels);
       for (const channel of payload) {
-        registry.publishToGuild(channel.guildId, { op: 'channel:update', d: channel });
+        registry.publishToGuild(request.params.guildId, { op: 'channel:update', d: channel });
       }
 
       return reply.send(payload);
@@ -402,12 +397,12 @@ export async function guildRoutes(app: FastifyInstance): Promise<void> {
       throw errors.invalid(parsed.error.issues[0]?.message ?? 'Invalid message');
     }
 
-    const { message, guildId } = await editMessage({
+    const { message, audience } = await editMessage({
       userId,
       messageId: request.params.messageId,
       content: parsed.data.content,
     });
-    registry.publishToGuild(guildId, { op: 'message:update', d: message });
+    registry.publishToAudience(audience, { op: 'message:update', d: message });
     return message;
   });
 
@@ -415,11 +410,11 @@ export async function guildRoutes(app: FastifyInstance): Promise<void> {
     '/api/messages/:messageId',
     async (request, reply) => {
       const { userId } = requireUser(request);
-      const { channelId, messageId, guildId } = await deleteMessage({
+      const { channelId, messageId, audience } = await deleteMessage({
         userId,
         messageId: request.params.messageId,
       });
-      registry.publishToGuild(guildId, { op: 'message:delete', d: { channelId, messageId } });
+      registry.publishToAudience(audience, { op: 'message:delete', d: { channelId, messageId } });
       return reply.code(204).send();
     },
   );

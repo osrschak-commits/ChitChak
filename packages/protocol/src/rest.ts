@@ -61,6 +61,20 @@ export const deleteAccountSchema = z.object({
   password: z.string().min(1),
 });
 
+/**
+ * Adding a friend is by exact username, never by search.
+ *
+ * A lookup that tolerates near-misses is a way to walk the whole user list, so
+ * the field takes the name as typed and either finds it or does not.
+ */
+export const sendFriendRequestSchema = z.object({
+  username: usernameSchema,
+});
+
+export const blockUserSchema = z.object({
+  userId: z.string().min(1),
+});
+
 export const updateProfileSchema = z
   .object({
     displayName: z.string().min(1, 'Display name cannot be empty').max(48),
@@ -204,6 +218,8 @@ export type RefreshBody = z.infer<typeof refreshSchema>;
 export type ForgotPasswordBody = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordBody = z.infer<typeof resetPasswordSchema>;
 export type DeleteAccountBody = z.infer<typeof deleteAccountSchema>;
+export type SendFriendRequestBody = z.infer<typeof sendFriendRequestSchema>;
+export type BlockUserBody = z.infer<typeof blockUserSchema>;
 export type UpdateProfileBody = z.infer<typeof updateProfileSchema>;
 export type ImageUploadBody = z.infer<typeof imageUploadSchema>;
 export type CreateGuildBody = z.infer<typeof createGuildSchema>;

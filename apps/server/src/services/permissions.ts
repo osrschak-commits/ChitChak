@@ -8,6 +8,8 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { channelOverwrites, channels, guildMembers, guilds, memberRanks, ranks } from '../db/schema.js';
 import { errors } from '../lib/errors.js';
+import { dmParticipants } from './dms.js';
+import { areFriends } from './friends.js';
 
 /**
  * Permission resolution.
@@ -125,7 +127,80 @@ export async function requirePermission(
   return context;
 }
 
-/** @throws unless the member holds `permission` in that specific channel. */
+/**
+ * Fetch a channel that must belong to a guild, with `guildId` narrowed.
+ *
+ * For the administration paths - renaming, reordering, deleting, overwrites,
+ * voice - where a DM is not a thing that can be configured. It is reported as
+ * missing rather than forbidden, since confirming a private conversation exists
+ * is itself a disclosure.
+ */
+export async function requireGuildChannel(
+  channelId: string,
+): Promise<Omit<typeof channels.$inferSelect, 'guildId'> & { guildId: string }> {
+  const channel = await db.query.channels.findFirst({ where: eq(channels.id, channelId) });
+  if (!channel || channel.guildId === null) throw errors.notFound('No such channel');
+  return { ...channel, guildId: channel.guildId };
+}
+
+/**
+ * Access to a channel that may be either kind.
+ *
+ * A guild channel resolves through ranks and overwrites; a DM has neither, and
+ * asks one question instead - are you one of the two people in it, and are you
+ * still friends. Returning a discriminated union rather than a permission
+ * bitfield is deliberate: it makes every caller say out loud what it does in a
+ * DM, instead of a DM quietly inheriting whatever a missing rank happens to
+ * evaluate to.
+ */
+export type ChannelAccess =
+  | { kind: 'guild'; guildId: string; context: MemberContext; permissions: number }
+  | { kind: 'dm'; otherId: string };
+
+export async function requireChannelAccess(
+  channelId: string,
+  userId: string,
+  permission: number,
+  message?: string,
+): Promise<ChannelAccess> {
+  const channel = await db.query.channels.findFirst({ where: eq(channels.id, channelId) });
+  if (!channel) throw errors.notFound('No such channel');
+
+  if (channel.guildId === null) {
+    const participants = await dmParticipants(channelId);
+    // Not a guild channel and not a DM either: a channel with no guild and no
+    // pair should not exist, and pretending it is readable would be worse.
+    if (!participants || !participants.includes(userId)) throw errors.notFound('No such channel');
+
+    const otherId = participants[0] === userId ? participants[1] : participants[0];
+
+    // Checked on every access, not just when the conversation is opened: the
+    // friendship can end - or a block can arrive - while the channel is still
+    // sitting open in someone's client.
+    if (!(await areFriends(userId, otherId))) {
+      throw errors.forbidden('You can only message friends');
+    }
+
+    return { kind: 'dm', otherId };
+  }
+
+  const { context, permissions, guildId } = await requireChannelPermission(
+    channelId,
+    userId,
+    permission,
+    message,
+  );
+  return { kind: 'guild', guildId, context, permissions };
+}
+
+/**
+ * @throws unless the member holds `permission` in that specific guild channel.
+ *
+ * Guild channels only. A DM is reported as missing rather than forbidden, for
+ * the same reason an unreadable channel is: the callers left on this path -
+ * voice, and guild administration - have no meaning in a DM, and confirming one
+ * exists tells the asker something they had no way to know.
+ */
 export async function requireChannelPermission(
   channelId: string,
   userId: string,
@@ -134,6 +209,7 @@ export async function requireChannelPermission(
 ): Promise<{ context: MemberContext; permissions: number; guildId: string }> {
   const channel = await db.query.channels.findFirst({ where: eq(channels.id, channelId) });
   if (!channel) throw errors.notFound('No such channel');
+  if (channel.guildId === null) throw errors.notFound('No such channel');
 
   const context = await memberContext(channel.guildId, userId);
   const permissions = await channelPermissions(context, channelId);

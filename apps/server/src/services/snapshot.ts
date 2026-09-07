@@ -1,4 +1,4 @@
-import type { ChannelOverwrite, GuildMember, Rank, ReadyPayload } from '@chitchak/protocol';
+import type { Channel, ChannelOverwrite, GuildMember, Rank, ReadyPayload } from '@chitchak/protocol';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import {
@@ -12,6 +12,8 @@ import {
   voiceStates,
 } from '../db/schema.js';
 import { errors } from '../lib/errors.js';
+import { dmChannelsFor } from './dms.js';
+import { blockedIdsFor, relationshipsFor } from './friends.js';
 import { memberContext, visibleChannelIds } from './permissions.js';
 import {
   compareChannels,
@@ -19,6 +21,7 @@ import {
   toChannel,
   toGuild,
   toOverwrite,
+  toPublicUser,
   toPublicUserFields,
   toRank,
   toSelfUser,
@@ -36,6 +39,63 @@ import {
  * flag. A client that never receives a private channel cannot leak its name,
  * its topic, or who is sitting in it.
  */
+
+/**
+ * The relationship half of the snapshot.
+ *
+ * Friends are the one group of people a client must know about who may share no
+ * guild with it, so their profiles are gathered here rather than left to the
+ * guild member lists - otherwise the friends list would be a column of ids with
+ * no names against them.
+ */
+async function relationshipSnapshot(
+  userId: string,
+  alreadyKnown: Set<string>,
+): Promise<
+  Pick<
+    ReadyPayload,
+    'friends' | 'incomingRequests' | 'outgoingRequests' | 'blocked' | 'users' | 'dmChannels'
+  > & { dmChannelRows: Channel[] }
+> {
+  const [{ friendIds, incoming, outgoing }, blocked, dms] = await Promise.all([
+    relationshipsFor(userId),
+    blockedIdsFor(userId),
+    dmChannelsFor(userId),
+  ]);
+
+  const needed = [...new Set([...friendIds, ...incoming, ...outgoing, ...blocked])].filter(
+    (id) => !alreadyKnown.has(id),
+  );
+  const strangerRows = needed.length
+    ? await db.query.users.findMany({ where: inArray(users.id, needed) })
+    : [];
+
+  // Only conversations with people still on the friends list. A DM channel
+  // outlives an unfriending, and handing one over would put a conversation in
+  // the sidebar that cannot be posted to.
+  const stillFriends = new Set(friendIds);
+  const liveDms = dms.filter((dm) => stillFriends.has(dm.otherId));
+
+  const dmChannelRows = liveDms.length
+    ? await db.query.channels.findMany({
+        where: inArray(
+          channels.id,
+          liveDms.map((dm) => dm.channelId),
+        ),
+      })
+    : [];
+
+  return {
+    friends: friendIds,
+    incomingRequests: incoming,
+    outgoingRequests: outgoing,
+    blocked,
+    users: strangerRows.map(toPublicUser),
+    dmChannels: liveDms.map((dm) => ({ channelId: dm.channelId, userId: dm.otherId })),
+    dmChannelRows: dmChannelRows.map(toChannel),
+  };
+}
+
 export async function buildReadySnapshot(userId: string): Promise<ReadyPayload> {
   const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
   if (!user) throw errors.unauthorized('Account no longer exists');
@@ -49,15 +109,19 @@ export async function buildReadySnapshot(userId: string): Promise<ReadyPayload> 
   const self = toSelfUser(user);
 
   if (guildIds.length === 0) {
+    // Still a full snapshot: someone with no servers can have friends, and
+    // their conversations are the only thing in their sidebar.
+    const { dmChannelRows, ...relationships } = await relationshipSnapshot(userId, new Set([userId]));
     return {
       user: self,
       guilds: [],
-      channels: [],
+      channels: dmChannelRows,
       members: [],
       ranks: [],
       overwrites: [],
       voiceStates: [],
       presences: [],
+      ...relationships,
     };
   }
 
@@ -130,11 +194,19 @@ export async function buildReadySnapshot(userId: string): Promise<ReadyPayload> 
     : [];
   const overwriteList: ChannelOverwrite[] = overwriteRows.map(toOverwrite);
 
+  const { dmChannelRows, ...relationships } = await relationshipSnapshot(
+    userId,
+    new Set([userId, ...memberList.map((m) => m.userId)]),
+  );
+
   return {
     user: self,
     guilds: guildRows.map(toGuild),
-    channels: visibleChannels.map(toChannel).sort(compareChannels),
+    // DM channels are appended rather than sorted in: compareChannels orders by
+    // guild position, which a DM does not have.
+    channels: [...visibleChannels.map(toChannel).sort(compareChannels), ...dmChannelRows],
     members: memberList,
+    ...relationships,
     ranks: rankList,
     overwrites: overwriteList,
     // Voice state for a hidden channel would reveal who is in it.

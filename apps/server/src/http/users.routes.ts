@@ -5,9 +5,13 @@ import {
   imageUploadSchema,
   updateProfileSchema,
 } from '@chitchak/protocol';
-import { and, eq, ne, sql } from 'drizzle-orm';
+import { and, eq, inArray, ne, or, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import {
+  blocks,
+  channels,
+  dmChannels,
+  friendships,
   guildMembers,
   guilds,
   images,
@@ -228,6 +232,41 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         await tx
           .delete(images)
           .where(and(eq(images.kind, 'user_avatar'), eq(images.ownerId, userId)));
+
+        // Relationships end. Nobody should be left with "Deleted User" in their
+        // friends list, and a block against an account that no longer acts is
+        // protecting against nothing.
+        await tx
+          .delete(friendships)
+          .where(or(eq(friendships.userA, userId), eq(friendships.userB, userId)));
+        await tx
+          .delete(blocks)
+          .where(or(eq(blocks.blockerId, userId), eq(blocks.blockedId, userId)));
+
+        // The conversations go with them, and this is the one place messages
+        // are not kept.
+        //
+        // The rule elsewhere - anonymise, keep the thread - exists so other
+        // people's conversations still read. A DM had exactly two people in it:
+        // one is gone, and the other cannot reply, because replying needs a
+        // friendship that no longer exists. What would survive is an
+        // unreachable channel nobody can act in.
+        //
+        // Deleting the channel row is what does the work; dm_channels and the
+        // messages inside it follow by cascade.
+        const conversations = await tx
+          .select({ channelId: dmChannels.channelId })
+          .from(dmChannels)
+          .where(or(eq(dmChannels.userA, userId), eq(dmChannels.userB, userId)));
+
+        if (conversations.length > 0) {
+          await tx.delete(channels).where(
+            inArray(
+              channels.id,
+              conversations.map((row) => row.channelId),
+            ),
+          );
+        }
       });
 
       // Tokens are dead, but an open socket authenticated a while ago and is

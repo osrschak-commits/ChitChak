@@ -17,6 +17,7 @@ import { errors } from '../lib/errors.js';
 import { generateId } from '../lib/ids.js';
 import {
   memberContext,
+  requireGuildChannel,
   requirePermission,
   requireRankBelow,
 } from '../services/permissions.js';
@@ -331,10 +332,7 @@ export async function rankRoutes(app: FastifyInstance): Promise<void> {
     '/api/channels/:channelId/overwrites',
     async (request) => {
       const { userId } = requireUser(request);
-      const channel = await db.query.channels.findFirst({
-        where: eq(channels.id, request.params.channelId),
-      });
-      if (!channel) throw errors.notFound('No such channel');
+      const channel = await requireGuildChannel(request.params.channelId);
 
       const actor = await requirePermission(channel.guildId, userId, Permission.MANAGE_CHANNELS);
 
@@ -395,10 +393,7 @@ export async function rankRoutes(app: FastifyInstance): Promise<void> {
     '/api/channels/:channelId/overwrites',
     async (request) => {
       const { userId } = requireUser(request);
-      const channel = await db.query.channels.findFirst({
-        where: eq(channels.id, request.params.channelId),
-      });
-      if (!channel) throw errors.notFound('No such channel');
+      const channel = await requireGuildChannel(request.params.channelId);
       await requirePermission(channel.guildId, userId, Permission.MANAGE_CHANNELS);
 
       const rows = await db

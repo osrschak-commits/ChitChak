@@ -115,6 +115,30 @@ export class GatewayRegistry extends EventEmitter {
   }
 
   /**
+   * Fan out to whoever a message concerns - a guild, or the two people in a DM.
+   *
+   * The audience is decided where the permission check happened and carried
+   * here intact, so no call site has to remember that a channel might have no
+   * guild. The shape is declared structurally rather than imported from
+   * services/messages, which would point the gateway at the service layer that
+   * already points back at it.
+   */
+  publishToAudience(
+    audience: { kind: 'guild'; guildId: string } | { kind: 'dm'; userIds: readonly string[] },
+    message: ServerMessage,
+    exceptUserId?: string,
+  ): void {
+    if (audience.kind === 'guild') {
+      this.publishToGuild(audience.guildId, message, exceptUserId);
+      return;
+    }
+    this.publishToUsers(
+      audience.userIds.filter((id) => id !== exceptUserId),
+      message,
+    );
+  }
+
+  /**
    * Deliver only to this process's own sockets for a user.
    *
    * Used for things that are meaningless elsewhere - a voice token is bound to

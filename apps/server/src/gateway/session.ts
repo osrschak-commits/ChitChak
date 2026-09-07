@@ -15,6 +15,8 @@ import { db } from '../db/client.js';
 import { channels } from '../db/schema.js';
 import { isAppError } from '../lib/errors.js';
 import { sessionIsStillValid } from '../lib/session-validity.js';
+import { dmParticipants } from '../services/dms.js';
+import { areFriends } from '../services/friends.js';
 import { verifyAccessToken } from '../lib/tokens.js';
 import { buildReadySnapshot, guildIdsForUser } from '../services/snapshot.js';
 import { createMessage } from '../services/messages.js';
@@ -50,6 +52,8 @@ export class Session {
   private identified = false;
   private closed = false;
   private guildIds = new Set<string>();
+  /** Accepted friends, so presence reaches them with or without a shared guild. */
+  private friendIds = new Set<string>();
   private status: PresenceStatus = 'online';
 
   private identifyTimer: NodeJS.Timeout | undefined;
@@ -223,10 +227,11 @@ export class Session {
           channelId: message.d?.channelId,
           content: message.d?.content,
         });
-        registry.publishToGuild(created.guildId, {
-          op: 'message:create',
-          d: { ...created.message, nonce: undefined },
-        }, this.userId);
+        registry.publishToAudience(
+          created.audience,
+          { op: 'message:create', d: { ...created.message, nonce: undefined } },
+          this.userId,
+        );
         // Echo to the author with their nonce so the optimistic bubble the
         // client already rendered can be reconciled instead of duplicated.
         this.send({
@@ -239,10 +244,10 @@ export class Session {
       case 'typing:start': {
         const channelId = message.d?.channelId;
         if (typeof channelId !== 'string') return;
-        const guildId = await this.guildIdForChannel(channelId);
-        if (!guildId) return;
-        registry.publishToGuild(
-          guildId,
+        const audience = await this.audienceForChannel(channelId);
+        if (!audience) return;
+        registry.publishToAudience(
+          audience,
           {
             op: 'typing:start',
             d: {
@@ -298,6 +303,9 @@ export class Session {
 
     const snapshot = await buildReadySnapshot(this.userId);
     this.guildIds = new Set(snapshot.guilds.map((g) => g.id));
+    // Held for the life of the session so going offline can reach the same
+    // people going online did, without a query during teardown.
+    this.friendIds = new Set(snapshot.friends);
 
     registry.add(this);
 
@@ -305,7 +313,11 @@ export class Session {
 
     // Fill in presence for everyone the client can see, so their member list is
     // correct on first paint rather than only after people move.
-    const visibleUserIds = [...new Set(snapshot.members.map((m) => m.userId))];
+    // Friends are included even when no guild is shared with them - seeing that
+    // a friend is online is most of what a friends list is for.
+    const visibleUserIds = [
+      ...new Set([...snapshot.members.map((m) => m.userId), ...snapshot.friends]),
+    ];
     snapshot.presences = await presence.getStatuses(visibleUserIds);
 
     this.send({ op: 'ready', d: snapshot });
@@ -324,6 +336,13 @@ export class Session {
         d: { userId: this.userId, status },
       }, this.userId);
     }
+    // Friends hear about it too. A friend who shares a guild is reached twice;
+    // the client applies the same status either way, so a duplicate is cheaper
+    // than working out which friends the guild fan-out already covered.
+    registry.publishToUsers([...this.friendIds], {
+      op: 'presence:update',
+      d: { userId: this.userId, status },
+    });
   }
 
   private startHeartbeatWatchdog(): void {
@@ -350,10 +369,32 @@ export class Session {
     return this.opCount <= RATE_LIMIT_OPS;
   }
 
-  private async guildIdForChannel(channelId: string): Promise<string | null> {
+  /**
+   * Who an event about this channel should reach, or null if this session has
+   * no business in it.
+   *
+   * Returns rather than throws: the callers are fire-and-forget gateway ops
+   * where the right response to "not allowed" is silence, not an error frame.
+   */
+  private async audienceForChannel(
+    channelId: string,
+  ): Promise<{ kind: 'guild'; guildId: string } | { kind: 'dm'; userIds: [string, string] } | null> {
     const channel = await db.query.channels.findFirst({ where: eq(channels.id, channelId) });
-    if (!channel || !this.guildIds.has(channel.guildId)) return null;
-    return channel.guildId;
+    if (!channel) return null;
+
+    if (channel.guildId !== null) {
+      return this.guildIds.has(channel.guildId) ? { kind: 'guild', guildId: channel.guildId } : null;
+    }
+
+    const participants = await dmParticipants(channelId);
+    if (!participants || !participants.includes(this.userId)) return null;
+
+    // Checked here too, cheaply, so that unfriending someone also stops them
+    // seeing you type.
+    const otherId = participants[0] === this.userId ? participants[1] : participants[0];
+    if (!(await areFriends(this.userId, otherId))) return null;
+
+    return { kind: 'dm', userIds: participants };
   }
 
   private async teardown(): Promise<void> {
@@ -387,6 +428,10 @@ export class Session {
         d: { userId: this.userId, status: 'offline' },
       });
     }
+    registry.publishToUsers([...this.friendIds], {
+      op: 'presence:update',
+      d: { userId: this.userId, status: 'offline' },
+    });
   }
 }
 
