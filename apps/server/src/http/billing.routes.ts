@@ -62,10 +62,16 @@ export async function billingRoutes(app: FastifyInstance): Promise<void> {
       const raw = request.body?.raw;
       if (typeof raw !== 'string') return reply.code(400).send({ error: 'expected a body' });
 
-      if (!paddle.verifySignature(request.headers['paddle-signature'] as string | undefined, raw)) {
-        // Deliberately terse. An unsigned or stale request gets told nothing
-        // about why, since the only party who needs the detail is us.
-        request.log.warn('[paddle] rejected an unsigned or stale webhook');
+      const check = paddle.checkSignature(
+        request.headers['paddle-signature'] as string | undefined,
+        raw,
+      );
+      if (check !== 'ok') {
+        // The log says which way it failed - a wrong secret and a wrong clock
+        // are indistinguishable from outside and want completely different
+        // fixes. The reply stays terse: the only party who needs the detail is
+        // us, and telling a forger why they failed only helps them.
+        request.log.warn({ reason: check }, '[paddle] webhook refused');
         return reply.code(401).send({ error: 'bad signature' });
       }
 

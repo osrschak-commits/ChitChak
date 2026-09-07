@@ -20,8 +20,27 @@ import { applyFromProvider, type Status } from './subscriptions.js';
 const API_BASE = () =>
   config.PADDLE_ENV === 'sandbox' ? 'https://sandbox-api.paddle.com' : 'https://api.paddle.com';
 
-/** How old a signed request may be. Paddle's own guidance is five seconds. */
-const MAX_SIGNATURE_AGE_MS = 5000;
+/**
+ * How old a signed request may be.
+ *
+ * Paddle suggest five seconds. That is too tight to be safe here, and the
+ * reason is worth writing down: five seconds asks three clocks to agree -
+ * Paddle's, ours, and whatever the network added - and when they do not, the
+ * failure is a webhook rejected, which means money taken and nothing delivered.
+ * That is the worst outcome in this file. A machine an innocent ten seconds out
+ * would break every payment it ever received, and look exactly like a wrong
+ * secret while doing it.
+ *
+ * Widening it costs almost nothing, because the age check is not what stops a
+ * replay: the ledger's unique index on (user, reason, reference) is. A captured
+ * webhook replayed a thousand times pays out once whatever this number says.
+ * The window is here to stop something signed last year turning up, and five
+ * minutes does that as well as five seconds does.
+ */
+const MAX_SIGNATURE_AGE_MS = 5 * 60 * 1000;
+
+/** Why a webhook was refused. */
+export type SignatureResult = 'ok' | 'no-secret' | 'malformed' | 'stale' | 'mismatch';
 
 /**
  * Is this really from Paddle, and is it recent?
@@ -31,13 +50,17 @@ const MAX_SIGNATURE_AGE_MS = 5000;
  * string and every signature fails. That is why the webhook route takes the raw
  * buffer.
  *
- * Compared with `timingSafeEqual`, and the age is checked as well as the
- * signature: without the age check a signed request captured once could be
- * replayed forever, and a replayed "subscription renewed" is free keys.
+ * Compared with `timingSafeEqual`, which is why the lengths are checked first:
+ * a wrong-length input makes it throw rather than return false.
+ *
+ * Returns which way it failed rather than a boolean, because a wrong secret and
+ * a wrong clock are indistinguishable from outside and want completely
+ * different fixes. The log says which; the reply never does.
  */
-export function verifySignature(header: string | undefined, rawBody: string): boolean {
+export function checkSignature(header: string | undefined, rawBody: string): SignatureResult {
   const secret = config.PADDLE_WEBHOOK_SECRET;
-  if (!secret || !header) return false;
+  if (!secret) return 'no-secret';
+  if (!header) return 'malformed';
 
   // Paddle-Signature: ts=1671552777;h1=eb4d0dc8...
   const parts = new Map(
@@ -49,10 +72,11 @@ export function verifySignature(header: string | undefined, rawBody: string): bo
 
   const timestamp = parts.get('ts');
   const signature = parts.get('h1');
-  if (!timestamp || !signature) return false;
+  if (!timestamp || !signature) return 'malformed';
 
   const age = Math.abs(Date.now() - Number(timestamp) * 1000);
-  if (!Number.isFinite(age) || age > MAX_SIGNATURE_AGE_MS) return false;
+  if (!Number.isFinite(age)) return 'malformed';
+  if (age > MAX_SIGNATURE_AGE_MS) return 'stale';
 
   const expected = createHmac('sha256', secret).update(`${timestamp}:${rawBody}`).digest('hex');
 
@@ -60,9 +84,13 @@ export function verifySignature(header: string | undefined, rawBody: string): bo
   // timingSafeEqual throw rather than return false.
   const given = Buffer.from(signature, 'hex');
   const mine = Buffer.from(expected, 'hex');
-  if (given.length !== mine.length) return false;
+  if (given.length !== mine.length) return 'malformed';
 
-  return timingSafeEqual(given, mine);
+  return timingSafeEqual(given, mine) ? 'ok' : 'mismatch';
+}
+
+export function verifySignature(header: string | undefined, rawBody: string): boolean {
+  return checkSignature(header, rawBody) === 'ok';
 }
 
 /** Paddle's subscription statuses, as ours. */
