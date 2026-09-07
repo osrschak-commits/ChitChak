@@ -9,6 +9,7 @@ import { gatewayPlugin } from './gateway/index.js';
 import { startVoiceXpTicker, stopVoiceXpTicker } from './voice/xp-ticker.js';
 import * as presence from './gateway/presence.js';
 import { registry } from './gateway/registry.js';
+import { billingRoutes } from './http/billing.routes.js';
 import { authRoutes } from './http/auth.routes.js';
 import { guildRoutes } from './http/guilds.routes.js';
 import { imageRoutes } from './http/images.routes.js';
@@ -112,6 +113,7 @@ app.get('/health', async () => {
   return { status: 'ok', sessions: registry.localSessionCount, uptime: process.uptime() };
 });
 
+await app.register(billingRoutes);
 await app.register(authRoutes);
 await app.register(imageRoutes);
 await app.register(userRoutes);

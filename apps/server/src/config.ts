@@ -34,6 +34,21 @@ const envSchema = z.object({
    */
   SIGNUP_CODE: blankIsUnset(z.string().min(4).optional()),
 
+  /**
+   * Paddle, who take the money.
+   *
+   * All optional, and deliberately so: without them the server runs, the shop
+   * shows, keys already granted still spend, and only buying is unavailable.
+   * A deployment that has not set up billing should not fail to boot.
+   */
+  PADDLE_ENV: z.enum(['sandbox', 'production']).default('sandbox'),
+  PADDLE_API_KEY: blankIsUnset(z.string().min(10).optional()),
+  PADDLE_WEBHOOK_SECRET: blankIsUnset(z.string().min(10).optional()),
+  /** Price ids from the Paddle catalogue. */
+  PADDLE_PRICE_SUBSCRIPTION: blankIsUnset(z.string().min(3).optional()),
+  PADDLE_PRICE_KEYS_5: blankIsUnset(z.string().min(3).optional()),
+  PADDLE_PRICE_KEYS_15: blankIsUnset(z.string().min(3).optional()),
+
   JWT_SECRET: z.string().min(32, 'JWT_SECRET must be at least 32 characters'),
   ACCESS_TOKEN_TTL: z.coerce.number().int().positive().default(900),
   REFRESH_TOKEN_TTL: z.coerce.number().int().positive().default(60 * 60 * 24 * 30),

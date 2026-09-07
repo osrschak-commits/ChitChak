@@ -52,18 +52,63 @@ app rather than as "you cannot afford that".
 resolves to: this person is in this state until this date. Nothing above that
 line knows which provider it is.
 
-**Not yet chosen.** The realistic options for a solo developer:
-
-- **Stripe** — best API, lowest fees. You are the merchant of record, so VAT
-  registration and returns in every country you sell to are yours. Stripe Tax
-  calculates; it does not file.
-- **Paddle / Lemon Squeezy** — they become the legal seller and handle VAT
-  entirely. Higher fees. This is what most one-person operations selling digital
-  goods to consumers actually use, and the current recommendation.
+**Paddle**, because Paddle is merchant of record: they are the legal seller, so
+VAT in every country a customer lives in is theirs to calculate, collect and
+file. Stripe has a better API and lower fees, but leaves all of that with you,
+and for a one-person operation the filing is the expensive part rather than the
+integration.
 
 Discord takes cards directly through Stripe and goes through Apple and Google on
 mobile, because the app stores require it. That works for them because they have
 a finance team; the part that does not transfer is the tax filing, not the code.
+
+### Setting it up
+
+Nothing below is in the repository, and the server runs without any of it — the
+shop shows, keys already granted still spend, and only buying is unavailable.
+
+1. A Paddle account, and **Sandbox** first. Everything works there with test
+   cards; nothing needs a real bank account until you go live.
+2. In the catalogue, create the products and prices:
+   - a recurring monthly price for the subscription
+   - one-off prices for key packs (5 and 15)
+3. **Notifications** → a destination pointing at
+   `https://api.chitchak.com/api/webhooks/paddle`, subscribed to
+   `subscription.*` and `transaction.completed`. Copy the secret key it gives
+   you.
+4. Put them in `.env.production` on the server:
+
+   ```
+   PADDLE_ENV=production          # or sandbox while testing
+   PADDLE_API_KEY=...
+   PADDLE_WEBHOOK_SECRET=...
+   PADDLE_PRICE_SUBSCRIPTION=pri_...
+   PADDLE_PRICE_KEYS_5=pri_...
+   PADDLE_PRICE_KEYS_15=pri_...
+   ```
+
+5. Redeploy. `GET /api/premium/store` starts reporting `open: true` and the buy
+   buttons appear on their own.
+
+Going live also needs Paddle to approve the account — they check what is being
+sold, which for a chat app's cosmetics is straightforward, but it is a review
+with a wait rather than a switch.
+
+### The webhook is the authentication
+
+There is no session on a webhook, so its signature is the only thing standing
+between the internet and free keys. It is checked against the **raw bytes**,
+which is why that route has its own body parser: `JSON.stringify(JSON.parse(x))`
+is rarely `x`, and re-serialising would fail every signature for reasons that
+look like a wrong secret.
+
+Compared with `timingSafeEqual`, and the timestamp is checked as well as the
+signature — five seconds, per Paddle's guidance. Without the age check, one
+captured request could be replayed forever, and a replayed renewal is free keys.
+
+Verified by trying: no signature, a wrong secret, a minute-old timestamp, a body
+edited after signing, a malformed header, and a truncated signature. All six
+refused, and nothing reached the ledger.
 
 ## Statuses
 

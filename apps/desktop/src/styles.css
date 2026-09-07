@@ -3366,3 +3366,10 @@ textarea::placeholder {
   letter-spacing: 1px;
   vertical-align: middle;
 }
+
+.brass__buy {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}

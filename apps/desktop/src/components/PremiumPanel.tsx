@@ -26,6 +26,7 @@ const SLOT_BLURBS: Record<string, string> = {
 
 export function PremiumPanel() {
   const [state, setState] = useState<PremiumState | null>(null);
+  const [store, setStore] = useState<{ open: boolean; packs: Array<{ id: string; keys: number | null }> } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,10 +36,34 @@ export function PremiumPanel() {
       .premium()
       .then((next) => live && setState(next))
       .catch(() => live && setError('Could not load the store.'));
+    void api
+      .premiumStore()
+      .then((next) => live && setStore(next))
+      .catch(() => live && setStore({ open: false, packs: [] }));
     return () => {
       live = false;
     };
   }, []);
+
+  /**
+   * Pay in a real browser, not in here.
+   *
+   * `window.open` reaches Electron's window-open handler, which hands the URL
+   * to the system browser. Somebody typing a card number should be able to see
+   * the address bar, and an app window cannot honestly offer one.
+   */
+  async function openCheckout(pack: string) {
+    setBusy(pack);
+    setError(null);
+    try {
+      const { url } = await api.checkout(pack);
+      window.open(url, '_blank', 'noopener');
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : 'Could not open the checkout');
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function refresh() {
     setState(await api.premium());
@@ -89,16 +114,45 @@ export function PremiumPanel() {
             ) : (
               <>
                 <span className="brass__badge brass__badge--off mono">Not subscribed</span>
-                {/* Honest about the state of it rather than a button that goes
-                    nowhere. A "Subscribe" that does nothing is worse than none. */}
                 <span className="row__hint">
-                  Subscribing gets you {state.keysPerPeriod} keys a period. Not open yet — there is
-                  nothing to pay with.
+                  {store?.open
+                    ? `Brass gets you ${state.keysPerPeriod} keys a period.`
+                    : /* Honest about the state of it rather than a button that
+                         goes nowhere. A "Subscribe" that does nothing is worse
+                         than none. */
+                      'Subscribing is not open yet.'}
                 </span>
               </>
             )}
           </div>
         </div>
+
+        {store?.open && (
+          <div className="brass__buy">
+            {!state.subscription.active && store.packs.some((p) => p.id === 'subscription') && (
+              <button
+                className="btn btn--primary btn--sm"
+                disabled={busy === 'subscription'}
+                onClick={() => void openCheckout('subscription')}
+              >
+                {busy === 'subscription' ? 'Opening…' : 'Subscribe'}
+              </button>
+            )}
+
+            {store.packs
+              .filter((pack) => pack.keys !== null)
+              .map((pack) => (
+                <button
+                  key={pack.id}
+                  className="btn btn--ghost btn--sm"
+                  disabled={busy === pack.id}
+                  onClick={() => void openCheckout(pack.id)}
+                >
+                  {busy === pack.id ? 'Opening…' : `Buy ${pack.keys} keys`}
+                </button>
+              ))}
+          </div>
+        )}
       </div>
 
       {error && <div className="notice">{error}</div>}

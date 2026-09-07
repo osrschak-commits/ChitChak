@@ -299,6 +299,19 @@ class ApiClient {
     });
   }
 
+  /** What this server can sell, if anything. */
+  premiumStore(): Promise<{ open: boolean; packs: Array<{ id: string; keys: number | null }> }> {
+    return this.request('/api/premium/store');
+  }
+
+  /** Start a checkout and get somewhere to send them. */
+  checkout(pack: string): Promise<{ url: string }> {
+    return this.request('/api/premium/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ pack }),
+    });
+  }
+
   keyHistory(): Promise<{ entries: KeyEntry[] }> {
     return this.request('/api/premium/keys');
   }
