@@ -2866,3 +2866,33 @@ textarea::placeholder {
 .tile__live {
   color: var(--brass-400);
 }
+
+/* ==========================================================================
+   Day separator
+
+   One date per day rather than one per message: a timestamp on every line that
+   says which day it was is noise on the ninety-nine lines from the same day.
+   ========================================================================== */
+
+.daybreak {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 10px;
+}
+
+.daybreak::before,
+.daybreak::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.daybreak__label {
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  white-space: nowrap;
+}

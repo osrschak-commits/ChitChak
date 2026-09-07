@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Permission } from '@chitchak/protocol';
 import { usePermissions } from '../hooks/usePermissions.js';
 import { usePersonPopover } from '../hooks/usePersonPopover.js';
@@ -12,6 +12,50 @@ import { Avatar, MemberName } from './primitives.js';
  * are not modes to switch between.
  */
 const GROUPING_WINDOW_MS = 5 * 60 * 1000;
+
+/** The calendar day something happened on, in local time. */
+function dayKey(date: Date): string {
+  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+}
+
+/**
+ * How a day is named in the separator.
+ *
+ * "Today" and "Yesterday" because that is what people call them, and a weekday
+ * for the rest of the week because "Tuesday" locates a conversation better than
+ * a number does. Older than that and the date is the only thing that helps.
+ */
+function dayLabel(date: Date): string {
+  const now = new Date();
+  const today = dayKey(now);
+  if (dayKey(date) === today) return 'Today';
+
+  const yesterday = new Date(now);
+  yesterday.setDate(now.getDate() - 1);
+  if (dayKey(date) === dayKey(yesterday)) return 'Yesterday';
+
+  const sameYear = date.getFullYear() === now.getFullYear();
+  const withinWeek = now.getTime() - date.getTime() < 6 * 86_400_000;
+
+  return date.toLocaleDateString([], {
+    weekday: withinWeek ? 'long' : undefined,
+    day: 'numeric',
+    month: 'long',
+    year: sameYear ? undefined : 'numeric',
+  });
+}
+
+/** The full thing, for the tooltip on a timestamp. */
+function fullStamp(date: Date): string {
+  return date.toLocaleString([], {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
   const channels = useApp((s) => s.channels);
@@ -159,18 +203,31 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
                 (message.authorId === selfId ? self : undefined) ??
                 people.get(message.authorId);
               const name = author?.nickname ?? authorProfile?.displayName ?? 'Unknown';
+              const time = new Date(message.createdAt);
+              // A new day always starts a fresh block. The grouping window is
+              // five minutes, which straddles midnight perfectly happily -
+              // without this, the first message of a day can hide under the
+              // previous day's name with nothing to say the date changed.
+              const newDay =
+                previous === undefined || dayKey(new Date(previous.createdAt)) !== dayKey(time);
               const grouped =
+                !newDay &&
                 previous !== undefined &&
                 previous.authorId === message.authorId &&
                 Date.parse(message.createdAt) - Date.parse(previous.createdAt) < GROUPING_WINDOW_MS;
-              const time = new Date(message.createdAt);
               const isAuthor = message.authorId === selfId;
 
               return (
-                <div key={message.id} className={`msg ${grouped ? 'msg--grouped' : ''}`}>
+                <Fragment key={message.id}>
+                {newDay && (
+                  <div className="daybreak" role="separator">
+                    <span className="daybreak__label mono">{dayLabel(time)}</span>
+                  </div>
+                )}
+                <div className={`msg ${grouped ? 'msg--grouped' : ''}`}>
                   <div className="msg__gutter">
                     {grouped ? (
-                      <span className="msg__stamp">
+                      <span className="msg__stamp" title={fullStamp(time)}>
                         {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     ) : (
@@ -203,7 +260,11 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
                           {...person.bind(message.authorId)}
                           title={`${name} — click for profile, right-click to moderate`}
                         />
-                        <time className="msg__time" dateTime={message.createdAt}>
+                        <time
+                          className="msg__time"
+                          dateTime={message.createdAt}
+                          title={fullStamp(time)}
+                        >
                           {time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </time>
                       </div>
@@ -253,6 +314,7 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
                     </div>
                   )}
                 </div>
+                </Fragment>
               );
             })}
           </div>
