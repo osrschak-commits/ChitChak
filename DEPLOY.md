@@ -155,12 +155,18 @@ to something you can read out loud. Finish with `chmod 600 .env.production`.
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 docker compose -f docker-compose.prod.yml --env-file .env.production \
-  --profile tools run --rm migrate
+  --profile tools run --rm --build migrate
 ```
 
 The second command creates the database tables. Re-run it after any deploy that
 changes the schema. The build takes a few minutes the first time: it compiles the
 API, and it compiles the web client that `https://yourdomain.com` serves.
+
+**Do not drop the `--build` from the migrate command.** `migrate` is in the
+`tools` profile, so `up -d --build` skips it — without `--build` it runs from
+whatever image was last built, which on a deploy that adds a migration is one
+that does not contain it. It then applies nothing, prints "Migrations applied",
+and exits 0, leaving new code running against an old schema.
 
 Check it came up:
 
@@ -314,7 +320,7 @@ The `/app` copy in that preview is built against the **live** API, which refuses
 git pull
 docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 docker compose -f docker-compose.prod.yml --env-file .env.production \
-  --profile tools run --rm migrate
+  --profile tools run --rm --build migrate
 ```
 
 Server-only changes need no new installer.

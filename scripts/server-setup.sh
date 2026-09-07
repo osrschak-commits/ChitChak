@@ -163,7 +163,7 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d --bui
 
 say "Applying database migrations"
 docker compose -f docker-compose.prod.yml --env-file .env.production \
-  --profile tools run --rm migrate
+  --profile tools run --rm --build migrate
 
 say "Waiting for the API to answer"
 for _ in $(seq 1 30); do
