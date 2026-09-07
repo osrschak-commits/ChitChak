@@ -119,6 +119,8 @@ interface AppState {
   videoFeeds: VideoFeed[];
   /** Screens on offer in the current room, watched or not. */
   screenShares: ScreenShare[];
+  /** Whether the member rail is showing. Remembered between sessions. */
+  membersVisible: boolean;
   selfMuted: boolean;
   selfDeafened: boolean;
   cameraOn: boolean;
@@ -168,6 +170,7 @@ interface AppState {
   /** Start or stop receiving somebody else's screen. */
   watchScreen(trackSid: string): void;
   stopWatchingScreen(trackSid: string): void;
+  toggleMembers(): void;
   setTransmitMode(mode: TransmitMode): void;
   setPushToTalkActive(active: boolean): void;
   setAudioSettings(settings: Partial<AudioSettings>): Promise<void>;
@@ -328,6 +331,17 @@ function signedOutState() {
   };
 }
 
+const MEMBERS_VISIBLE_KEY = 'chitchak.members-visible';
+
+/** Shown unless it was turned off - a member list nobody asked to hide is useful. */
+function readMembersVisible(): boolean {
+  try {
+    return localStorage.getItem(MEMBERS_VISIBLE_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
 export const useApp = create<AppState>((set, get) => ({
   authenticated: api.isAuthenticated,
   user: api.user,
@@ -363,6 +377,7 @@ export const useApp = create<AppState>((set, get) => ({
   levels: new Map(),
   videoFeeds: [],
   screenShares: [],
+  membersVisible: readMembersVisible(),
   selfMuted: false,
   selfDeafened: false,
   cameraOn: false,
@@ -609,6 +624,17 @@ export const useApp = create<AppState>((set, get) => ({
     }
     set({ screenShareOn: getEngine().screenShareOn });
     pushVoiceState(get());
+  },
+
+  toggleMembers() {
+    const membersVisible = !get().membersVisible;
+    set({ membersVisible });
+    try {
+      localStorage.setItem(MEMBERS_VISIBLE_KEY, membersVisible ? '1' : '0');
+    } catch {
+      // Private browsing, or storage disabled. The rail still toggles; it just
+      // forgets, which is a far smaller problem than refusing to toggle.
+    }
   },
 
   watchScreen(trackSid) {

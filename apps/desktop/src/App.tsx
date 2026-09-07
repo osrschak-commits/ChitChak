@@ -7,6 +7,7 @@ import { FriendsPanel } from './components/FriendsPanel.js';
 import { FriendsSidebar } from './components/FriendsSidebar.js';
 import { GuildDialog } from './components/GuildDialog.js';
 import { Celebrations } from './components/Celebrations.js';
+import { MemberRail } from './components/MemberRail.js';
 import { ProfileDialog } from './components/ProfileDialog.js';
 import { ResetPasswordScreen, takeResetTokenFromUrl } from './components/ResetPasswordScreen.js';
 import { ServerSettingsDialog } from './components/ServerSettingsDialog.js';
@@ -42,6 +43,7 @@ export function App() {
   const selectedGuildId = useApp((s) => s.selectedGuildId);
   const mainView = useApp((s) => s.mainView);
   const scope = useApp((s) => s.scope);
+  const membersVisible = useApp((s) => s.membersVisible);
   const selectedDmChannelId = useApp((s) => s.selectedDmChannelId);
   const voiceChannelId = useApp((s) => s.voiceChannelId);
 
@@ -137,6 +139,14 @@ export function App() {
             <ChatPanel onEditProfile={() => setOverlay('profile')} />
           )}
         </ErrorBoundary>
+
+        {/* Not in the friends scope: there is no server there to list, and the
+            conversation list on the left is already the roster. */}
+        {scope !== 'friends' && selectedGuildId && membersVisible && (
+          <ErrorBoundary scope="member list">
+            <MemberRail guildId={selectedGuildId} />
+          </ErrorBoundary>
+        )}
       </div>
 
       <Celebrations />

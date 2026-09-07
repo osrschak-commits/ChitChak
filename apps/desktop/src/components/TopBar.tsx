@@ -52,6 +52,9 @@ export function TopBar({
     };
   }, [open]);
 
+  const membersVisible = useApp((s) => s.membersVisible);
+  const toggleMembers = useApp((s) => s.toggleMembers);
+
   const guild = guilds.find((g) => g.id === selectedGuildId);
   const memberCount = guild
     ? [...members.values()].filter((m) => m.guildId === guild.id).length
@@ -149,9 +152,15 @@ export function TopBar({
       </div>
 
       {guild && (
-        <span className="legend mono" title={`${memberCount} members`}>
+        <button
+          type="button"
+          className="legend mono topbar__members"
+          onClick={toggleMembers}
+          aria-pressed={membersVisible}
+          title={membersVisible ? 'Hide the member list' : 'Show the member list'}
+        >
           {memberCount} {memberCount === 1 ? 'member' : 'members'}
-        </span>
+        </button>
       )}
 
       <div className="topbar__spacer" />

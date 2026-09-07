@@ -45,6 +45,7 @@
   --radius-sm: 5px;
 
   --sidebar-w: 244px;
+  --rail-w: 208px;
   --topbar-h: 46px;
 
   --font-ui: 'Archivo Variable', 'Archivo', system-ui, -apple-system, sans-serif;
@@ -150,7 +151,9 @@ textarea::placeholder {
 
 .shell__body {
   display: grid;
-  grid-template-columns: var(--sidebar-w) 1fr;
+  /* The rail is a third column when it is there and simply absent when it is
+     not - no reserved gap, no layout that shifts by a pixel when it opens. */
+  grid-template-columns: var(--sidebar-w) 1fr auto;
   min-height: 0;
 }
 
@@ -2895,4 +2898,126 @@ textarea::placeholder {
   text-transform: uppercase;
   color: var(--text-muted);
   white-space: nowrap;
+}
+
+/* ==========================================================================
+   Member rail
+
+   Grouped by what people are doing, not by rank: the question this list
+   answers is "who could I talk to right now".
+   ========================================================================== */
+
+.rail {
+  width: var(--rail-w);
+  border-left: 1px solid var(--line);
+  background: var(--graphite-850);
+  overflow-y: auto;
+  padding: 14px 8px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+.rail__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0 8px;
+  margin-bottom: 6px;
+}
+
+.rail__count {
+  color: var(--text-faint);
+}
+
+.rail__person {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  min-width: 0;
+}
+
+.rail__person:hover {
+  background: var(--graphite-750);
+}
+
+/* Dimmed rather than hidden. Knowing who is in a server but not around is
+   worth something; knowing it as loudly as who is here is not. */
+.rail__person--away {
+  opacity: 0.45;
+}
+
+.rail__portrait {
+  position: relative;
+  flex: none;
+  display: flex;
+}
+
+.rail__dot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 2px solid var(--graphite-850);
+}
+
+.rail__dot--online { background: var(--signal-500); }
+.rail__dot--idle { background: var(--brass-500); }
+.rail__dot--dnd { background: var(--alert-400); }
+.rail__dot--offline { background: var(--graphite-600); }
+
+.rail__text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.rail__name {
+  font-size: 12.5px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rail__where {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--signal-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The member count doubles as the switch, so it has to read as one. */
+.topbar__members {
+  background: none;
+  border: none;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font: inherit;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.topbar__members:hover {
+  color: var(--text-secondary);
+  background: var(--graphite-750);
+}
+
+.topbar__members[aria-pressed='true'] {
+  color: var(--text-secondary);
 }
