@@ -399,6 +399,73 @@ docker compose -f docker-compose.prod.yml exec -T postgres \
 Put that in a cron job and copy the result somewhere that is not this server. A
 backup that lives only on the machine it is backing up is not a backup.
 
+### Set it up once
+
+```bash
+./scripts/install-backups.sh
+```
+
+That installs two cron jobs: a dump every night at 04:12, and a **restore check**
+every Sunday. Both log to `/var/log/chitchak-backup.log`. Running the installer
+again replaces the entries rather than adding a second copy.
+
+### Why there is a restore check
+
+A backup nobody has ever restored is a file, not a backup. `backup-verify.sh`
+takes the newest dump, restores it into a throwaway Postgres container, counts
+the rows, and throws the container away. It never touches the live database, so
+it is safe to run at any time:
+
+```bash
+./scripts/backup-verify.sh                  # the newest
+./scripts/backup-verify.sh backups/some.gz  # a specific one
+```
+
+Worth running by hand after any schema change.
+
+### What the nightly job refuses to do
+
+The dump is written to a temporary file and only moved into place once it has
+been checked, because a half-written backup that looks like a backup is worse
+than an obviously missing one. It is rejected if the gzip is corrupt, if the
+tables that must be there are not, or **if it is less than half the size of the
+previous one** — the signature of a truncated table, and the failure people
+discover months later.
+
+Old dumps are pruned after 30 days, but the newest seven are always kept
+whatever their age. Otherwise a server left off for two months would wake up and
+delete the only copies it had.
+
+### Offsite
+
+**Everything above still lives on the machine it is backing up.** That protects
+against a bad migration or a deleted table; it does nothing about a dead disk or
+a lost VPS.
+
+Set `BACKUP_REMOTE` and the nightly job copies each dump off the box as well. It
+takes either an rclone remote or an scp target:
+
+```bash
+BACKUP_REMOTE=b2:chitchak-backups          # rclone: Backblaze B2, R2, S3...
+BACKUP_REMOTE=user@otherhost:/backups      # or plain scp
+```
+
+The database compresses to about 50 KB, so every object-storage free tier covers
+it many times over. Backblaze B2 and Cloudflare R2 both have one.
+
+### Restoring for real
+
+Restore into an **empty** database. Loading a dump over a populated one collides
+on every primary key and leaves a mess worse than either state.
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production stop server
+gunzip -c backups/chitchak-YYYYMMDD-HHMMSS.sql.gz | \
+  docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres \
+  psql -v ON_ERROR_STOP=1 -U chitchak -d chitchak
+docker compose -f docker-compose.prod.yml --env-file .env.production start server
+```
+
 ## If voice does not connect
 
 The stack has a specific failure mode worth recognising: **signalling succeeds
