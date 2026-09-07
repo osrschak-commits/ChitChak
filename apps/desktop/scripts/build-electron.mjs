@@ -25,7 +25,11 @@ export async function buildElectron({ minify = false } = {}) {
     // font has to travel inside the bundle. 15 KB, and the alternative is a
     // splash that falls back to whatever monospace font the machine happens to
     // have for the first second of every launch.
-    loader: { '.woff2': 'dataurl' },
+    // The splash font and the tray icon both live inside the bundle. `build/`
+    // is electron-builder's resources directory and is not part of the packaged
+    // app, so a runtime path to the icon works in development and produces no
+    // tray at all in a real install.
+    loader: { '.woff2': 'dataurl', '.png': 'dataurl' },
     sourcemap: true,
     minify,
     logLevel: 'warning',

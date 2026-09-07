@@ -10,6 +10,7 @@ import {
   systemPreferences,
 } from 'electron';
 import { createSplash, type Splash } from './splash.js';
+import { createTray, type TrayHandle } from './tray.js';
 import { bootUpdate, initUpdater, installAndRestart } from './updater.js';
 
 const isMac = process.platform === 'darwin';
@@ -41,6 +42,30 @@ const devServerUrl = process.env.VITE_DEV_SERVER_URL ?? 'http://localhost:5173';
 const dirname = __dirname;
 
 let mainWindow: BrowserWindow | null = null;
+let tray: TrayHandle | null = null;
+
+/**
+ * Whether the app is on its way out, as opposed to the window being closed.
+ *
+ * The close handler cannot tell the difference on its own - a quit closes the
+ * window too - so the quit paths say so first. Without this, choosing Quit from
+ * the tray hides the window and leaves the app running, which is the exact
+ * opposite of what was asked for.
+ */
+let quitting = false;
+
+/** Bring the window back, wherever it went. */
+function showWindow(): void {
+  if (!mainWindow) return;
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function quitApp(): void {
+  quitting = true;
+  app.quit();
+}
 
 /**
  * Push-to-talk key. Electron's globalShortcut fires on key *press* only - there
@@ -90,6 +115,20 @@ function createWindow(splash: Splash | null): void {
     splash?.window.setAlwaysOnTop(false);
     mainWindow?.show();
     splash?.close();
+  });
+
+  /**
+   * The X hides; it does not quit.
+   *
+   * On macOS this was already the behaviour - the app stays in the dock - and
+   * everywhere else it now matches, with the tray standing in for the dock. The
+   * call keeps running either way, which is the whole reason for it.
+   */
+  mainWindow.on('close', (event) => {
+    if (quitting) return;
+    event.preventDefault();
+    mainWindow?.hide();
+    tray?.explainOnce();
   });
 
   mainWindow.on('closed', () => {
@@ -295,6 +334,27 @@ function installPermissionHandlers(): void {
   );
 }
 
+/**
+ * One ChitChak at a time.
+ *
+ * Load-bearing now that the window hides instead of closing: the app is often
+ * running with nothing on screen, so clicking the shortcut again is the obvious
+ * thing to do and used to start a second copy - two gateway connections, two
+ * microphones, two of everything, and no clue why. The second launch now hands
+ * its request to the first and exits.
+ *
+ * Before `whenReady`, because a second instance must find this out and leave
+ * before it starts building windows.
+ */
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    // Someone asked for the app. Wherever the window went, bring it back.
+    showWindow();
+  });
+}
+
 app.whenReady().then(() => {
   // The UI is graphite and has no light variant. Left to follow the system, a
   // Mac in light mode frames it in a pale native title bar and hands it white
@@ -318,9 +378,10 @@ app.whenReady().then(() => {
         if (mainWindow) return;
         splash.set('loading');
         createWindow(splash);
-        // Both read `mainWindow`, so neither can run before it exists.
+        // All three read `mainWindow`, so none can run before it exists.
         installPermissionHandlers();
         initUpdater(() => mainWindow);
+        tray = createTray({ show: showWindow, quit: quitApp });
       };
 
       if (outcome.kind === 'installing') {
@@ -413,13 +474,27 @@ app.whenReady().then(() => {
 
   app.on('activate', () => {
     // No splash: this is a dock click on a running app, not a cold start, so
-    // there is nothing to wait through.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow(null);
+    // there is nothing to wait through. Usually there is still a window and it
+    // is merely hidden, in which case showing it is the whole job.
+    if (mainWindow) showWindow();
+    else if (BrowserWindow.getAllWindows().length === 0) createWindow(null);
   });
 });
 
-app.on('will-quit', () => globalShortcut.unregisterAll());
+// Every other way out - the menu, Alt+F4 on a second window, a shutdown - has
+// to set this too, or the close handler hides the window and cancels the quit.
+app.on('before-quit', () => {
+  quitting = true;
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
+  tray?.destroy();
+  tray = null;
+});
 
 app.on('window-all-closed', () => {
+  // Reached only when the window was really destroyed, since an ordinary close
+  // now hides it. That means this fires on the way out rather than deciding it.
   if (process.platform !== 'darwin') app.quit();
 });
