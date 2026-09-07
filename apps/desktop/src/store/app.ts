@@ -5,6 +5,7 @@ import type {
   GuildMember,
   Message,
   PresenceStatus,
+  Progress,
   PublicUser,
   Rank,
   SelfUser,
@@ -76,6 +77,16 @@ interface AppState {
   dmChannels: Map<string, string>;
   /** The open conversation, when `scope` is 'friends'. */
   selectedDmChannelId: string | null;
+
+  /** Your level and how far into it you are. Nobody else's - see TODO.md. */
+  progress: Progress;
+  /**
+   * Things just earned, newest first, for the corner of the screen.
+   *
+   * Held in the store rather than in a component so a level-up that arrives
+   * while the profile dialog is closed is still seen.
+   */
+  celebrations: Array<{ key: string; kind: 'level' | 'task'; title: string; detail: string }>;
   channels: Map<string, Channel>;
   members: Map<string, GuildMember>;
   ranks: Map<string, Rank>;
@@ -133,6 +144,7 @@ interface AppState {
   unblockPerson(userId: string): Promise<void>;
   /** Opens the conversation with a friend, creating it if this is the first. */
   openDm(userId: string): Promise<void>;
+  dismissCelebration(key: string): void;
   selectTextChannel(channelId: string): void;
   setMainView(view: 'chat' | 'call'): void;
   /** Refresh membership after creating or joining a server, then open it. */
@@ -285,6 +297,15 @@ function signedOutState() {
     people: new Map<string, PublicUser>(),
     dmChannels: new Map<string, string>(),
     selectedDmChannelId: null,
+    progress: {
+      xp: 0,
+      level: 1,
+      intoLevel: 0,
+      needed: 155,
+      streak: 0,
+      completedTaskIds: [],
+    } as Progress,
+    celebrations: [] as AppState['celebrations'],
     channels: new Map<string, Channel>(),
     members: new Map<string, GuildMember>(),
     ranks: new Map<string, Rank>(),
@@ -314,6 +335,8 @@ export const useApp = create<AppState>((set, get) => ({
   people: new Map(),
   dmChannels: new Map(),
   selectedDmChannelId: null,
+  progress: { xp: 0, level: 1, intoLevel: 0, needed: 155, streak: 0, completedTaskIds: [] },
+  celebrations: [],
   channels: new Map(),
   members: new Map(),
   ranks: new Map(),
@@ -420,6 +443,10 @@ export const useApp = create<AppState>((set, get) => ({
   async unblockPerson(userId) {
     await api.unblockUser(userId);
     set((s) => ({ blocked: without(s.blocked, userId) }));
+  },
+
+  dismissCelebration(key) {
+    set((s) => ({ celebrations: s.celebrations.filter((c) => c.key !== key) }));
   },
 
   async openDm(userId) {
@@ -660,6 +687,7 @@ function applyServerMessage(
         blocked,
         users: people,
         dmChannels,
+        progress: standing,
       } = message.d;
       const channelMap = new Map(channels.map((c) => [c.id, c]));
 
@@ -707,6 +735,7 @@ function applyServerMessage(
         blocked: new Set(blocked),
         people: new Map(people.map((person) => [person.id, person])),
         dmChannels: new Map(dmChannels.map((dm) => [dm.channelId, dm.userId])),
+        progress: standing,
         selectedGuildId: guildId,
         selectedTextChannelId: textStillValid ?? firstText?.id ?? null,
         pendingGuildId: null,
@@ -772,6 +801,34 @@ function applyServerMessage(
       if (updated.id === get().user?.id) {
         set((s) => ({ user: s.user ? { ...s.user, ...updated } : s.user }));
       }
+      return;
+    }
+
+    case 'level:up': {
+      set((s) => ({
+        progress: message.d.progress,
+        celebrations: [
+          {
+            key: `level-${message.d.level}`,
+            kind: 'level' as const,
+            title: `Level ${message.d.level}`,
+            detail: 'Nice.',
+          },
+          ...s.celebrations,
+        ].slice(0, 4),
+      }));
+      return;
+    }
+
+    case 'task:complete': {
+      const task = message.d;
+      set((s) => ({
+        progress: task.progress,
+        celebrations: [
+          { key: `task-${task.id}`, kind: 'task' as const, title: task.name, detail: `+${task.xp} XP` },
+          ...s.celebrations,
+        ].slice(0, 4),
+      }));
       return;
     }
 

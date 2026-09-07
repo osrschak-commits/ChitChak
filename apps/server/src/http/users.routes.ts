@@ -25,7 +25,8 @@ import {
 import { registry } from '../gateway/registry.js';
 import { errors } from '../lib/errors.js';
 import { verifyPassword } from '../lib/password.js';
-import { progress } from '../services/progress.js';
+import { progress, progressFor } from '../services/progress.js';
+import { TASKS, completedTaskIds } from '../services/tasks.js';
 import { toPublicUser, toSelfUser } from '../services/serialize.js';
 import { authenticate, requireUser } from './authenticate.js';
 import { decodeDataUrl } from '../lib/images.js';
@@ -280,6 +281,41 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
 
       request.log.info({ userId }, 'account deleted and anonymised');
       return reply.code(204).send();
+    },
+  });
+
+  /**
+   * Every task there is, and how far you are through the ones you have not
+   * finished.
+   *
+   * Served rather than duplicated in the client: the names, the thresholds and
+   * the XP are all decided by the catalogue in services/tasks.ts, and a second
+   * copy in the client would be wrong the first time either changed. Fetched
+   * when the panel opens rather than carried in every ready snapshot, since it
+   * is static and nobody looks at it often.
+   */
+  app.get('/api/tasks', {
+    preHandler: authenticate,
+    handler: async (request) => {
+      const { userId } = requireUser(request);
+      const done = await completedTaskIds(userId);
+
+      // Progress is only computed for the unfinished ones - a finished task's
+      // number would just be its own goal, and this is twenty-odd queries.
+      const catalogue = await Promise.all(
+        TASKS.map(async (task) => ({
+          id: task.id,
+          name: task.name,
+          group: task.group,
+          how: task.how,
+          xp: task.xp,
+          goal: task.goal,
+          done: done.has(task.id),
+          progress: done.has(task.id) ? task.goal : await task.check(userId).catch(() => 0),
+        })),
+      );
+
+      return { tasks: catalogue, progress: await progressFor(userId) };
     },
   });
 

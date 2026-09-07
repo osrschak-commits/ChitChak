@@ -65,7 +65,10 @@ export async function progress(
     }
 
     if (completed.length > 0 || award.levelledUp) {
-      announce(userId, award.level, award.levelledUp, completed);
+      // Read back once, after every award in this pass has landed, so the
+      // client is told where it actually stands rather than where it stood
+      // partway through.
+      await announce(userId, award.levelledUp, completed);
     }
 
     return { ...award, completed };
@@ -80,17 +83,22 @@ export async function progress(
   }
 }
 
-function announce(
+async function announce(
   userId: string,
-  level: number,
   levelledUp: boolean,
   completed: ProgressResult['completed'],
-): void {
-  if (levelledUp) {
-    registry.publishToUsers([userId], { op: 'level:up', d: { level } });
-  }
+): Promise<void> {
+  const standing = await progressFor(userId);
+
   for (const task of completed) {
-    registry.publishToUsers([userId], { op: 'task:complete', d: task });
+    registry.publishToUsers([userId], { op: 'task:complete', d: { ...task, progress: standing } });
+  }
+  // Last, so the level lands after the tasks that paid for it.
+  if (levelledUp) {
+    registry.publishToUsers([userId], {
+      op: 'level:up',
+      d: { level: standing.level, progress: standing },
+    });
   }
 }
 

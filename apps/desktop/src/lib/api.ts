@@ -1,5 +1,6 @@
 import type {
   ApiError,
+  Progress,
   AuthResponse,
   Ban,
   Channel,
@@ -13,6 +14,18 @@ import type {
   Rank,
   SelfUser,
 } from '@chitchak/protocol';
+
+/** One row of the task list. Mirrors what GET /api/tasks returns. */
+export interface TaskSummary {
+  id: string;
+  name: string;
+  group: string;
+  how: string;
+  xp: number;
+  goal: number;
+  done: boolean;
+  progress: number;
+}
 
 /**
  * HTTP client.
@@ -209,6 +222,19 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ email }),
     });
+  }
+
+  // --- Levels ---------------------------------------------------------------
+
+  /**
+   * Every task, with your progress through the unfinished ones.
+   *
+   * Fetched rather than bundled into the client: the names, thresholds and XP
+   * live in the server's catalogue, and a second copy here would be wrong the
+   * first time either changed.
+   */
+  listTasks(): Promise<{ tasks: TaskSummary[]; progress: Progress }> {
+    return this.request('/api/tasks');
   }
 
   // --- Friends --------------------------------------------------------------

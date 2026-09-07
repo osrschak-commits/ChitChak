@@ -6,6 +6,7 @@ import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { FriendsPanel } from './components/FriendsPanel.js';
 import { FriendsSidebar } from './components/FriendsSidebar.js';
 import { GuildDialog } from './components/GuildDialog.js';
+import { Celebrations } from './components/Celebrations.js';
 import { ProfileDialog } from './components/ProfileDialog.js';
 import { ResetPasswordScreen, takeResetTokenFromUrl } from './components/ResetPasswordScreen.js';
 import { ServerSettingsDialog } from './components/ServerSettingsDialog.js';
@@ -137,6 +138,8 @@ export function App() {
           )}
         </ErrorBoundary>
       </div>
+
+      <Celebrations />
 
       {overlay === 'profile' && <ProfileDialog onClose={() => setOverlay('none')} />}
       {overlay === 'voice-settings' && <VoiceSettingsDialog onClose={() => setOverlay('none')} />}

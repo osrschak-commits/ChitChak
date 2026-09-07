@@ -43,9 +43,14 @@ export type Trigger =
   | 'profile'
   | 'daily';
 
+/** Display grouping. Close to `trigger` but not the same: invites and friends
+ *  are one heading to a reader, and two different events to the runner. */
+export type TaskGroup = 'Voice' | 'Talking' | 'People' | 'Belonging' | 'Habit' | 'Settling in';
+
 export interface Task {
   id: string;
   name: string;
+  group: TaskGroup;
   /** Shown under the name. Written as the person reads it, not as it is computed. */
   how: string;
   xp: number;
@@ -115,6 +120,7 @@ export const TASKS: Task[] = [
   {
     id: 'voice.first',
     name: 'First call',
+    group: 'Voice',
     how: 'Join a voice channel with someone else in it',
     xp: 200,
     trigger: 'voice',
@@ -123,6 +129,7 @@ export const TASKS: Task[] = [
   },
   ...tiers(
     {
+      group: 'Voice',
       how: 'Time spent talking to people',
       trigger: 'voice',
       check: (userId) => statOf(userId, 'voiceSeconds'),
@@ -136,6 +143,7 @@ export const TASKS: Task[] = [
   ),
   ...tiers(
     {
+      group: 'Voice',
       how: 'Days you joined a call',
       trigger: 'voice',
       check: (userId) => statOf(userId, 'voiceDays'),
@@ -150,6 +158,7 @@ export const TASKS: Task[] = [
   {
     id: 'voice.fullroom',
     name: 'Full room',
+    group: 'Voice',
     how: 'Be in a call with five other people',
     xp: 500,
     trigger: 'voice',
@@ -159,6 +168,7 @@ export const TASKS: Task[] = [
   {
     id: 'voice.screenshare',
     name: 'Showed everyone',
+    group: 'Voice',
     how: 'Share your screen for the first time',
     xp: 250,
     trigger: 'voice',
@@ -170,6 +180,7 @@ export const TASKS: Task[] = [
   {
     id: 'talk.first',
     name: 'Said something',
+    group: 'Talking',
     how: 'Send your first message',
     xp: 50,
     trigger: 'message',
@@ -177,7 +188,7 @@ export const TASKS: Task[] = [
     check: earnedMessages,
   },
   ...tiers(
-    { how: 'Messages sent', trigger: 'message', check: earnedMessages },
+    { group: 'Talking', how: 'Messages sent', trigger: 'message', check: earnedMessages },
     [
       { suffix: 'm100', name: 'In the conversation', goal: 100, xp: 300 },
       { suffix: 'm1k', name: 'Never short of a word', goal: 1_000, xp: 1_500 },
@@ -188,6 +199,7 @@ export const TASKS: Task[] = [
   {
     id: 'talk.dm',
     name: 'Quiet word',
+    group: 'Talking',
     how: 'Send your first direct message',
     xp: 150,
     trigger: 'message',
@@ -206,6 +218,7 @@ export const TASKS: Task[] = [
   {
     id: 'people.first',
     name: 'Someone to talk to',
+    group: 'People',
     how: 'Make your first friend',
     xp: 200,
     trigger: 'friend',
@@ -213,7 +226,7 @@ export const TASKS: Task[] = [
     check: acceptedFriends,
   },
   ...tiers(
-    { how: 'Friends who accepted', trigger: 'friend', check: acceptedFriends },
+    { group: 'People', how: 'Friends who accepted', trigger: 'friend', check: acceptedFriends },
     [
       { suffix: 'f5', name: 'A few of you', goal: 5, xp: 400 },
       { suffix: 'f25', name: 'Quite a crowd', goal: 25, xp: 2_000 },
@@ -223,6 +236,7 @@ export const TASKS: Task[] = [
   ),
   ...tiers(
     {
+      group: 'People',
       how: 'People who joined through your invite',
       trigger: 'invite',
       check: (userId) =>
@@ -245,6 +259,7 @@ export const TASKS: Task[] = [
   {
     id: 'belong.first',
     name: 'Somewhere to be',
+    group: 'Belonging',
     how: 'Join your first server',
     xp: 150,
     trigger: 'guild',
@@ -259,6 +274,7 @@ export const TASKS: Task[] = [
   },
   ...tiers(
     {
+      group: 'Belonging',
       how: 'Servers you are a member of',
       trigger: 'guild',
       check: (userId) =>
@@ -278,6 +294,7 @@ export const TASKS: Task[] = [
   {
     id: 'belong.founder',
     name: 'Made a place',
+    group: 'Belonging',
     how: 'Create a server that five other people join',
     xp: 800,
     trigger: 'guild',
@@ -305,6 +322,7 @@ export const TASKS: Task[] = [
   // --- Habit -----------------------------------------------------------------
   ...tiers(
     {
+      group: 'Habit',
       how: 'Days in a row',
       trigger: 'daily',
       check: (userId) => statOf(userId, 'currentStreak'),
@@ -318,6 +336,7 @@ export const TASKS: Task[] = [
   ),
   ...tiers(
     {
+      group: 'Habit',
       how: 'How long you have had an account',
       trigger: 'daily',
       check: async (userId) => {
@@ -336,6 +355,7 @@ export const TASKS: Task[] = [
   {
     id: 'habit.early',
     name: 'Early',
+    group: 'Habit',
     how: 'Be one of the first hundred accounts',
     xp: 1_000,
     trigger: 'daily',
@@ -357,6 +377,7 @@ export const TASKS: Task[] = [
   {
     id: 'setup.avatar',
     name: 'A face to it',
+    group: 'Settling in',
     how: 'Set a profile picture',
     xp: 100,
     trigger: 'profile',
@@ -369,6 +390,7 @@ export const TASKS: Task[] = [
   {
     id: 'setup.bio',
     name: 'A word about you',
+    group: 'Settling in',
     how: 'Write a bio',
     xp: 100,
     trigger: 'profile',
@@ -383,6 +405,7 @@ export const TASKS: Task[] = [
   {
     id: 'setup.colour',
     name: 'Your colour',
+    group: 'Settling in',
     how: 'Pick an accent colour',
     xp: 50,
     trigger: 'profile',
@@ -425,3 +448,16 @@ export async function claimTask(userId: string, taskId: string): Promise<boolean
 }
 
 export { today };
+
+
+/** The catalogue as the client renders it - names, not queries. */
+export function taskCatalogue(): Array<{
+  id: string;
+  name: string;
+  group: TaskGroup;
+  how: string;
+  xp: number;
+  goal: number;
+}> {
+  return TASKS.map(({ id, name, group, how, xp, goal }) => ({ id, name, group, how, xp, goal }));
+}

@@ -2585,3 +2585,229 @@ textarea::placeholder {
 .friends__sidebar .section__title {
   padding: 0 4px;
 }
+
+/* ==========================================================================
+   Levels
+
+   Brass throughout: the accent already means "this is you", and a level is the
+   most personal number in the app. Nothing here borrows the signal colour —
+   that stays reserved for live audio.
+   ========================================================================== */
+
+.level__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.level__number {
+  font-size: 26px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--brass-300);
+  min-width: 34px;
+}
+
+.level__bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--graphite-750);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.level__fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--brass-500), var(--brass-300));
+  /* Eased rather than instant: XP arrives while you are looking elsewhere, and
+     a bar that slides is the only hint that anything happened. */
+  transition: width 600ms var(--ease);
+}
+
+.level__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 8px;
+}
+
+.tasks__group {
+  margin-bottom: 16px;
+}
+
+.tasks__group:last-child {
+  margin-bottom: 0;
+}
+
+.tasks__group-name {
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  margin-bottom: 6px;
+}
+
+.task {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px 1fr auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px 8px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.task:hover {
+  background: var(--graphite-750);
+}
+
+.task__tick {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+
+.task--done .task__tick {
+  color: var(--brass-400);
+}
+
+.task__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.task__name {
+  font-size: 12.5px;
+  color: var(--text-primary);
+}
+
+.task--done .task__name {
+  color: var(--text-muted);
+}
+
+.task__how,
+.task__progress {
+  font-size: 11px;
+  color: var(--text-faint);
+  line-height: 1.4;
+}
+
+.task__xp {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.task--done .task__xp {
+  color: var(--brass-500);
+}
+
+/* Sits along the bottom edge of the row rather than taking a column: on the
+   long tasks the number is the point, and the bar is a glance. */
+.task__track {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 2px;
+  height: 2px;
+  border-radius: 999px;
+  background: var(--graphite-700);
+}
+
+.task__track-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--brass-500);
+  opacity: 0.75;
+}
+
+/* ==========================================================================
+   Celebrations
+   ========================================================================== */
+
+.celebrations {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  /* Above the scrim: levelling up while a dialog is open is exactly when it
+     happens, since the profile is where the level lives. */
+  z-index: 300;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  /* Never over the message being written. */
+  max-width: 300px;
+}
+
+.celebration {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 14px;
+  text-align: left;
+  font: inherit;
+  color: var(--text-primary);
+  background: var(--graphite-800);
+  border: 1px solid var(--line-strong);
+  border-left: 2px solid var(--brass-500);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  animation: celebration-in 320ms var(--ease) both;
+}
+
+.celebration:hover {
+  border-color: var(--brass-500);
+}
+
+.celebration--level {
+  border-left-color: var(--brass-300);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--brass-glow);
+}
+
+.celebration__mark {
+  color: var(--brass-400);
+  font-size: 12px;
+}
+
+.celebration__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.celebration__title {
+  font-size: 12.5px;
+  color: var(--text-bright);
+}
+
+.celebration__detail {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+@keyframes celebration-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .celebration {
+    animation: none;
+  }
+
+  .level__fill {
+    transition: none;
+  }
+}

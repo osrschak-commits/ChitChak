@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { ApiRequestError, api } from '../lib/api.js';
 import { prepareSquareImage } from '../lib/image.js';
 import { useApp } from '../store/app.js';
+import { LevelPanel } from './LevelPanel.js';
 import { Avatar } from './primitives.js';
 
 /**
@@ -240,6 +241,8 @@ export function ProfileDialog({ onClose }: { onClose(): void }) {
               </div>
             </div>
           </div>
+
+          <LevelPanel />
 
           <div className="section">
             <h3 className="section__title">Account</h3>

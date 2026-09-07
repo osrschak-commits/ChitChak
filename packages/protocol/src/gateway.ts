@@ -143,9 +143,12 @@ export type ServerMessage =
    */
   | { op: 'friend:remove'; d: { userId: Snowflake } }
   /** You reached a new level. Sent only to you. */
-  | { op: 'level:up'; d: { level: number } }
+  /* Both carry the whole standing, not just what changed: the level curve
+     lives on the server, and a client that applied a delta would have to keep
+     its own copy of the maths to know how far along the next bar starts. */
+  | { op: 'level:up'; d: { level: number; progress: Progress } }
   /** You finished a task. Sent only to you. */
-  | { op: 'task:complete'; d: { id: string; name: string; xp: number } };
+  | { op: 'task:complete'; d: { id: string; name: string; xp: number; progress: Progress } };
 
 export type GatewayErrorCode =
   | 'invalid_token'
