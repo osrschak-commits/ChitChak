@@ -6,6 +6,7 @@ import { channels, guildMembers, users, voiceStates } from '../db/schema.js';
 import { registry } from '../gateway/registry.js';
 import { errors } from '../lib/errors.js';
 import { requireChannelPermission, requireGuildChannel } from '../services/permissions.js';
+import { noteScreenShare } from './xp-ticker.js';
 import { toVoiceState } from '../services/serialize.js';
 import { createVoiceToken, ensureRoom, livekitUrl, removeParticipant } from './livekit.js';
 
@@ -145,6 +146,9 @@ export async function updateSelfVoiceState(
   // Deafening implies muting. Enforced here rather than trusted from the client
   // so every observer agrees on what the icons mean.
   const selfMuted = patch.selfDeafened ? true : patch.selfMuted;
+
+  // One-off, and only worth recording the first time it turns on.
+  if (patch.selfScreenShare) void noteScreenShare(userId);
 
   const [row] = await db
     .update(voiceStates)

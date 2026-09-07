@@ -16,6 +16,7 @@ import {
   sendRequest,
   unblockUser,
 } from '../services/friends.js';
+import { progress } from '../services/progress.js';
 import { toChannel, toPublicUser } from '../services/serialize.js';
 import { authenticate, requireUser } from './authenticate.js';
 
@@ -204,6 +205,10 @@ async function announceFriendship(
 
   registry.publishToUsers([userId], { op: 'friend:accept', d: { user: them, dmChannel: channel } });
   registry.publishToUsers([otherId], { op: 'friend:accept', d: { user: me, dmChannel: channel } });
+
+  // Both of them gained a friend, so both are re-checked.
+  void progress(userId, 'friend');
+  void progress(otherId, 'friend');
 
   return channel;
 }

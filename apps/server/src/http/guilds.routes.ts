@@ -27,6 +27,7 @@ import {
   voiceStates,
 } from '../db/schema.js';
 import { registry } from '../gateway/registry.js';
+import { progress } from '../services/progress.js';
 import { errors } from '../lib/errors.js';
 import { generateId } from '../lib/ids.js';
 import { decodeDataUrl } from '../lib/images.js';
@@ -124,6 +125,10 @@ export async function guildRoutes(app: FastifyInstance): Promise<void> {
 
       return { guild: toGuild(guild), channels: created.map(toChannel) };
     });
+
+    // After the transaction, not inside it: the tasks read the membership row
+    // it creates, and a read from outside would not see it until it commits.
+    void progress(userId, 'guild');
 
     return reply.code(201).send(result);
   });
@@ -540,6 +545,12 @@ export async function guildRoutes(app: FastifyInstance): Promise<void> {
 
       return inserted;
     });
+
+    // The joiner gains a server; the person whose invite it was gains a use,
+    // and the owner may now have enough members for the founder task.
+    void progress(userId, 'guild');
+    void progress(invite.createdBy, 'invite');
+    void progress(invite.createdBy, 'guild');
 
     registry.publishToGuild(invite.guildId, {
       op: 'guild:member_add',

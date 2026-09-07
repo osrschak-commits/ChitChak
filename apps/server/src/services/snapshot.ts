@@ -13,6 +13,7 @@ import {
 } from '../db/schema.js';
 import { errors } from '../lib/errors.js';
 import { dmChannelsFor } from './dms.js';
+import { progressFor } from './progress.js';
 import { blockedIdsFor, relationshipsFor } from './friends.js';
 import { memberContext, visibleChannelIds } from './permissions.js';
 import {
@@ -113,6 +114,7 @@ export async function buildReadySnapshot(userId: string): Promise<ReadyPayload> 
     // their conversations are the only thing in their sidebar.
     const { dmChannelRows, ...relationships } = await relationshipSnapshot(userId, new Set([userId]));
     return {
+      progress: await progressFor(userId),
       user: self,
       guilds: [],
       channels: dmChannelRows,
@@ -200,6 +202,7 @@ export async function buildReadySnapshot(userId: string): Promise<ReadyPayload> 
   );
 
   return {
+    progress: await progressFor(userId),
     user: self,
     guilds: guildRows.map(toGuild),
     // DM channels are appended rather than sorted in: compareChannels orders by

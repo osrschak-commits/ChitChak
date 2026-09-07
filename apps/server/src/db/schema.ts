@@ -3,6 +3,7 @@ import {
   bigint,
   boolean,
   customType,
+  date,
   index,
   integer,
   pgEnum,
@@ -184,6 +185,72 @@ export const blocks = pgTable(
   (table) => [
     primaryKey({ columns: [table.blockerId, table.blockedId] }),
     index('blocks_blocked_idx').on(table.blockedId),
+  ],
+);
+
+/**
+ * Levelling state, one row per person.
+ *
+ * Its own table rather than columns on `users` for two reasons. `users` is read
+ * on nearly every request and is about identity; this is written every time
+ * somebody speaks, and mixing the two would put a hot write path through the
+ * row that authentication reads. And a person can exist without ever having
+ * earned anything - the row is created on first award, so absence means zero.
+ */
+export const userStats = pgTable('user_stats', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  xp: integer('xp').notNull().default(0),
+  /**
+   * Derived from xp, stored anyway.
+   *
+   * Recomputing it is trivial, but it is displayed beside names all over the
+   * client and would otherwise be recomputed per row per render, and it is the
+   * obvious thing to sort or filter by later.
+   */
+  level: integer('level').notNull().default(1),
+
+  /** Cooldown anchor: a message earns nothing until a minute after this. */
+  lastMessageXpAt: timestamp('last_message_xp_at', { withTimezone: true }),
+
+  /** Streaks. The date is UTC, so a streak does not break on a timezone change. */
+  lastActiveDate: date('last_active_date'),
+  currentStreak: integer('current_streak').notNull().default(0),
+
+  /** Voice, which nothing recorded before - see voice/xp-ticker.ts. */
+  voiceSeconds: integer('voice_seconds').notNull().default(0),
+  lastVoiceDate: date('last_voice_date'),
+  voiceDays: integer('voice_days').notNull().default(0),
+  /** One-offs cheaper to remember than to reconstruct. */
+  hasSharedScreen: boolean('has_shared_screen').notNull().default(false),
+  biggestCall: integer('biggest_call').notNull().default(0),
+
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Tasks somebody has finished.
+ *
+ * The pair is the primary key, so awarding a task twice is impossible rather
+ * than merely unlikely - the same reason friendships are keyed the way they
+ * are. Every award is an insert that either succeeds once or conflicts, which
+ * makes the whole grant path safe to run from anywhere, including twice at
+ * once.
+ */
+export const userTasks = pgTable(
+  'user_tasks',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Matches an id in services/tasks.ts. Text, so the catalogue can grow. */
+    taskId: text('task_id').notNull(),
+    completedAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.taskId] }),
+    index('user_tasks_user_idx').on(table.userId),
   ],
 );
 

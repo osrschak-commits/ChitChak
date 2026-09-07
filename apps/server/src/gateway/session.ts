@@ -17,6 +17,7 @@ import { isAppError } from '../lib/errors.js';
 import { sessionIsStillValid } from '../lib/session-validity.js';
 import { dmParticipants } from '../services/dms.js';
 import { areFriends } from '../services/friends.js';
+import { scoreMessage } from '../services/progress.js';
 import { verifyAccessToken } from '../lib/tokens.js';
 import { buildReadySnapshot, guildIdsForUser } from '../services/snapshot.js';
 import { createMessage } from '../services/messages.js';
@@ -232,6 +233,11 @@ export class Session {
           { op: 'message:create', d: { ...created.message, nonce: undefined } },
           this.userId,
         );
+
+        // Scored after the message is delivered, never before, and behind
+        // scoreMessage's own catch: a floating promise that rejects would take
+        // the process down with it, which is not a theoretical risk - it did.
+        void scoreMessage(this.userId);
         // Echo to the author with their nonce so the optimistic bubble the
         // client already rendered can be reconciled instead of duplicated.
         this.send({

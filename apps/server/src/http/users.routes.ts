@@ -25,6 +25,7 @@ import {
 import { registry } from '../gateway/registry.js';
 import { errors } from '../lib/errors.js';
 import { verifyPassword } from '../lib/password.js';
+import { progress } from '../services/progress.js';
 import { toPublicUser, toSelfUser } from '../services/serialize.js';
 import { authenticate, requireUser } from './authenticate.js';
 import { decodeDataUrl } from '../lib/images.js';
@@ -84,6 +85,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       if (!updated) throw errors.unauthorized('Account no longer exists');
 
       await broadcastProfile(userId, updated);
+      void progress(userId, 'profile');
       return toSelfUser(updated);
     },
   });
@@ -119,6 +121,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
       if (!updated) throw errors.unauthorized();
 
       await broadcastProfile(userId, updated);
+      void progress(userId, 'profile');
       return toSelfUser(updated);
     },
   });

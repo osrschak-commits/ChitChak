@@ -80,6 +80,18 @@ export interface ReadyPayload {
   users: PublicUser[];
   /** One per open conversation. `channels` carries the channel itself. */
   dmChannels: Array<{ channelId: Snowflake; userId: Snowflake }>;
+  /** Your own level, and how far into it you are. */
+  progress: Progress;
+}
+
+/** Somebody's standing. `intoLevel` of `needed` fills the bar. */
+export interface Progress {
+  xp: number;
+  level: number;
+  intoLevel: number;
+  needed: number;
+  streak: number;
+  completedTaskIds: string[];
 }
 
 /** Credentials for the SFU. Short-lived and scoped to exactly one room. */
@@ -129,7 +141,11 @@ export type ServerMessage =
    * the list, and spelling out which of the four happened would tell the other
    * person more than they are owed.
    */
-  | { op: 'friend:remove'; d: { userId: Snowflake } };
+  | { op: 'friend:remove'; d: { userId: Snowflake } }
+  /** You reached a new level. Sent only to you. */
+  | { op: 'level:up'; d: { level: number } }
+  /** You finished a task. Sent only to you. */
+  | { op: 'task:complete'; d: { id: string; name: string; xp: number } };
 
 export type GatewayErrorCode =
   | 'invalid_token'

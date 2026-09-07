@@ -6,6 +6,7 @@ import { config, isProduction } from './config.js';
 import { closeDatabase, sql } from './db/client.js';
 import { connectRateLimitRedis, disconnectRateLimitRedis, rateLimitRedis } from './lib/rate-limit-store.js';
 import { gatewayPlugin } from './gateway/index.js';
+import { startVoiceXpTicker, stopVoiceXpTicker } from './voice/xp-ticker.js';
 import * as presence from './gateway/presence.js';
 import { registry } from './gateway/registry.js';
 import { authRoutes } from './http/auth.routes.js';
@@ -122,6 +123,9 @@ await app.register(gatewayPlugin);
 
 await presence.startPresence();
 await registry.start();
+// Voice time can only be counted while it is happening - voice_states keeps no
+// history. See voice/xp-ticker.ts.
+startVoiceXpTicker();
 
 await app.listen({ port: config.PORT, host: config.HOST });
 app.log.info(`gateway ready at ws://localhost:${config.PORT}/gateway`);
@@ -143,6 +147,7 @@ async function shutdown(signal: string): Promise<void> {
   try {
     await app.close();
     await registry.stop();
+    stopVoiceXpTicker();
     await presence.stopPresence();
     await disconnectRateLimitRedis();
     await closeDatabase();

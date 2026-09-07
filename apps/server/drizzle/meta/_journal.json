@@ -57,6 +57,13 @@
       "when": 1788749358957,
       "tag": "0007_friends_and_dms",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788754753061,
+      "tag": "0008_levels",
+      "breakpoints": true
     }
   ]
 }
