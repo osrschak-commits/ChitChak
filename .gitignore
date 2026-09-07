@@ -18,5 +18,10 @@ apps/desktop/build/
 # /updates and /download; locally it is whatever `npm run release` last built.
 updates/
 
+# Database dumps. Real accounts, real private conversations - this must never
+# be committed, and it is on the server where an absent-minded `git add -A`
+# would otherwise pick it up.
+backups/
+
 .DS_Store
 Thumbs.db
