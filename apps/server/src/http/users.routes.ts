@@ -25,7 +25,10 @@ import {
 import { registry } from '../gateway/registry.js';
 import { errors } from '../lib/errors.js';
 import { verifyPassword } from '../lib/password.js';
+import * as cosmetics from '../services/cosmetics.js';
+import * as keysService from '../services/keys.js';
 import { levelOf, progress, progressFor } from '../services/progress.js';
+import * as subscriptionsService from '../services/subscriptions.js';
 import { TASKS, type Task, completedTaskIds } from '../services/tasks.js';
 import { toPublicUser, toSelfUser } from '../services/serialize.js';
 import { authenticate, requireUser } from './authenticate.js';
@@ -336,6 +339,80 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     handler: async (request) => {
       requireUser(request);
       return { level: await levelOf(request.params.userId) };
+    },
+  });
+
+  /**
+   * Everything about your premium standing, in one request.
+   *
+   * The catalogue, what you own, what you are wearing, your balance and your
+   * subscription. One round trip because they are always read together - a shop
+   * that shows prices without saying what you can afford is not a shop.
+   */
+  app.get('/api/premium', {
+    preHandler: authenticate,
+    handler: async (request) => {
+      const { userId } = requireUser(request);
+      const [standing, owned] = await Promise.all([
+        subscriptionsService.standingOf(userId),
+        cosmetics.ownedBy(userId),
+      ]);
+      const ownedIds = new Map(owned.map((row) => [row.cosmeticId, row]));
+
+      return {
+        subscription: {
+          status: standing.status,
+          active: standing.active,
+          renewsAt: standing.renewsAt,
+        },
+        keys: standing.keys,
+        keysPerPeriod: keysService.KEYS_PER_PERIOD,
+        items: cosmetics.COSMETICS.map((item) => ({
+          ...item,
+          owned: ownedIds.has(item.id),
+          equipped: ownedIds.get(item.id)?.equipped ?? false,
+        })),
+      };
+    },
+  });
+
+  /** What your keys have done. Asked when a balance looks wrong. */
+  app.get('/api/premium/keys', {
+    preHandler: authenticate,
+    handler: async (request) => {
+      const { userId } = requireUser(request);
+      return { entries: await keysService.history(userId) };
+    },
+  });
+
+  app.post<{ Body: { cosmeticId?: string } }>('/api/premium/buy', {
+    preHandler: authenticate,
+    config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
+    handler: async (request) => {
+      const { userId } = requireUser(request);
+      const cosmeticId = request.body?.cosmeticId;
+      if (typeof cosmeticId !== 'string') throw errors.invalid('cosmeticId is required');
+
+      await cosmetics.buy(userId, cosmeticId);
+      return { keys: await keysService.balanceOf(userId) };
+    },
+  });
+
+  app.post<{ Body: { cosmeticId?: string | null; slot?: string } }>('/api/premium/equip', {
+    preHandler: authenticate,
+    handler: async (request) => {
+      const { userId } = requireUser(request);
+      const slot = request.body?.slot;
+      if (slot !== 'plate' && slot !== 'badge') throw errors.invalid('Unknown slot');
+
+      // null is "take it off", which is a normal thing to want.
+      const cosmeticId = request.body?.cosmeticId ?? null;
+      await cosmetics.equip(userId, cosmeticId, slot);
+
+      const row = await db.query.users.findFirst({ where: eq(users.id, userId) });
+      if (row) await broadcastProfile(userId, row);
+
+      return { worn: await cosmetics.wornBy(userId) };
     },
   });
 

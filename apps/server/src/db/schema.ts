@@ -567,8 +567,96 @@ export const memberRanksRelations = relations(memberRanks, ({ one }) => ({
 
 export type UserRow = typeof users.$inferSelect;
 export type GuildRow = typeof guilds.$inferSelect;
+/**
+ * Premium: a subscription, and the keys it comes with.
+ *
+ * Two things rather than one, because they answer different questions. The
+ * subscription says whether somebody is paying right now; the ledger says where
+ * every key they have ever had came from and went. Keeping them apart means
+ * cancelling a subscription does not have to decide what happens to a balance.
+ */
+export const subscriptions = pgTable('subscriptions', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  /**
+   * Mirrors the payment provider rather than deciding anything itself. The
+   * provider is the authority on whether money arrived; this is a local copy so
+   * every request does not have to ask them.
+   */
+  status: text('status').notNull().default('none'),
+  /**
+   * Which provider, and their id for this subscription. Nullable because a
+   * subscription can exist before payments are wired up - a comp, a test, or
+   * the founder's own.
+   */
+  provider: text('provider'),
+  providerId: text('provider_id'),
+  /** When the paid-for period ends. Also when the next keys are due. */
+  currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
+  /** The period whose keys have already been granted, so a retry cannot double up. */
+  lastGrantedPeriodEnd: timestamp('last_granted_period_end', { withTimezone: true }),
+  createdAt: createdAt(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Every key in and every key out.
+ *
+ * A ledger rather than a balance column, because "how many keys do I have" is a
+ * question you can answer either way but "where did my keys go" is a question
+ * you can only answer from a ledger - and it is the one people actually ask,
+ * usually when they think something has gone wrong. The balance is the sum.
+ */
+export const keyLedger = pgTable(
+  'key_ledger',
+  {
+    id: id(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Positive for keys gained, negative for keys spent. Never zero. */
+    amount: integer('amount').notNull(),
+    /** 'subscription' | 'purchase' | 'spend' | 'grant' | 'refund'. */
+    reason: text('reason').notNull(),
+    /**
+     * What this entry is about - a cosmetic id, a provider payment id, the
+     * period a grant was for. Also the idempotency key: one entry per reference
+     * per person, so a webhook delivered twice pays out once.
+     */
+    reference: text('reference'),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index('key_ledger_user_idx').on(table.userId),
+    uniqueIndex('key_ledger_reference_idx').on(table.userId, table.reason, table.reference),
+  ],
+);
+
+/** What somebody owns, and what they are currently wearing. */
+export const ownedCosmetics = pgTable(
+  'owned_cosmetics',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** An id from the catalogue in services/cosmetics.ts, which is code. */
+    cosmeticId: text('cosmetic_id').notNull(),
+    /** Worn, as opposed to merely owned. At most one per slot - enforced in code. */
+    equipped: boolean('equipped').notNull().default(false),
+    acquiredAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.userId, table.cosmeticId] }),
+    index('owned_cosmetics_user_idx').on(table.userId),
+  ],
+);
+
 export type ChannelRow = typeof channels.$inferSelect;
 export type MessageRow = typeof messages.$inferSelect;
 export type VoiceStateRow = typeof voiceStates.$inferSelect;
 export type RankRow = typeof ranks.$inferSelect;
 export type BanRow = typeof bans.$inferSelect;
+export type SubscriptionRow = typeof subscriptions.$inferSelect;
+export type KeyLedgerRow = typeof keyLedger.$inferSelect;
+export type OwnedCosmeticRow = typeof ownedCosmetics.$inferSelect;
