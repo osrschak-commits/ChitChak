@@ -1,4 +1,4 @@
-import { and, count, eq, isNotNull, or, sql } from 'drizzle-orm';
+import { and, count, eq, isNotNull, lt, or, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import {
   dmChannels,
@@ -363,11 +363,16 @@ export const TASKS: Task[] = [
     check: async (userId) => {
       const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
       if (!user) return 0;
+      // lt(), not a raw `sql` fragment. A Date inside a fragment reaches the
+      // driver as a Date, which it cannot bind, and the whole check throws -
+      // which is exactly what this did: every account that should have had
+      // "Early" was told it had 0 of 1, because the caller caught the error and
+      // read it as no progress.
       const earlier = await scalar(
         db
           .select({ value: sql<number>`coalesce(count(*), 0)` })
           .from(users)
-          .where(sql`${users.createdAt} < ${user.createdAt}`),
+          .where(lt(users.createdAt, user.createdAt)),
       );
       return earlier < 100 ? 1 : 0;
     },

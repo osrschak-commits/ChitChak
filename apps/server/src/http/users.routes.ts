@@ -26,7 +26,7 @@ import { registry } from '../gateway/registry.js';
 import { errors } from '../lib/errors.js';
 import { verifyPassword } from '../lib/password.js';
 import { progress, progressFor } from '../services/progress.js';
-import { TASKS, completedTaskIds } from '../services/tasks.js';
+import { TASKS, type Task, completedTaskIds } from '../services/tasks.js';
 import { toPublicUser, toSelfUser } from '../services/serialize.js';
 import { authenticate, requireUser } from './authenticate.js';
 import { decodeDataUrl } from '../lib/images.js';
@@ -311,7 +311,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
           xp: task.xp,
           goal: task.goal,
           done: done.has(task.id),
-          progress: done.has(task.id) ? task.goal : await task.check(userId).catch(() => 0),
+          progress: done.has(task.id) ? task.goal : await progressOf(task, userId),
         })),
       );
 
@@ -321,6 +321,22 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
 
   // Serving the avatar image itself lives in images.routes.ts, which is
   // registered without an auth hook so `<img src>` works.
+}
+
+/**
+ * How far into a task somebody is, for the list.
+ *
+ * A failing check still reports zero - one broken query should not take the
+ * whole panel down - but it says so first. Swallowing it silently is how
+ * `habit.early` spent its entire life reporting 0 of 1 to everyone.
+ */
+async function progressOf(task: Task, userId: string): Promise<number> {
+  try {
+    return await task.check(userId);
+  } catch (error) {
+    console.error('[tasks] check failed', { task: task.id, userId, error });
+    return 0;
+  }
 }
 
 /** Push a profile change to everyone who shares a server with this user. */

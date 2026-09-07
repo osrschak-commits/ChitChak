@@ -51,7 +51,17 @@ export async function progress(
       for (const task of relevant) {
         if (already.has(task.id)) continue;
 
-        const value = await task.check(userId);
+        // Per task, not per pass. These are independent conditions, and one
+        // that cannot be evaluated should cost that task only - letting it
+        // reach the outer catch would abandon every task after it in the list,
+        // so a single broken query would quietly stop all of them paying out.
+        let value: number;
+        try {
+          value = await task.check(userId);
+        } catch (error) {
+          console.error('[progress] check failed', { userId, task: task.id, error });
+          continue;
+        }
         if (value < task.goal) continue;
 
         // The insert is the claim, so two triggers racing cannot both pay out.
