@@ -3159,3 +3159,35 @@ textarea::placeholder {
   text-transform: uppercase;
   color: var(--text-faint);
 }
+
+/* Renaming happens in the menu rather than a dialog: it is one short field, and
+   a modal for it would be more ceremony than the change deserves. */
+.menu__form {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px;
+}
+
+.menu__input {
+  flex: 1;
+  min-width: 0;
+  background: var(--graphite-900);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 5px 8px;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.menu__input:focus {
+  outline: none;
+  border-color: var(--brass-500);
+}
+
+.menu__note {
+  padding: 6px 10px 8px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  line-height: 1.4;
+}

@@ -646,7 +646,15 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   async stopScreenShare() {
-    await getEngine().stopScreenShare().catch(() => {});
+    // Reported rather than swallowed. A share that fails to stop leaves someone
+    // broadcasting while they believe they have stopped, which is the one
+    // failure here nobody would think to check.
+    await getEngine()
+      .stopScreenShare()
+      .catch((error: unknown) => {
+        console.error('[voice] stopping the screen share failed', error);
+        set({ voiceError: 'Could not stop sharing your screen. Try leaving the call.' });
+      });
     set({ screenShareOn: getEngine().screenShareOn });
     pushVoiceState(get());
   },

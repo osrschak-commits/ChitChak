@@ -47,7 +47,17 @@ export function CallView() {
    * Nothing is being received for these - that is the point - so there is no
    * feed to render, only an invitation.
    */
-  const onOffer = screenShares.filter((share) => !share.watching);
+  const present = new Set(occupants.map((state) => state.userId));
+  const onOffer = screenShares.filter(
+    (share) =>
+      !share.watching &&
+      // Cross-checked against who the server says is in the room. These are two
+      // different sources - the offer comes from the SFU, the occupants from the
+      // gateway - and when somebody leaves they do not stop being true at the
+      // same instant. Trusting the SFU alone leaves a stream on offer from
+      // somebody who has gone, in a channel showing nobody in it.
+      present.has(share.userId),
+  );
 
   const nameOf = (userId: string) => {
     const who = members.get(`${channel?.guildId}:${userId}`);
@@ -215,7 +225,9 @@ function PersonTile({
   const camera = videoFeeds.find((f) => f.userId === state.userId && f.source === 'camera');
   const screen = videoFeeds.find((f) => f.userId === state.userId && f.source === 'screen');
   // From the offers rather than the feeds: somebody is streaming whether or not
-  // this viewer took it up, and their tile should say so either way.
+  // this viewer took it up, and their tile should say so either way. The tile
+  // only exists for someone the gateway says is here, so this needs no
+  // cross-check of its own.
   const streaming = screenShares.some((share) => share.userId === state.userId);
   const level = state.selfMuted ? 0 : (levels.get(state.userId) ?? 0);
   const isSpeaking = speaking.has(state.userId) && !state.selfMuted;

@@ -5,6 +5,8 @@ import { usePermissions } from '../hooks/usePermissions.js';
 import { usePersonPopover } from '../hooks/usePersonPopover.js';
 import { useApp } from '../store/app.js';
 import { Avatar, MemberName, Meter } from './primitives.js';
+import { ChannelAccessDialog } from './ChannelAccessDialog.js';
+import { ChannelMenu } from './ChannelMenu.js';
 import { CreateChannelDialog } from './CreateChannelDialog.js';
 import { ScreenPicker } from './ScreenPicker.js';
 
@@ -35,6 +37,17 @@ export function Sidebar({
   const guild = guilds.find((g) => g.id === selectedGuildId);
   const { can } = usePermissions();
   const mayManageChannels = can(Permission.MANAGE_CHANNELS);
+
+  /** Which channel was right-clicked, and where the pointer was. */
+  const [channelMenu, setChannelMenu] = useState<{ channel: Channel; x: number; y: number } | null>(
+    null,
+  );
+  const [accessFor, setAccessFor] = useState<Channel | null>(null);
+
+  const openChannelMenu = (channel: Channel) => (event: React.MouseEvent) => {
+    event.preventDefault();
+    setChannelMenu({ channel, x: event.clientX, y: event.clientY });
+  };
   // Anything that makes the settings dialog worth opening.
   const mayManage =
     can(Permission.MANAGE_SERVER) ||
@@ -110,6 +123,7 @@ export function Sidebar({
                     key={channel.id}
                     className={`chan ${active ? 'chan--active' : ''}`}
                     onClick={() => selectTextChannel(channel.id)}
+                    onContextMenu={openChannelMenu(channel)}
                   >
                     <span className="chan__tick" aria-hidden="true" />
                     <span className="chan__name">{channel.name}</span>
@@ -140,6 +154,7 @@ export function Sidebar({
                   connected={channel.id === voiceChannelId}
                   occupants={[...voiceStates.values()].filter((v) => v.channelId === channel.id)}
                   onJoin={() => joinVoice(channel.id)}
+                  onContextMenu={openChannelMenu(channel)}
                 />
               ))}
             </div>
@@ -150,6 +165,20 @@ export function Sidebar({
       {/* Your identity and settings live in the top bar; this column ends with
           the call, which is the only thing here that needs to stay reachable. */}
       <CallBar />
+
+      {channelMenu && (
+        <ChannelMenu
+          channel={channelMenu.channel}
+          x={channelMenu.x}
+          y={channelMenu.y}
+          onClose={() => setChannelMenu(null)}
+          onEditAccess={() => setAccessFor(channelMenu.channel)}
+        />
+      )}
+
+      {accessFor && (
+        <ChannelAccessDialog channel={accessFor} onClose={() => setAccessFor(null)} />
+      )}
 
       {creating && guild && (
         <CreateChannelDialog
@@ -167,11 +196,13 @@ function VoiceRow({
   connected,
   occupants,
   onJoin,
+  onContextMenu,
 }: {
   channel: Channel;
   connected: boolean;
   occupants: import('@chitchak/protocol').VoiceState[];
   onJoin(): void;
+  onContextMenu(event: React.MouseEvent): void;
 }) {
   const members = useApp((s) => s.members);
   const levels = useApp((s) => s.levels);
@@ -201,6 +232,9 @@ function VoiceRow({
           .filter(Boolean)
           .join(' ')}
         onClick={onJoin}
+        // On the element rather than the button's disabled state: a room your
+        // rank cannot join is still one you may be allowed to rename or delete.
+        onContextMenu={onContextMenu}
         disabled={blocked}
         title={
           !mayConnect

@@ -234,7 +234,12 @@ export class VoiceEngine {
         this.emitParticipants();
         this.emitScreenShares();
       })
-      .on(RoomEvent.ParticipantDisconnected, () => {
+      .on(RoomEvent.ParticipantDisconnected, (participant) => {
+        // Their track ids will never be seen again; leaving them in `watching`
+        // would silently re-subscribe if the SFU ever reused one.
+        for (const publication of participant.trackPublications.values()) {
+          this.watching.delete(publication.trackSid);
+        }
         this.emitParticipants();
         this.emitVideoFeeds();
         this.emitScreenShares();
@@ -394,9 +399,21 @@ export class VoiceEngine {
     if (tracks.length === 0) return;
     this.screenTracks = [];
 
+    // Each track on its own. A share publishes two of them, and one refusing to
+    // unpublish must not leave the other one live: the failure mode is a person
+    // who has stopped sharing, believes they have, and is still on everyone
+    // else's screen.
     for (const track of tracks) {
-      if (room) await room.localParticipant.unpublishTrack(track);
-      track.stop();
+      try {
+        if (room) await room.localParticipant.unpublishTrack(track);
+      } catch (error) {
+        console.error('[voice] could not unpublish a screen track', error);
+      }
+      try {
+        track.stop();
+      } catch {
+        // Already stopped. Nothing to do and nothing worth saying.
+      }
     }
     this.emitVideoFeeds();
   }
