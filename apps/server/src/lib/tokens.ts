@@ -76,3 +76,26 @@ export function refreshTokensMatch(candidateHash: string, storedHash: string): b
 export function refreshTokenExpiry(): Date {
   return new Date(Date.now() + config.REFRESH_TOKEN_TTL * 1000);
 }
+
+/**
+ * Password reset tokens: the same construction as refresh tokens, for the same
+ * reasons - opaque, high-entropy, stored only as a hash, looked up by an
+ * indexed equality check.
+ *
+ * Kept as its own pair of functions rather than sharing the refresh ones so
+ * that changing the lifetime, length or storage of one cannot silently change
+ * the other. They are different credentials with different blast radii: this
+ * one, in an email, is a single link that can set a password.
+ */
+export function generateResetToken(): { token: string; hash: string } {
+  const token = randomBytes(32).toString('base64url');
+  return { token, hash: hashResetToken(token) };
+}
+
+export function hashResetToken(token: string): string {
+  return createHash('sha256').update(token).digest('base64url');
+}
+
+export function resetTokenExpiry(): Date {
+  return new Date(Date.now() + config.PASSWORD_RESET_TTL * 1000);
+}

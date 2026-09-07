@@ -86,6 +86,13 @@ LIVEKIT_API_SECRET=${secret()}
 # Friends type this once when they register. Empty means anyone who finds the
 # server can create an account.
 SIGNUP_CODE=${signupCode}
+
+# Outgoing mail, used for password resets. Optional: left blank, the server
+# logs the reset link instead of sending it, and you pass it on by hand.
+# Fill it in and people can reset their own passwords.
+#   SMTP_URL=smtps://user:password@smtp.provider.com:465
+SMTP_URL=
+MAIL_FROM=ChitChak <noreply@${domain}>
 `;
 
 writeFileSync(target, contents, { mode: 0o600 });

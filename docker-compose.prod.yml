@@ -74,6 +74,15 @@ services:
       # which is a real browser origin and would otherwise be refused by CORS.
       # www redirects to the apex, so there is only ever one.
       CLIENT_ORIGIN: https://${CHITCHAK_DOMAIN}
+      # Where a password reset link has to point. Not CLIENT_ORIGIN: the web
+      # client is served under /app, and a link to the site root would land on
+      # the download page with the token still in the fragment.
+      APP_URL: https://${CHITCHAK_DOMAIN}/app
+      # Optional. Without them the server still runs and still accepts reset
+      # requests - it writes the link to the log instead of emailing it, so a
+      # reset is recoverable by hand rather than impossible.
+      SMTP_URL: ${SMTP_URL:-}
+      MAIL_FROM: ${MAIL_FROM:-}
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s

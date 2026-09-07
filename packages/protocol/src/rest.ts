@@ -41,6 +41,15 @@ export const refreshSchema = z.object({
   refreshToken: z.string().min(1),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: passwordSchema,
+});
+
 export const updateProfileSchema = z
   .object({
     displayName: z.string().min(1, 'Display name cannot be empty').max(48),
@@ -181,6 +190,8 @@ export const createInviteSchema = z
 export type RegisterBody = z.infer<typeof registerSchema>;
 export type LoginBody = z.infer<typeof loginSchema>;
 export type RefreshBody = z.infer<typeof refreshSchema>;
+export type ForgotPasswordBody = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordBody = z.infer<typeof resetPasswordSchema>;
 export type UpdateProfileBody = z.infer<typeof updateProfileSchema>;
 export type ImageUploadBody = z.infer<typeof imageUploadSchema>;
 export type CreateGuildBody = z.infer<typeof createGuildSchema>;

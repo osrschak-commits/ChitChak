@@ -9,7 +9,9 @@ import { ApiRequestError, api, serverHost } from '../lib/api.js';
  * banner the user has to reconcile with the form themselves.
  */
 export function AuthScreen({ onAuthenticated }: { onAuthenticated(): void }) {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
+  /** Set once a reset email has been requested, replacing the form with advice. */
+  const [resetRequested, setResetRequested] = useState(false);
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -26,6 +28,15 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated(): void }) {
   const [busy, setBusy] = useState(false);
 
   const isRegister = mode === 'register';
+  const isForgot = mode === 'forgot';
+
+  /** Switching modes should not carry the previous one's errors with it. */
+  function goTo(next: 'login' | 'register' | 'forgot') {
+    setMode(next);
+    setFormError(null);
+    setFieldErrors({});
+    setResetRequested(false);
+  }
 
   useEffect(() => {
     api
@@ -43,6 +54,14 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated(): void }) {
     setFieldErrors({});
 
     try {
+      if (isForgot) {
+        await api.requestPasswordReset(email);
+        // Deliberately shown whether or not that address has an account: the
+        // server will not say, and neither will this.
+        setResetRequested(true);
+        return;
+      }
+
       if (isRegister) {
         await api.register({
           email,
@@ -69,15 +88,43 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated(): void }) {
     }
   }
 
+  // Shown instead of the form once a link has been asked for, because there is
+  // nothing else useful to do on this screen until the email arrives.
+  if (resetRequested) {
+    return (
+      <div className="auth">
+        <div className="auth__card">
+          <div className="auth__mark">CHITCHAK</div>
+          <h1 className="auth__title">Check your email</h1>
+          <p className="auth__sub">
+            If <strong>{email}</strong> has an account, a link to choose a new password is on its
+            way. It works once and expires within the hour.
+          </p>
+          <p className="auth__sub">
+            The link opens in your browser. Once you have set a new password, come back here and
+            sign in with it.
+          </p>
+          <button className="btn btn--primary btn--block" type="button" onClick={() => goTo('login')}>
+            Back to sign in
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="auth">
       <form className="auth__card" onSubmit={submit}>
         <div className="auth__mark">CHITCHAK</div>
-        <h1 className="auth__title">{isRegister ? 'Set up your profile' : 'Welcome back'}</h1>
+        <h1 className="auth__title">
+          {isRegister ? 'Set up your profile' : isForgot ? 'Reset your password' : 'Welcome back'}
+        </h1>
         <p className="auth__sub">
           {isRegister
             ? 'Pick a name people will recognise. You can change all of this later.'
-            : 'Sign in to rejoin your servers.'}
+            : isForgot
+              ? 'Enter the address you signed up with and we will email you a link.'
+              : 'Sign in to rejoin your servers.'}
         </p>
 
         {formError && <div className="notice" style={{ margin: '0 0 16px' }}>{formError}</div>}
@@ -162,42 +209,61 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated(): void }) {
           </>
         )}
 
-        <div className="field">
-          <label className="field__label" htmlFor="auth-password">
-            Password
-          </label>
-          <input
-            id="auth-password"
-            type="password"
-            value={password}
-            autoComplete={isRegister ? 'new-password' : 'current-password'}
-            required
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          {fieldErrors.password ? (
-            <div className="field__error">{fieldErrors.password}</div>
-          ) : (
-            isRegister && <div className="field__hint">At least 10 characters.</div>
-          )}
-        </div>
+        {!isForgot && (
+          <div className="field">
+            <label className="field__label" htmlFor="auth-password">
+              Password
+            </label>
+            <input
+              id="auth-password"
+              type="password"
+              value={password}
+              autoComplete={isRegister ? 'new-password' : 'current-password'}
+              required
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            {fieldErrors.password ? (
+              <div className="field__error">{fieldErrors.password}</div>
+            ) : isRegister ? (
+              <div className="field__hint">At least 10 characters.</div>
+            ) : (
+              <button type="button" className="linkish field__hint" onClick={() => goTo('forgot')}>
+                Forgot your password?
+              </button>
+            )}
+          </div>
+        )}
 
         <button className="btn btn--primary btn--block" type="submit" disabled={busy}>
-          {busy ? 'Please wait…' : isRegister ? 'Create account' : 'Sign in'}
+          {busy
+            ? 'Please wait…'
+            : isRegister
+              ? 'Create account'
+              : isForgot
+                ? 'Email me a link'
+                : 'Sign in'}
         </button>
 
         <div className="auth__switch">
-          {isRegister ? 'Already have an account? ' : 'New here? '}
-          <button
-            type="button"
-            className="linkish"
-            onClick={() => {
-              setMode(isRegister ? 'login' : 'register');
-              setFormError(null);
-              setFieldErrors({});
-            }}
-          >
-            {isRegister ? 'Sign in' : 'Create one'}
-          </button>
+          {isForgot ? (
+            <>
+              {'Remembered it? '}
+              <button type="button" className="linkish" onClick={() => goTo('login')}>
+                Sign in
+              </button>
+            </>
+          ) : (
+            <>
+              {isRegister ? 'Already have an account? ' : 'New here? '}
+              <button
+                type="button"
+                className="linkish"
+                onClick={() => goTo(isRegister ? 'login' : 'register')}
+              >
+                {isRegister ? 'Sign in' : 'Create one'}
+              </button>
+            </>
+          )}
         </div>
       </form>
     </div>

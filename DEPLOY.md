@@ -109,6 +109,36 @@ regenerating `POSTGRES_PASSWORD` locks the server out of its own database.
 Pass `--signup-code none` if you genuinely want open registration — but on a
 public domain, don't.
 
+### Email, and why you probably want it
+
+`SMTP_URL` and `MAIL_FROM` are the only optional settings in that file, and they
+are what password resets run on.
+
+**Left blank, the server still works.** It accepts reset requests and writes the
+link into its own log instead of emailing it, so a forgotten password is
+something you fix by hand:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production \
+  logs server | grep -A2 'logging this mail'
+```
+
+That is survivable for a handful of friends and unsustainable beyond it — every
+forgotten password becomes a message to you. Fill them in and people reset their
+own:
+
+```bash
+SMTP_URL=smtps://user:password@smtp.provider.com:465
+MAIL_FROM=ChitChak <noreply@yourdomain.com>
+```
+
+Any provider works — Resend, Postmark, SES, or your registrar's mailbox.
+Whichever you pick, add the **SPF and DKIM records it gives you** to your DNS,
+or the mail will go to spam, which for a password reset is the same as not
+sending it at all.
+
+Percent-encode the password in that URL if it contains `@ : / #`.
+
 <details>
 <summary>Filling it in by hand instead</summary>
 

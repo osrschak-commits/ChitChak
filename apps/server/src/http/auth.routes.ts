@@ -1,18 +1,28 @@
 import { timingSafeEqual } from 'node:crypto';
 import type { AuthResponse } from '@chitchak/protocol';
-import { loginSchema, refreshSchema, registerSchema } from '@chitchak/protocol';
+import {
+  forgotPasswordSchema,
+  loginSchema,
+  refreshSchema,
+  registerSchema,
+  resetPasswordSchema,
+} from '@chitchak/protocol';
 import { and, eq, isNull } from 'drizzle-orm';
-import type { FastifyInstance } from 'fastify';
+import type { FastifyInstance, FastifyBaseLogger } from 'fastify';
 import { config } from '../config.js';
 import { db } from '../db/client.js';
-import { refreshTokens, users } from '../db/schema.js';
+import { passwordResets, refreshTokens, users } from '../db/schema.js';
 import { errors } from '../lib/errors.js';
 import { generateId } from '../lib/ids.js';
+import { sendMail } from '../lib/mail.js';
 import { fakeVerify, hashPassword, needsRehash, verifyPassword } from '../lib/password.js';
 import {
   generateRefreshToken,
+  generateResetToken,
   hashRefreshToken,
+  hashResetToken,
   refreshTokenExpiry,
+  resetTokenExpiry,
   signAccessToken,
 } from '../lib/tokens.js';
 import { toSelfUser } from '../services/serialize.js';
@@ -206,6 +216,91 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   });
 
   /**
+   * Ask for a reset link.
+   *
+   * Always 204, always immediately, whether or not the address has an account.
+   * Both halves of that matter: a different status code would confirm which
+   * addresses are registered, and so would a different response time, which is
+   * why the work happens after the reply rather than before it. Nothing the
+   * caller can observe distinguishes the two cases.
+   */
+  app.post('/api/auth/password/forgot', {
+    // Deliberately tighter than login. Each request sends mail to an address
+    // the requester chose, so an unbounded one is both an enumeration oracle
+    // and a way to have us spam a stranger.
+    config: { rateLimit: { max: 5, timeWindow: '15 minutes' } },
+    handler: async (request, reply) => {
+      const parsed = forgotPasswordSchema.safeParse(request.body);
+      // Even a malformed address gets the same answer.
+      if (parsed.success) {
+        const email = parsed.data.email.trim().toLowerCase();
+        void deliverResetLink(email, request.log);
+      }
+      return reply.code(204).send();
+    },
+  });
+
+  /**
+   * Use a reset link.
+   *
+   * Succeeding here ends every existing session for the account, not just the
+   * one that asked. Someone resetting a password because they think it was
+   * stolen is not helped by the thief staying signed in.
+   */
+  app.post('/api/auth/password/reset', {
+    config: { rateLimit: { max: 10, timeWindow: '15 minutes' } },
+    handler: async (request, reply) => {
+      const parsed = resetPasswordSchema.safeParse(request.body);
+      if (!parsed.success) {
+        throw errors.invalid('Check the fields below', fieldErrors(parsed.error.issues));
+      }
+
+      const reset = await db.query.passwordResets.findFirst({
+        where: eq(passwordResets.tokenHash, hashResetToken(parsed.data.token)),
+      });
+
+      // A token that was never issued and one that has expired are the same
+      // thing to the person holding it: ask for a new link.
+      if (!reset || reset.expiresAt.getTime() < Date.now()) {
+        throw errors.invalid('That reset link has expired. Request a new one.');
+      }
+      // Distinguished only because you must already hold a real token to see
+      // it, and "already used" is the difference between "click the newer
+      // email" and "start again".
+      if (reset.usedAt) {
+        throw errors.invalid('That reset link has already been used.');
+      }
+
+      const passwordHash = await hashPassword(parsed.data.password);
+      const now = new Date();
+
+      await db.transaction(async (tx) => {
+        // tokensValidFrom invalidates every access token already issued, which
+        // are stateless and cannot be revoked one by one.
+        await tx
+          .update(users)
+          .set({ passwordHash, tokensValidFrom: now })
+          .where(eq(users.id, reset.userId));
+
+        await tx
+          .update(refreshTokens)
+          .set({ revokedAt: now })
+          .where(and(eq(refreshTokens.userId, reset.userId), isNull(refreshTokens.revokedAt)));
+
+        // Every outstanding link for this account, not just the one used: if
+        // several were requested, the rest should not still be live.
+        await tx
+          .update(passwordResets)
+          .set({ usedAt: now })
+          .where(and(eq(passwordResets.userId, reset.userId), isNull(passwordResets.usedAt)));
+      });
+
+      request.log.info({ userId: reset.userId }, 'password reset; all sessions revoked');
+      return reply.code(204).send();
+    },
+  });
+
+  /**
    * What the client needs to know before anyone has signed in.
    *
    * Public and unauthenticated by necessity - it is read on the sign-up screen.
@@ -222,6 +317,69 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
   // GET/PATCH /api/users/@me live in users.routes.ts alongside the rest of the
   // profile surface.
+}
+
+/**
+ * Issues a reset link and mails it, or does nothing at all if the address has
+ * no account.
+ *
+ * Runs after the response has gone out, so it can take as long as SMTP takes
+ * without that being visible as a slower reply for a registered address. Every
+ * failure inside is logged rather than thrown: there is no longer a request to
+ * fail, and the caller was never going to be told either way.
+ */
+async function deliverResetLink(email: string, log: FastifyBaseLogger): Promise<void> {
+  try {
+    const user = await db.query.users.findFirst({ where: eq(users.email, email) });
+    if (!user) {
+      log.info({ email }, 'password reset requested for an address with no account');
+      return;
+    }
+
+    // Only the newest link should work. Without this, every link ever requested
+    // stays live until it expires, which widens the window on an old email.
+    const now = new Date();
+    await db
+      .update(passwordResets)
+      .set({ usedAt: now })
+      .where(and(eq(passwordResets.userId, user.id), isNull(passwordResets.usedAt)));
+
+    const { token, hash } = generateResetToken();
+    await db.insert(passwordResets).values({
+      id: generateId(),
+      userId: user.id,
+      tokenHash: hash,
+      expiresAt: resetTokenExpiry(),
+    });
+
+    // The token travels in the URL fragment rather than the query string: a
+    // fragment is never sent to the server, so it stays out of access logs and
+    // out of the Referer header if the page ever links anywhere.
+    const link = `${config.APP_URL.replace(/\/+$/, '')}/#reset=${token}`;
+    const hours = Math.round(config.PASSWORD_RESET_TTL / 3600);
+    const validFor = hours >= 1 ? `${hours} hour${hours === 1 ? '' : 's'}` : 'a short time';
+
+    await sendMail(
+      {
+        to: user.email,
+        subject: 'Reset your ChitChak password',
+        text: [
+          `Hello ${user.displayName},`,
+          '',
+          'Someone asked to reset the password for your ChitChak account.',
+          `Open this link to choose a new one. It works once, and expires in ${validFor}:`,
+          '',
+          link,
+          '',
+          'If that was not you, you can ignore this email - nothing has changed,',
+          'and your current password still works.',
+        ].join('\n'),
+      },
+      log,
+    );
+  } catch (error) {
+    log.error({ err: error, email }, 'failed to issue a password reset');
+  }
 }
 
 function fieldErrors(issues: Array<{ path: PropertyKey[]; message: string }>): Record<string, string> {

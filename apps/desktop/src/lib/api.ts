@@ -195,6 +195,29 @@ class ApiClient {
     return auth.user;
   }
 
+  /**
+   * Ask for a reset link.
+   *
+   * Resolves the same way whether or not the address has an account - the
+   * server answers 204 either way, on purpose, so that this cannot be used to
+   * find out who is registered. The screen says "if that address has an
+   * account" for the same reason.
+   */
+  async requestPasswordReset(email: string): Promise<void> {
+    await this.request<void>('/api/auth/password/forgot', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    });
+  }
+
+  /** Sets a new password from an emailed token, ending every existing session. */
+  async resetPassword(token: string, password: string): Promise<void> {
+    await this.request<void>('/api/auth/password/reset', {
+      method: 'POST',
+      body: JSON.stringify({ token, password }),
+    });
+  }
+
   async logout(): Promise<void> {
     const refreshToken = this.session?.refreshToken;
     this.persist(null);

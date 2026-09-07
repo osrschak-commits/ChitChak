@@ -5,6 +5,7 @@ import { ChatPanel } from './components/ChatPanel.js';
 import { ErrorBoundary } from './components/ErrorBoundary.js';
 import { GuildDialog } from './components/GuildDialog.js';
 import { ProfileDialog } from './components/ProfileDialog.js';
+import { ResetPasswordScreen, takeResetTokenFromUrl } from './components/ResetPasswordScreen.js';
 import { ServerSettingsDialog } from './components/ServerSettingsDialog.js';
 import { Sidebar } from './components/Sidebar.js';
 import { TopBar } from './components/TopBar.js';
@@ -17,6 +18,11 @@ type Overlay = 'none' | 'profile' | 'voice-settings' | 'server-settings' | 'crea
 
 export function App() {
   const [overlay, setOverlay] = useState<Overlay>('none');
+  /**
+   * Read once, on mount, and stripped from the URL as it is read - so a reload
+   * does not re-open the form and the token never sits in the address bar.
+   */
+  const [resetToken, setResetToken] = useState(takeResetTokenFromUrl);
   /** Which section the settings dialog opens on, so "Invite people" lands there. */
   const [settingsTab, setSettingsTab] = useState<'overview' | 'invites'>('overview');
   const [pttKey, setPttKey] = useState('F8');
@@ -27,6 +33,7 @@ export function App() {
   // about either.
   const authenticated = useApp((s) => s.authenticated);
   const markAuthenticated = useApp((s) => s.markAuthenticated);
+  const signOut = useApp((s) => s.signOut);
   const user = useApp((s) => s.user);
   const gatewayStatus = useApp((s) => s.gatewayStatus);
   const selectedGuildId = useApp((s) => s.selectedGuildId);
@@ -42,6 +49,23 @@ export function App() {
   }, []);
 
   usePushToTalk(pttKey);
+
+  // Before the auth check, not after: someone may be signed in on this device
+  // and resetting precisely because they are not sure who else is. The reset
+  // revokes every session anyway, so there is nothing to preserve behind it.
+  if (resetToken) {
+    return (
+      <ResetPasswordScreen
+        token={resetToken}
+        onDone={() => {
+          setResetToken(null);
+          // The old session is dead server-side regardless of how this ended;
+          // holding on to its tokens would only produce a shell that 401s.
+          void signOut();
+        }}
+      />
+    );
+  }
 
   if (!authenticated) {
     return <AuthScreen onAuthenticated={markAuthenticated} />;

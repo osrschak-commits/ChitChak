@@ -85,6 +85,32 @@ export const refreshTokens = pgTable(
   ],
 );
 
+/**
+ * Password reset tokens.
+ *
+ * Stored hashed, for the same reason refresh tokens are: a leaked dump should
+ * not hand anyone a way into an account. Short-lived and single-use - `usedAt`
+ * rather than deletion, so a link clicked twice can say "already used" instead
+ * of the same "invalid or expired" as a forged one.
+ */
+export const passwordResets = pgTable(
+  'password_resets',
+  {
+    id: id(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    usedAt: timestamp('used_at', { withTimezone: true }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex('password_resets_hash_idx').on(table.tokenHash),
+    index('password_resets_user_idx').on(table.userId),
+  ],
+);
+
 export const guilds = pgTable('guilds', {
   id: id(),
   name: text('name').notNull(),
