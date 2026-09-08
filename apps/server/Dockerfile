@@ -53,6 +53,15 @@ COPY --from=build --chown=chitchak:chitchak /repo/apps/server/node_modules apps/
 # Migrations are SQL files, needed at run time by the migrate command.
 COPY --from=build --chown=chitchak:chitchak /repo/apps/server/drizzle apps/server/drizzle
 
+# Attachments are written here, and the path is a mount in production.
+#
+# Created and owned before the mount lands so a named volume inherits the right
+# ownership. A bind mount does not - Docker makes that directory on the host as
+# root, and this process is not root, so the host directory has to be chowned to
+# this user's uid. See DEPLOY.md; getting it wrong means every upload fails with
+# a permission error the first time somebody tries one.
+RUN mkdir -p /data/uploads && chown -R chitchak:chitchak /data
+
 USER chitchak
 ENV NODE_ENV=production
 EXPOSE 4000
