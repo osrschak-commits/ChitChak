@@ -34,28 +34,29 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  # Skips the winCodeSign toolchain download.
+  # True so the packaged .exe carries our icon in its own resources, rather than
+  # only the installer and shortcuts doing so. With this off, Explorer and
+  # anything else that reads the binary show Electron's default atom.
   #
-  # That package contains macOS symlinks, and extracting a symlink on Windows
-  # needs a privilege a normal user account does not have - so the build fails
-  # on the download, before it ever gets to packaging. We are not signing
-  # anything, so the toolchain is dead weight.
+  # It requires the winCodeSign toolchain, which contains macOS symlinks - and
+  # creating a symlink on Windows is privileged, so on a machine without that
+  # permission the build fails while unpacking, long before it packages
+  # anything. Turning it on therefore needs Windows Developer Mode:
   #
-  # The cost is that the inner app .exe keeps Electron's default icon; the
-  # installer, Start Menu entry and desktop shortcut all still use ours. To get
-  # the inner icon too, turn on Windows Developer Mode (Settings > System > For
-  # developers), which grants the symlink privilege, and set this back to true.
+  #   Settings > System > For developers > Developer Mode
   #
-  # Developer Mode alone is not enough on the machine that is already logged in.
-  # SeCreateSymbolicLinkPrivilege is written into the access token at logon, so a
-  # session that started before the toggle never receives it and the build fails
-  # the same way it did with the toggle off. Sign out and back in, then check:
+  # Note that Developer Mode does *not* add SeCreateSymbolicLinkPrivilege to
+  # your token - `whoami /priv` will never list it, and checking there is
+  # misleading. What it does is let a process create symlinks when it passes
+  # SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE. Node passes that flag and
+  # Windows PowerShell 5.1's New-Item does not, so PowerShell fails while the
+  # build succeeds. To check the way that actually predicts a build:
   #
-  #   whoami /priv | findstr Symbolic
+  #   node -e "require('fs').symlinkSync('a','b','file')"
   #
-  # If that prints nothing, leave this false - flipping it only converts a
-  # missing icon into a failed build.
-  signAndEditExecutable: false
+  # If that throws EPERM, set this back to false. The icon is worth less than a
+  # build that runs.
+  signAndEditExecutable: true
 
 nsis:
   # A one-click installer that picks its own location and launches immediately
