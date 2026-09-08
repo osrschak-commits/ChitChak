@@ -175,30 +175,101 @@ textarea::placeholder {
 }
 
 /* Server switcher replaces the icon rail entirely. */
-.switcher {
-  position: relative;
+/*
+ * The two places you can be: a server, or your friends.
+ *
+ * Full height and marked underneath rather than drawn as pills, so the
+ * selected one is indicated on the bar's own bottom edge - which is what makes
+ * these read as tabs onto the view below rather than as two buttons that
+ * happen to be lit.
+ */
+.scope-tabs {
+  display: flex;
+  align-self: stretch;
+  /* The bar's own left padding is the inset; the tabs supply the rest. */
+  margin-left: -2px;
 }
 
-.switcher__button {
+.scope-tab {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 9px;
-  height: 32px;
-  padding: 0 10px;
-  border-radius: var(--radius);
-  border: 1px solid transparent;
-  transition: background 120ms var(--ease), border-color 120ms var(--ease);
-  max-width: 260px;
+  height: 100%;
+  padding: 0 12px;
+  max-width: 280px;
+  color: var(--text-secondary);
+  transition: background 120ms var(--ease), color 120ms var(--ease);
 }
 
-.switcher__button:hover,
-.switcher__button[aria-expanded='true'],
-/* Friends is a plain button rather than a menu, so "you are here" is the only
-   state it has to show. Without this it reads as untouched while you are
-   looking straight at the screen it opens. */
-.switcher__button[aria-pressed='true'] {
-  background: var(--graphite-750);
-  border-color: var(--line-strong);
+.scope-tab:hover {
+  background: var(--graphite-850);
+  color: var(--text-bright);
+}
+
+/*
+ * The mark sits on the bar's bottom border rather than above it, so the tab
+ * joins the view it opens instead of floating over it.
+ */
+.scope-tab--on::after {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--brass-400);
+}
+
+.scope-tab--on {
+  background: var(--graphite-850);
+}
+
+.scope-tab--on .scope-tab__name {
+  color: var(--brass-300);
+}
+
+.scope-tab__name {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The two halves of the server tab: the label goes back, the chevron picks. */
+.scope-tab__main,
+.scope-tab__more {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 100%;
+  color: inherit;
+  min-width: 0;
+}
+
+.scope-tab__more {
+  padding: 0 2px 0 6px;
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.scope-tab__more:hover,
+.scope-tab__more[aria-expanded='true'] {
+  color: var(--text-bright);
+}
+
+.scope-tab__badge {
+  min-width: 18px;
+  padding: 1px 5px;
+  border-radius: 9px;
+  background: var(--brass-400);
+  color: var(--graphite-900);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
 }
 
 .switcher__name {
@@ -208,12 +279,6 @@ textarea::placeholder {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.switcher__chevron {
-  color: var(--text-muted);
-  font-size: 9px;
-  margin-left: 2px;
 }
 
 .switcher__menu {
@@ -2513,19 +2578,6 @@ textarea::placeholder {
 }
 
 .friends__badge,
-.switcher__badge {
-  min-width: 18px;
-  padding: 1px 5px;
-  border-radius: 9px;
-  background: var(--brass-400);
-  color: var(--graphite-900);
-  font-size: 11px;
-  font-weight: 600;
-  text-align: center;
-}
-
-.switcher__badge { margin-left: auto; }
-
 .friends__list {
   display: flex;
   flex-direction: column;
@@ -3450,16 +3502,3 @@ textarea::placeholder {
 }
 
 /* Which of the two switchers you are actually looking at. */
-.switcher__button--on {
-  color: var(--text-bright);
-}
-
-.switcher__button--on .switcher__name {
-  color: var(--brass-300);
-}
-
-/* The bar starts with the switchers now, so it needs its own left inset -
-   the wordmark used to provide it. */
-.topbar > .switcher:first-child {
-  margin-left: 14px;
-}

@@ -141,6 +141,14 @@ interface AppState {
   selectGuild(guildId: string): void;
   /** Open the friends surface, leaving any server selection where it was. */
   openFriends(): void;
+  /**
+   * Back to the server you were in, without disturbing which channel that was.
+   *
+   * Not `selectGuild(selectedGuildId)`: that is for *choosing* a server and
+   * drops you in its first text channel, so using it to come back from Friends
+   * would quietly move you out of the conversation you left.
+   */
+  showGuild(): void;
   selectDmChannel(channelId: string): void;
   sendFriendRequest(username: string): Promise<void>;
   acceptFriendRequest(userId: string): Promise<void>;
@@ -416,6 +424,11 @@ export const useApp = create<AppState>((set, get) => ({
 
   openFriends() {
     set({ scope: 'friends', mainView: 'chat' });
+  },
+
+  showGuild() {
+    if (!get().selectedGuildId) return;
+    set({ scope: 'guild' });
   },
 
   selectDmChannel(channelId) {

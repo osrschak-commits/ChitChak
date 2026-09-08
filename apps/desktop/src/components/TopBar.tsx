@@ -5,11 +5,13 @@ import { Avatar } from './primitives.js';
 import { UpdateBanner } from './UpdateBanner.js';
 
 /**
- * Top bar with the server switcher.
+ * Top bar: which of the two places you are in, and who you are.
  *
- * The switcher replaces the usual column of server icons. With a handful of
- * servers a labelled menu is easier to read than a stack of monograms, and
- * removing the rail gives the channel list and the call the full width.
+ * Two tabs, because there are two scopes - a server, or your friends and DMs -
+ * and both need to show which one you are looking at. The server tab carries
+ * the picker that replaces the usual column of server icons: with a handful of
+ * servers a labelled menu reads better than a stack of monograms, and dropping
+ * the rail gives the channel list and the call the full width.
  */
 export function TopBar({
   onCreateServer,
@@ -26,6 +28,7 @@ export function TopBar({
   const selectedGuildId = useApp((s) => s.selectedGuildId);
   const selectGuild = useApp((s) => s.selectGuild);
   const openFriends = useApp((s) => s.openFriends);
+  const showGuild = useApp((s) => s.showGuild);
   const scope = useApp((s) => s.scope);
   const requestCount = useApp((s) => s.incomingRequests.size);
   const members = useApp((s) => s.members);
@@ -69,21 +72,44 @@ export function TopBar({
         valuable space in the bar telling people something they already know.
         What belongs here is where you are.
       */}
-      <div className="switcher">
-        <button
-          className="switcher__button"
-          aria-expanded={open}
-          aria-haspopup="menu"
-          onClick={() => setOpen((v) => !v)}
-        >
-          <GuildBadge guild={guild} size={20} />
-          <span className="switcher__name">{guild?.name ?? 'No server'}</span>
-          <span className="switcher__chevron" aria-hidden="true">
-            ▼
-          </span>
-        </button>
+      <div className="scope-tabs">
+        <div className={`scope-tab ${scope === 'guild' ? 'scope-tab--on' : ''}`}>
+          {/*
+            Split, because it does two things that should not share a click.
+            The label is the tab - it takes you back to the server you were in.
+            The chevron is the picker. Folding both into one control meant that
+            returning from Friends cost a menu you did not want.
+          */}
+          <button
+            className="scope-tab__main"
+            aria-pressed={scope === 'guild'}
+            title={guild ? `Back to ${guild.name}` : 'Choose a server'}
+            onClick={() => {
+              // With no server there is nothing to go back to, so the only
+              // useful thing the label can do is offer the list.
+              if (guild) {
+                setOpen(false);
+                showGuild();
+              } else {
+                setOpen((v) => !v);
+              }
+            }}
+          >
+            <GuildBadge guild={guild} size={20} />
+            <span className="scope-tab__name">{guild?.name ?? 'No server'}</span>
+          </button>
 
-        {open && (
+          <button
+            className="scope-tab__more"
+            aria-expanded={open}
+            aria-haspopup="menu"
+            aria-label="Switch server"
+            onClick={() => setOpen((v) => !v)}
+          >
+            <span aria-hidden="true">▼</span>
+          </button>
+
+          {open && (
           <div className="switcher__menu" role="menu">
             {guilds.map((item) => (
               <button
@@ -127,33 +153,32 @@ export function TopBar({
               <span>Join with an invite</span>
             </button>
           </div>
-        )}
+          )}
+        </div>
+
+        {/*
+          Friends is a tab beside the server, not an entry inside it. It is not
+          a server, and burying it among them made the one surface that is
+          about people the hardest of them to reach.
+
+          The two tabs are the two places you can be, so both carry the same
+          selected state - which is what a lone lit button could not say.
+        */}
+        <button
+          className={`scope-tab ${scope === 'friends' ? 'scope-tab--on' : ''}`}
+          aria-pressed={scope === 'friends'}
+          onClick={() => {
+            setOpen(false);
+            openFriends();
+          }}
+        >
+          <FriendsBadge size={20} />
+          <span className="scope-tab__name">Friends</span>
+          {/* A request nobody can see until they go looking is a request nobody
+              answers. */}
+          {requestCount > 0 && <span className="scope-tab__badge mono">{requestCount}</span>}
+        </button>
       </div>
-
-      {/*
-        Friends is its own control rather than an entry in the server menu.
-        It is not a server, and burying it among them made the one surface that
-        is about people the hardest of them to reach.
-
-        A button, not a menu. There is one place it goes, and a menu whose only
-        job is to offer a single destination asks for a second click to say
-        nothing. Whether you are already there is shown by the button's own
-        state instead.
-      */}
-      <button
-        className={`switcher__button ${scope === 'friends' ? 'switcher__button--on' : ''}`}
-        aria-pressed={scope === 'friends'}
-        onClick={() => {
-          setOpen(false);
-          openFriends();
-        }}
-      >
-        <FriendsBadge size={20} />
-        <span className="switcher__name">Friends</span>
-        {/* A request nobody can see until they go looking is a request nobody
-            answers. */}
-        {requestCount > 0 && <span className="switcher__badge mono">{requestCount}</span>}
-      </button>
 
       {guild && (
         <button
