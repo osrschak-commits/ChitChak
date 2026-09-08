@@ -18,7 +18,7 @@
  * .icns since 10.7, which is what makes one writable from a machine with no
  * `iconutil` - i.e. a Windows one.
  */
-const { writeFileSync, existsSync } = require('node:fs');
+const { writeFileSync, existsSync, mkdirSync } = require('node:fs');
 const path = require('node:path');
 
 const electron = require('electron');
@@ -62,6 +62,21 @@ const outDir = path.resolve(__dirname, '..', 'build');
  * Skipped without complaint if the site is not checked out beside us.
  */
 const siteIcon = path.resolve(__dirname, '..', '..', 'site', 'public', 'icon.png');
+
+/**
+ * The renderer's copy, which is committed rather than generated.
+ *
+ * Everything else in build/ is gitignored, because it is rebuilt from the logo
+ * on the machine that packages the app. The renderer cannot rely on that: it is
+ * also built inside apps/site/Dockerfile, from a checkout, with no Electron to
+ * run the importer - so a build/ path resolves to nothing there.
+ *
+ * Vite does not fail on a missing asset in HTML or CSS. It leaves the URL
+ * untouched, emits nothing, and exits zero, so the first sign is a 404 in
+ * somebody's browser. Committing this one file is what keeps the web client's
+ * favicon and sign-in logo from depending on a step that cannot run.
+ */
+const rendererIcon = path.resolve(__dirname, '..', 'src', 'assets', 'icon.png');
 
 /** Rendered size -> the icns types that expect exactly those pixels. */
 const ICNS_TYPES = {
@@ -263,6 +278,10 @@ app.whenReady().then(() => {
     writeFileSync(siteIcon, pngBySize.get(256));
     console.log('wrote the site icon (256)');
   }
+
+  mkdirSync(path.dirname(rendererIcon), { recursive: true });
+  writeFileSync(rendererIcon, pngBySize.get(256));
+  console.log('wrote the renderer icon (256) - commit this one');
 
   app.exit(0);
 });

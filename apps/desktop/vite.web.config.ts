@@ -1,5 +1,7 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
+// @ts-expect-error - a build script, not part of the typechecked source
+import { assertAssetsResolved } from './scripts/assert-assets-resolved.mjs';
 
 /**
  * The same renderer, built for a browser instead of Electron.
@@ -21,7 +23,10 @@ import { defineConfig } from 'vite';
  *     public origin for no benefit to anyone but a reader of it.
  */
 export default defineConfig({
-  plugins: [react()],
+  // This is the build that runs inside apps/site/Dockerfile, from a checkout
+  // with no generated files - so it is the one that would ship a broken asset
+  // reference without complaining.
+  plugins: [react(), assertAssetsResolved({ outDir: 'dist-web', base: '/app/' })],
   // Must match where the site serves it. See apps/site/Caddyfile.
   base: '/app/',
   build: {
