@@ -43,9 +43,27 @@ DB_USER="${POSTGRES_USER:-chitchak}"
 KEEP_DAYS="${BACKUP_KEEP_DAYS:-30}"
 KEEP_MINIMUM="${BACKUP_KEEP_MINIMUM:-7}"
 UPLOAD_DIR="${UPLOAD_DIR:-$REPO_DIR/uploads}"
-# Optional. An rclone remote ("b2:chitchak-backups") or an scp target
+# Optional. An rclone remote ("r2:chitchak-backups") or an scp target
 # ("user@host:/path"). Empty means local-only, which is not a real backup - see
 # the note at the end of the run.
+#
+# Falls back to .env.production, where the rest of the server's configuration
+# already lives. The alternative is the crontab, which is written by
+# install-backups.sh - so a setting kept there is one that disappears the next
+# time anybody re-runs that script, silently, leaving backups that look like
+# they are working.
+#
+# Read rather than sourced: that file belongs to compose and is full of values
+# this script has no business defining.
+if [ -z "${BACKUP_REMOTE:-}" ] && [ -f "$REPO_DIR/.env.production" ]; then
+  BACKUP_REMOTE=$(grep -E '^BACKUP_REMOTE=' "$REPO_DIR/.env.production" | tail -1 | cut -d= -f2-)
+  # Strip surrounding quotes, which .env files often carry and rclone does not
+  # want as part of a remote name.
+  BACKUP_REMOTE="${BACKUP_REMOTE%\"}"
+  BACKUP_REMOTE="${BACKUP_REMOTE#\"}"
+  BACKUP_REMOTE="${BACKUP_REMOTE%\'}"
+  BACKUP_REMOTE="${BACKUP_REMOTE#\'}"
+fi
 REMOTE="${BACKUP_REMOTE:-}"
 
 STAMP="$(date -u +%Y%m%d-%H%M%S)"
