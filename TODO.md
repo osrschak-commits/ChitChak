@@ -4,26 +4,21 @@ Things worth doing, roughly in the order they will start to hurt. Not a wish
 list — everything here is something that is either already a gap or becomes one
 the moment more than a handful of people use this.
 
-## Offsite backups
+## Offsite backups — done
 
-**The gap:** backups run nightly and are verified by a weekly restore, but every
-copy sits on the machine it is backing up. That covers a bad migration or a
-deleted table. It does nothing about a dead disk or a lost VPS, which is the
-case backups exist for.
+Backups now go to Cloudflare R2 (`r2:chitchak-backups`) as well as staying on
+the box. The dump is copied nightly and kept by date; the uploads directory is
+mirrored, so a second run transfers nothing.
 
-**What it needs:** a bucket and credentials. `scripts/backup.sh` already takes
-`BACKUP_REMOTE` — an rclone remote or an scp target — and copies each dump off
-the box when it is set. Nothing else has to change.
+Verified by pulling the dump back out of the bucket: gzip intact, 25 tables,
+user and attachment rows present, byte-for-byte identical to the local copy.
 
-The database compresses to about 50 KB, so Cloudflare R2 and Backblaze B2 both
-cover it inside their free tiers, permanently. See the Offsite section in
-DEPLOY.md.
+Two things to know about the setup:
 
-This got sharper the day attachments shipped. The database was small enough that
-losing the VPS meant losing a 50 KB file nobody had copied; uploaded files live
-on the same disk and are the one thing here that cannot be rebuilt from the
-repo. `scripts/backup.sh` already archives and ships them when `BACKUP_REMOTE`
-is set — it is still just a bucket and a credential away.
+- `BACKUP_REMOTE` lives in `.env.production`, not in the crontab, so re-running
+  `install-backups.sh` cannot silently unset it.
+- The remote needs `region=auto` in the rclone config. Without it R2 answers
+  every request with 403, which reads like a bad credential and is not one.
 
 ## Email
 

@@ -487,8 +487,24 @@ Backblaze B2 and Cloudflare R2 have a free tier in the tens of gigabytes, which
 is a long way off for a group this size.
 
 An scp target needs `rsync` on both ends; a bucket needs `rclone` configured on
-the server (`rclone config`). Without them the dump still goes and the run says
-so rather than failing quietly.
+the server. Without them the dump still goes and the run says so rather than
+failing quietly.
+
+Set `BACKUP_REMOTE` in `.env.production`, not in the crontab — `backup.sh` reads
+it from there, and the crontab is rewritten by `install-backups.sh`, so anything
+kept in it disappears the next time that runs.
+
+**For Cloudflare R2, the remote needs `region=auto`.** Without it every request
+comes back `403 AccessDenied`, which reads exactly like a wrong key and is not
+one:
+
+```bash
+rclone config create r2 s3 provider=Cloudflare   access_key_id=... secret_access_key=...   endpoint=https://<account-id>.r2.cloudflarestorage.com   region=auto acl=private no_check_bucket=true
+```
+
+Use a current rclone, not the distribution's. Ubuntu ships a 2022 build that
+uploads to R2 only on its second attempt, logging `501 NotImplemented` each
+night for something that is not actually broken.
 
 ### Restoring for real
 
