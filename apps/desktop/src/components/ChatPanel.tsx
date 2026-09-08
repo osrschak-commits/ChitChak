@@ -2,6 +2,8 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { Permission } from '@chitchak/protocol';
 import { usePermissions } from '../hooks/usePermissions.js';
 import { usePersonPopover } from '../hooks/usePersonPopover.js';
+import { rememberEmoji } from '../lib/emoji.js';
+import { EmojiPicker } from './EmojiPicker.js';
 import { SearchPanel } from './SearchPanel.js';
 import { useApp } from '../store/app.js';
 import { Avatar, MemberName } from './primitives.js';
@@ -88,6 +90,8 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
   const { canInChannel, resolve } = usePermissions();
 
   const [draft, setDraft] = useState('');
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const composerRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const person = usePersonPopover(selectedGuildId, { onEditProfile });
@@ -358,7 +362,45 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
           </div>
 
           <div className="composer">
+            {emojiOpen && (
+              <EmojiPicker
+                onClose={() => setEmojiOpen(false)}
+                onPick={(emoji) => {
+                  rememberEmoji(emoji.char);
+                  /*
+                    Inserted where the caret is, not appended. Someone who
+                    clicked back into the middle of a sentence to add a reaction
+                    to a word meant it to go there, and a picker that always
+                    appends quietly makes that impossible.
+
+                    The caret is read from the input rather than tracked in
+                    state: focus moved to the picker's search box, but an input
+                    keeps its selection while blurred, so this is still the
+                    position the person left.
+                  */
+                  const field = composerRef.current;
+                  const at = field?.selectionStart ?? draft.length;
+                  const to = field?.selectionEnd ?? at;
+                  const next = draft.slice(0, at) + emoji.char + draft.slice(to);
+                  if (next.length > 4000) return;
+
+                  setDraft(next);
+                  setEmojiOpen(false);
+                  // After the state has landed, so the caret is set on text
+                  // that exists - and left after the emoji, ready to keep
+                  // typing.
+                  requestAnimationFrame(() => {
+                    const caret = at + emoji.char.length;
+                    field?.focus();
+                    field?.setSelectionRange(caret, caret);
+                  });
+                }}
+              />
+            )}
+
+            <div className="composer__field">
             <input
+              ref={composerRef}
               value={draft}
               disabled={!maySend}
               placeholder={
@@ -377,6 +419,19 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
                 }
               }}
             />
+            <button
+              type="button"
+              className="composer__emoji"
+              disabled={!maySend}
+              aria-expanded={emojiOpen}
+              title="Emoji"
+              aria-label="Emoji"
+              onClick={() => setEmojiOpen((open) => !open)}
+            >
+              🙂
+            </button>
+            </div>
+
             <div className="composer__hint">
               {draft.length > 3600 ? `${4000 - draft.length} characters left` : ''}
             </div>
