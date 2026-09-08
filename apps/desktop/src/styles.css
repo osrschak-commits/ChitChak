@@ -1753,6 +1753,24 @@ textarea::placeholder {
   object-fit: cover;
 }
 
+/* A stream that has been taken up but has not arrived yet. Quieter than an
+   offer: there is nothing to decide, only something to wait for. */
+.offer--starting {
+  opacity: 0.75;
+}
+
+.offer__mark--wait {
+  animation: offer-wait 1.1s linear infinite;
+}
+
+@keyframes offer-wait {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .offer__mark--wait { animation: none; }
+}
+
 /* --- Looking at a picture -------------------------------------------------- */
 
 /*

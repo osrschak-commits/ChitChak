@@ -50,6 +50,23 @@ export function CallView() {
    * feed to render, only an invitation.
    */
   const present = new Set(occupants.map((state) => state.userId));
+
+  /**
+   * Watched, but nothing is arriving yet.
+   *
+   * There is a gap between pressing Watch and the first frame: the publisher
+   * has to be told, and a keyframe has to make it here. The offer card is gone
+   * by then - it is only shown for shares nobody has taken - so without
+   * something in its place the screen simply empties, which reads as the stream
+   * having failed rather than as it starting.
+   */
+  const starting = screenShares.filter(
+    (share) =>
+      share.watching &&
+      present.has(share.userId) &&
+      !screenFeeds.some((feed) => feed.trackSid === share.trackSid),
+  );
+
   const onOffer = screenShares.filter(
     (share) =>
       !share.watching &&
@@ -161,6 +178,24 @@ export function CallView() {
               onEnlarge={(feed) => setSpotlightSid(feed.trackSid)}
               {...person.bindMenuOnly(state.userId)}
             />
+          ))}
+
+          {starting.map((share) => (
+            <div key={share.trackSid} className="offer offer--starting">
+              <span className="offer__mark offer__mark--wait" aria-hidden="true">
+                ◌
+              </span>
+              <span className="offer__who">
+                Starting {nameOf(share.userId)}&rsquo;s stream
+                <span className="offer__sound mono">connecting</span>
+              </span>
+              <button
+                className="btn btn--ghost btn--sm"
+                onClick={() => stopWatchingScreen(share.trackSid)}
+              >
+                Cancel
+              </button>
+            </div>
           ))}
 
           {onOffer.map((share) => (

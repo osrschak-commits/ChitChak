@@ -481,7 +481,19 @@ export const useApp = create<AppState>((set, get) => ({
   },
 
   openFriends() {
-    set({ scope: 'friends', mainView: 'chat' });
+    /*
+      Closes the open conversation as well as switching surface.
+
+      Without this the friends screen was unreachable the moment a DM was
+      opened: App renders it only when no conversation is selected, so both
+      ways back - the sidebar's Friends button and the tab in the top bar -
+      set a scope that was already 'friends' and changed nothing visible. The
+      only way to add a second person was to restart the app.
+
+      Going to Friends means the list of people, which is what both controls
+      say on them. The conversation is one click away in the sidebar.
+    */
+    set({ scope: 'friends', mainView: 'chat', selectedDmChannelId: null });
   },
 
   showGuild() {

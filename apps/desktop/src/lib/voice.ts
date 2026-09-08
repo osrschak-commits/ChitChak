@@ -191,11 +191,30 @@ export class VoiceEngine {
     this.callbacks.onConnectionStateChanged('connecting');
 
     const room = new Room({
-      // Adaptive stream pauses video tracks whose elements are not visible, and
-      // dynacast stops the SFU forwarding layers nobody is watching. Both are
-      // real savings once cameras are in play.
-      adaptiveStream: true,
-      dynacast: true,
+      /*
+        Both deliberately off, and both were on.
+
+        They are the standard savings - adaptive stream pauses video whose
+        element is not visible, dynacast stops the publisher sending layers
+        nobody is subscribed to - and on a screen share they cost the one thing
+        that matters. Nobody is subscribed to a share until somebody presses
+        Watch, so dynacast has told the publisher to stop encoding it; the press
+        then has to wake the encoder and wait for a keyframe before a single
+        pixel arrives. Adaptive stream adds a second gate on top, holding the
+        track paused until the freshly mounted video element has been measured
+        and found visible.
+
+        The result was several seconds of nothing after clicking Watch, with the
+        offer already gone from the screen - which reads as the stream having
+        disappeared rather than as it starting.
+
+        We already do the saving these were for, and do it better: a screen
+        share is not subscribed to at all until it is asked for (see
+        watchScreenShare). Cameras in a call this size are not worth the
+        latency.
+      */
+      adaptiveStream: false,
+      dynacast: false,
       publishDefaults: {
         // Opus at 32kbps mono is transparent for speech and roughly a fifth of
         // what music-grade settings cost per participant.
@@ -389,7 +408,24 @@ export class VoiceEngine {
       // machine is playing, which is rarely what someone sharing a window
       // intends to broadcast.
       const tracks = await room.localParticipant.createScreenTracks({
-        audio: withAudio,
+        /*
+          Capture the machine's output as it actually sounds.
+
+          `audio: true` takes the browser's defaults, which are tuned for a
+          microphone: automatic gain control rides the level down, noise
+          suppression treats music and game audio as noise to be removed, and
+          echo cancellation subtracts what it thinks is your own speaker. On a
+          voice they help. On a loopback capture they are three separate
+          reasons for a stream to arrive faint and thin, which is exactly how
+          it sounded.
+        */
+        audio: withAudio
+          ? {
+              echoCancellation: false,
+              noiseSuppression: false,
+              autoGainControl: false,
+            }
+          : false,
         resolution: {
           width: this.video.width,
           height: this.video.height,
@@ -409,7 +445,21 @@ export class VoiceEngine {
                   maxFramerate: this.video.frameRate,
                 },
               }
-            : undefined,
+            : {
+                /*
+                  Not the room's audio defaults, which are for speech.
+
+                  32kbps mono with DTX is transparent for a voice and wrong for
+                  everything a screen share carries: DTX stops sending during
+                  what it judges to be silence, which on music is the quiet
+                  passages, and 32kbps mono makes the rest sound like a
+                  telephone. This is a few tens of kilobits more for the one
+                  track where it is audible.
+                */
+                audioPreset: { maxBitrate: 96_000 },
+                dtx: false,
+                red: true,
+              },
         );
         this.screenTracks.push(track);
       }
@@ -722,6 +772,10 @@ export class VoiceEngine {
     this.findScreenPublication(trackSid)?.setSubscribed(true);
     this.setScreenAudioForOwnerOf(trackSid, true);
     this.emitScreenShares();
+    // The track may already be attached - a share watched, stopped and watched
+    // again fires no new TrackSubscribed, so waiting for one would leave the
+    // picture missing until something else happened to refresh the list.
+    this.emitVideoFeeds();
   }
 
   stopWatchingScreenShare(trackSid: string): void {
