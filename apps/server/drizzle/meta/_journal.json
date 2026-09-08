@@ -92,6 +92,13 @@
       "when": 1788875575333,
       "tag": "0012_attachments",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1788909814239,
+      "tag": "0013_guild_emoji",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,7 @@
 import type {
   Channel,
   ChannelOverwrite,
+  Emoji,
   Guild,
   GuildMember,
   Message,
@@ -92,6 +93,8 @@ interface AppState {
   channels: Map<string, Channel>;
   members: Map<string, GuildMember>;
   ranks: Map<string, Rank>;
+  /** Custom emoji, keyed by id, across every guild you are in. */
+  emoji: Map<string, Emoji>;
   /** Keyed `channelId:rankId`, the natural key for a lookup. */
   overwrites: Map<string, ChannelOverwrite>;
   voiceStates: Map<string, VoiceState>;
@@ -383,6 +386,7 @@ function signedOutState() {
     channels: new Map<string, Channel>(),
     members: new Map<string, GuildMember>(),
     ranks: new Map<string, Rank>(),
+    emoji: new Map<string, Emoji>(),
     overwrites: new Map<string, ChannelOverwrite>(),
     voiceStates: new Map<string, VoiceState>(),
     presences: new Map<string, PresenceStatus>(),
@@ -425,6 +429,7 @@ export const useApp = create<AppState>((set, get) => ({
   channels: new Map(),
   members: new Map(),
   ranks: new Map(),
+  emoji: new Map(),
   overwrites: new Map(),
   voiceStates: new Map(),
   presences: new Map(),
@@ -834,6 +839,7 @@ function applyServerMessage(
         channels,
         members,
         ranks,
+        emoji,
         overwrites,
         voiceStates,
         presences,
@@ -897,6 +903,9 @@ function applyServerMessage(
         channels: channelMap,
         members: new Map(members.map((m) => [memberKey(m.guildId, m.userId), m])),
         ranks: new Map(ranks.map((r) => [r.id, r])),
+        // `?? []` so a client that reconnects to an older server still boots -
+        // it simply renders `:name:` as the words somebody typed.
+        emoji: new Map((emoji ?? []).map((e) => [e.id, e])),
         overwrites: new Map(overwrites.map((o) => [`${o.channelId}:${o.rankId}`, o])),
         voiceStates: new Map(voiceStates.map((v) => [v.userId, v])),
         presences: new Map(presences.map((p) => [p.userId, p.status])),
@@ -1118,6 +1127,20 @@ function applyServerMessage(
         return { channels, messages, selectedTextChannelId: replacement };
       });
       if (get().voiceChannelId === message.d.channelId) void get().leaveVoice();
+      return;
+    }
+
+    case 'emoji:create': {
+      set((s) => ({ emoji: new Map(s.emoji).set(message.d.id, message.d) }));
+      return;
+    }
+
+    case 'emoji:delete': {
+      set((s) => {
+        const emoji = new Map(s.emoji);
+        emoji.delete(message.d.emojiId);
+        return { emoji };
+      });
       return;
     }
 

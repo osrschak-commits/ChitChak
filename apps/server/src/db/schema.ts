@@ -730,6 +730,49 @@ export const attachmentsRelations = relations(attachments, ({ one }) => ({
   uploader: one(users, { fields: [attachments.uploaderId], references: [users.id] }),
 }));
 
+/**
+ * Custom emoji, per server.
+ *
+ * The bytes live on disk beside the attachments, addressed by the same content
+ * hash - a picture is a picture, and having two ways to store one would mean
+ * two things to back up and two ways to get the path wrong.
+ *
+ * `name` is unique per guild because that is what `:name:` has to resolve
+ * against. Not unique globally: two servers calling their own picture `:yes:`
+ * is normal, and each resolves inside the server it was typed in.
+ */
+export const guildEmoji = pgTable(
+  'guild_emoji',
+  {
+    id: id(),
+    guildId: text('guild_id')
+      .notNull()
+      .references(() => guilds.id, { onDelete: 'cascade' }),
+    /** Lowercase letters, digits and underscores. What goes between the colons. */
+    name: text('name').notNull(),
+    mimeType: text('mime_type').notNull(),
+    sha256: text('sha256').notNull(),
+    bytes: integer('bytes').notNull(),
+    creatorId: text('creator_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex('guild_emoji_name_idx').on(table.guildId, table.name),
+    index('guild_emoji_guild_idx').on(table.guildId),
+    // Asked before deleting a file: another emoji, or an attachment, may share
+    // those bytes.
+    index('guild_emoji_sha_idx').on(table.sha256),
+  ],
+);
+
+export const guildEmojiRelations = relations(guildEmoji, ({ one }) => ({
+  guild: one(guilds, { fields: [guildEmoji.guildId], references: [guilds.id] }),
+  creator: one(users, { fields: [guildEmoji.creatorId], references: [users.id] }),
+}));
+
+export type GuildEmojiRow = typeof guildEmoji.$inferSelect;
 export type AttachmentRow = typeof attachments.$inferSelect;
 export type ChannelRow = typeof channels.$inferSelect;
 export type MessageRow = typeof messages.$inferSelect;

@@ -5,6 +5,7 @@ import { usePersonPopover } from '../hooks/usePersonPopover.js';
 import { uploadFile } from '../lib/api.js';
 import { rememberEmoji } from '../lib/emoji.js';
 import { MessageAttachments, PendingAttachments, type Pending } from './Attachments.js';
+import { RichText } from './RichText.js';
 import { EmojiPicker } from './EmojiPicker.js';
 import { SearchPanel } from './SearchPanel.js';
 import { useApp } from '../store/app.js';
@@ -139,6 +140,31 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
           );
         });
     }
+  }
+
+  /**
+   * Puts text where the caret is, not at the end.
+   *
+   * The caret is read off the input rather than tracked in state: focus has by
+   * now moved to the picker's search box, but an input keeps its selection
+   * while blurred, so this is still where the person left it.
+   */
+  function insertAtCaret(text: string): void {
+    const field = composerRef.current;
+    const at = field?.selectionStart ?? draft.length;
+    const to = field?.selectionEnd ?? at;
+    const next = draft.slice(0, at) + text + draft.slice(to);
+    if (next.length > 4000) return;
+
+    setDraft(next);
+    setEmojiOpen(false);
+    // After the state has landed, so the caret is set on text that exists - and
+    // left after what was inserted, ready to keep typing.
+    requestAnimationFrame(() => {
+      const caret = at + text.length;
+      field?.focus();
+      field?.setSelectionRange(caret, caret);
+    });
   }
 
   function unstage(key: string): void {
@@ -400,7 +426,7 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
                       <>
                         {message.content && (
                           <div className="msg__text">
-                            {message.content}
+                            <RichText text={message.content} guildId={channel?.guildId ?? null} />
                             {message.editedAt && (
                               <span className="msg__edited" title={new Date(message.editedAt).toLocaleString()}>
                                 edited
@@ -484,6 +510,11 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
             {emojiOpen && (
               <EmojiPicker
                 onClose={() => setEmojiOpen(false)}
+                guildId={channel?.guildId ?? null}
+                // A custom emoji is inserted as `:name:`, the same thing
+                // somebody would have typed - so the message keeps working if
+                // the emoji is later removed.
+                onPickCustom={(custom) => insertAtCaret(`:${custom.name}:`)}
                 onPick={(emoji) => {
                   rememberEmoji(emoji.char);
                   /*
@@ -497,22 +528,7 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
                     keeps its selection while blurred, so this is still the
                     position the person left.
                   */
-                  const field = composerRef.current;
-                  const at = field?.selectionStart ?? draft.length;
-                  const to = field?.selectionEnd ?? at;
-                  const next = draft.slice(0, at) + emoji.char + draft.slice(to);
-                  if (next.length > 4000) return;
-
-                  setDraft(next);
-                  setEmojiOpen(false);
-                  // After the state has landed, so the caret is set on text
-                  // that exists - and left after the emoji, ready to keep
-                  // typing.
-                  requestAnimationFrame(() => {
-                    const caret = at + emoji.char.length;
-                    field?.focus();
-                    field?.setSelectionRange(caret, caret);
-                  });
+                  insertAtCaret(emoji.char);
                 }}
               />
             )}

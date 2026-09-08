@@ -1,6 +1,7 @@
 import type {
   Channel,
   ChannelOverwrite,
+  Emoji,
   Guild,
   GuildMember,
   Message,
@@ -76,6 +77,8 @@ export interface ReadyPayload {
   channels: Channel[];
   members: GuildMember[];
   ranks: Rank[];
+  /** Every custom emoji in every guild this user is in. */
+  emoji: Emoji[];
   overwrites: ChannelOverwrite[];
   voiceStates: VoiceState[];
   presences: Array<{ userId: Snowflake; status: PresenceStatus }>;
@@ -156,6 +159,8 @@ export type ServerMessage =
   | { op: 'guild:member_remove'; d: { guildId: Snowflake; userId: Snowflake } }
   /** Ranks or nickname changed for a member. */
   | { op: 'guild:member_update'; d: GuildMember }
+  | { op: 'emoji:create'; d: Emoji }
+  | { op: 'emoji:delete'; d: { guildId: Snowflake; emojiId: Snowflake } }
   | { op: 'guild:update'; d: Guild }
   | { op: 'guild:delete'; d: { guildId: Snowflake } }
   | { op: 'channel:create'; d: Channel }

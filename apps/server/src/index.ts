@@ -15,6 +15,7 @@ import { billingRoutes } from './http/billing.routes.js';
 import { authRoutes } from './http/auth.routes.js';
 import { guildRoutes } from './http/guilds.routes.js';
 import { attachmentRoutes, uploadRoutes } from './http/attachments.routes.js';
+import { emojiManageRoutes, emojiServeRoutes } from './http/emoji.routes.js';
 import { sweepOrphans } from './services/attachments.js';
 import { imageRoutes } from './http/images.routes.js';
 import { moderationRoutes } from './http/moderation.routes.js';
@@ -125,6 +126,9 @@ await app.register(imageRoutes);
 // Separate scopes keep the upload body parser off every other route.
 await app.register(attachmentRoutes);
 await app.register(uploadRoutes);
+// Same split as attachments: serving needs no auth and no body parser.
+await app.register(emojiServeRoutes);
+await app.register(emojiManageRoutes);
 await app.register(userRoutes);
 await app.register(friendRoutes);
 await app.register(guildRoutes);

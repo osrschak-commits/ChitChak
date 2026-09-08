@@ -1,10 +1,13 @@
+import type { Emoji as CustomEmoji } from '@chitchak/protocol';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { apiBase } from '../lib/api.js';
 import {
   EMOJI_GROUPS,
   recentEmoji,
   searchEmoji,
   type Emoji,
 } from '../lib/emoji.js';
+import { useApp } from '../store/app.js';
 
 /**
  * The emoji picker.
@@ -19,11 +22,33 @@ import {
  */
 export function EmojiPicker({
   onPick,
+  onPickCustom,
+  guildId,
   onClose,
 }: {
   onPick(emoji: Emoji): void;
+  /** Inserts `:name:` rather than a character - see RichText. */
+  onPickCustom(emoji: CustomEmoji): void;
+  guildId: string | null;
   onClose(): void;
 }) {
+  const allEmoji = useApp((s) => s.emoji);
+
+  /*
+    This server's emoji, first in the panel.
+
+    Only this server's: two servers calling their own picture `:yes:` is normal,
+    and offering both would insert a name that means the wrong one.
+  */
+  const custom = useMemo(
+    () =>
+      guildId
+        ? [...allEmoji.values()]
+            .filter((one) => one.guildId === guildId)
+            .sort((a, b) => a.name.localeCompare(b.name))
+        : [],
+    [allEmoji, guildId],
+  );
   const [query, setQuery] = useState('');
   const [group, setGroup] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -60,6 +85,10 @@ export function EmojiPicker({
   const results = query.trim() ? searchEmoji(query) : null;
   const showing = results ?? EMOJI_GROUPS[group]?.emoji ?? [];
 
+  // Custom emoji are searched by name only; they have no keywords to speak of.
+  const term = query.trim().toLowerCase().replace(/^:+|:+$/g, '');
+  const customShowing = term ? custom.filter((one) => one.name.includes(term)) : custom;
+
   return (
     <div className="emoji" ref={panelRef} role="dialog" aria-label="Emoji">
       <div className="emoji__head">
@@ -82,6 +111,25 @@ export function EmojiPicker({
         />
       </div>
 
+      {customShowing.length > 0 && (!results || term) && (
+        <div className="emoji__section">
+          <div className="emoji__label mono">This server</div>
+          <div className="emoji__grid">
+            {customShowing.map((one) => (
+              <button
+                key={one.id}
+                className="emoji__one emoji__one--custom"
+                title={`:${one.name}:`}
+                aria-label={`:${one.name}:`}
+                onClick={() => onPickCustom(one)}
+              >
+                <img src={`${apiBase}${one.url}`} alt="" draggable={false} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {!results && recent.length > 0 && group === 0 && (
         <div className="emoji__section">
           <div className="emoji__label mono">Recent</div>
@@ -95,7 +143,7 @@ export function EmojiPicker({
         </div>
         {showing.length === 0 ? (
           <div className="emoji__empty">
-            Nothing matches “{query.trim()}”. These are the standard set — custom ones are coming.
+            Nothing matches “{query.trim()}”.
           </div>
         ) : (
           <Grid emoji={showing} onPick={onPick} />

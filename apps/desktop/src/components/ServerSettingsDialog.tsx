@@ -6,6 +6,7 @@ import { prepareSquareImage } from '../lib/image.js';
 import { usePermissions } from '../hooks/usePermissions.js';
 import { useApp } from '../store/app.js';
 import { ChannelAccessDialog } from './ChannelAccessDialog.js';
+import { EmojiTab } from './EmojiTab.js';
 import { CreateChannelDialog } from './CreateChannelDialog.js';
 import { InvitesTab } from './InvitesTab.js';
 import { BansTab, MembersTab } from './MembersTab.js';
@@ -18,7 +19,7 @@ import { GuildBadge } from './TopBar.js';
  * Owner-only, and the server enforces that independently - this dialog is only
  * reachable for an owner, but every endpoint it calls checks again.
  */
-type Tab = 'overview' | 'ranks' | 'channels' | 'members' | 'bans' | 'invites';
+type Tab = 'overview' | 'ranks' | 'channels' | 'emoji' | 'members' | 'bans' | 'invites';
 
 export function ServerSettingsDialog({
   guildId,
@@ -45,6 +46,7 @@ export function ServerSettingsDialog({
     ['overview', 'Overview'],
     can(Permission.MANAGE_RANKS) && ['ranks', 'Ranks'],
     can(Permission.MANAGE_CHANNELS) && ['channels', 'Channels'],
+    can(Permission.MANAGE_SERVER) && ['emoji', 'Emoji'],
     ['members', 'Members'],
     can(Permission.BAN_MEMBERS) && ['bans', 'Bans'],
     can(Permission.CREATE_INVITE) && ['invites', 'Invites'],
@@ -82,6 +84,7 @@ export function ServerSettingsDialog({
             {tab === 'overview' && <OverviewTab guildId={guildId} onClose={onClose} />}
             {tab === 'ranks' && <RanksTab guildId={guildId} />}
             {tab === 'channels' && <ChannelsTab guildId={guildId} />}
+            {tab === 'emoji' && <EmojiTab guildId={guildId} />}
             {tab === 'members' && <MembersTab guildId={guildId} />}
             {tab === 'bans' && <BansTab guildId={guildId} />}
             {tab === 'invites' && <InvitesTab guildId={guildId} />}

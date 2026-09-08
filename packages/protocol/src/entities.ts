@@ -83,6 +83,30 @@ export interface Rank {
   isDefault: boolean;
 }
 
+/**
+ * A picture a server can use as an emoji.
+ *
+ * Written in a message as `:name:` and left that way. The client swaps it for
+ * the image when it draws, which keeps the message readable everywhere it is
+ * not resolved - a search result, a notification, a database row - and means an
+ * emoji that is later deleted degrades to the word somebody typed rather than
+ * to a broken image.
+ *
+ * `url` is unsigned and stable, like an avatar rather than like an attachment.
+ * These are decoration shown to everyone in the server and cached hard by the
+ * browser; a link that expires would mean every emoji in a long channel
+ * reloading itself daily.
+ */
+export interface Emoji {
+  id: Snowflake;
+  guildId: Snowflake;
+  /** Lowercase letters, digits and underscores. What goes between the colons. */
+  name: string;
+  url: string;
+  /** Who added it. */
+  creatorId: Snowflake;
+}
+
 /** Per-channel permission adjustment for one rank. */
 export interface ChannelOverwrite {
   channelId: Snowflake;

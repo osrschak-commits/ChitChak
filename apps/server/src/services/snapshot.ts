@@ -1,4 +1,10 @@
-import type { Channel, ChannelOverwrite, GuildMember, Rank, ReadyPayload } from '@chitchak/protocol';
+import type {
+  Channel,
+  ChannelOverwrite,
+  GuildMember,
+  Rank,
+  ReadyPayload,
+} from '@chitchak/protocol';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import {
@@ -12,6 +18,7 @@ import {
   voiceStates,
 } from '../db/schema.js';
 import { errors } from '../lib/errors.js';
+import { forGuilds } from './emoji.js';
 import { dmChannelsFor } from './dms.js';
 import { progressFor } from './progress.js';
 import { blockedIdsFor, relationshipsFor } from './friends.js';
@@ -120,6 +127,7 @@ export async function buildReadySnapshot(userId: string): Promise<ReadyPayload> 
       channels: dmChannelRows,
       members: [],
       ranks: [],
+      emoji: [],
       overwrites: [],
       voiceStates: [],
       presences: [],
@@ -211,6 +219,9 @@ export async function buildReadySnapshot(userId: string): Promise<ReadyPayload> 
     members: memberList,
     ...relationships,
     ranks: rankList,
+    // Every guild's emoji, because a message in any of them may name one and
+    // the client resolves `:name:` locally rather than asking per message.
+    emoji: await forGuilds(guildRows.map((row) => row.id)),
     overwrites: overwriteList,
     // Voice state for a hidden channel would reveal who is in it.
     voiceStates: voiceRows.filter((v) => visible.has(v.channelId)).map(toVoiceState),

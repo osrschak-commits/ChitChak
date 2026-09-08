@@ -1,6 +1,7 @@
 import type {
   ApiError,
   Attachment,
+  Emoji,
   Progress,
   AuthResponse,
   Ban,
@@ -302,6 +303,10 @@ class ApiClient {
   }
 
   // --- Premium --------------------------------------------------------------
+
+  deleteEmoji(guildId: string, emojiId: string): Promise<{ ok: boolean }> {
+    return this.request(`/api/guilds/${guildId}/emoji/${emojiId}`, { method: 'DELETE' });
+  }
 
   /** Catalogue, ownership, balance and subscription, in one request. */
   premium(): Promise<PremiumState> {
@@ -783,6 +788,37 @@ export function uploadFile(
 
     request.send(file);
   });
+}
+
+/**
+ * Adds a custom emoji to a server.
+ *
+ * The same raw-body shape as an attachment upload - one picture per request, so
+ * a multipart envelope would carry nothing the query string does not.
+ */
+export async function uploadEmoji(guildId: string, name: string, file: File): Promise<Emoji> {
+  const token = api.accessToken;
+  if (!token) throw new Error('Not signed in');
+
+  const response = await fetch(
+    `${API_BASE}/api/guilds/${guildId}/emoji?name=${encodeURIComponent(name)}`,
+    {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${token}`,
+        'content-type': file.type || 'application/octet-stream',
+      },
+      body: file,
+    },
+  );
+
+  if (!response.ok) {
+    // The server's sentence, not a status code: "that name is taken" and "this
+    // server is full" are things a person can act on.
+    const body = (await response.json().catch(() => null)) as { message?: string } | null;
+    throw new Error(body?.message ?? `Could not add that emoji (${response.status})`);
+  }
+  return (await response.json()) as Emoji;
 }
 
 /** Absolute URL for an avatar or icon path returned by the API. */
