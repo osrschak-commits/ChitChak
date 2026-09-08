@@ -15,6 +15,7 @@ import type {
 import { create } from 'zustand';
 import { api } from '../lib/api.js';
 import { gateway, type GatewayStatus } from '../lib/gateway.js';
+import { play, type SoundName } from '../lib/sounds.js';
 import {
   VoiceEngine,
   defaultAudioSettings,
@@ -128,6 +129,7 @@ interface AppState {
   transmitMode: TransmitMode;
   pushToTalkActive: boolean;
   audioSettings: AudioSettings;
+  notifySettings: NotifySettings;
   /** Per-person listening level, 0-100, keyed by user id. Yours alone. */
   userVolumes: Record<string, number>;
   /** How loud each person's screen share is, separately from their voice. */
@@ -184,12 +186,62 @@ interface AppState {
   setTransmitMode(mode: TransmitMode): void;
   setPushToTalkActive(active: boolean): void;
   setAudioSettings(settings: Partial<AudioSettings>): Promise<void>;
+  setNotifySettings(settings: Partial<NotifySettings>): void;
+  /** Plays one, ignoring the rate limit, so the settings screen can demo it. */
+  previewSound(name: SoundName): void;
   /** How loud one person is for you, 0-100. Remembered across restarts. */
   setUserVolume(userId: string, percent: number): void;
   /** How loud somebody's stream is for you. 0 is muted. */
   setStreamVolume(userId: string, percent: number): void;
   applySelfUser(user: SelfUser): void;
   dismissVoiceError(): void;
+}
+
+/**
+ * Which notifications make a sound, and how loud.
+ *
+ * Per event rather than one switch, because the tolerable volume of each is
+ * completely different: a busy server is a sound every few seconds, a DM is a
+ * handful a day. Being able to silence the first without losing the second is
+ * the difference between keeping sound on and turning it all off.
+ */
+export interface NotifySettings {
+  enabled: boolean;
+  /** 0-100. */
+  volume: number;
+  events: Record<SoundName, boolean>;
+}
+
+/*
+  Declared here rather than beside the other loaders at the foot of the file,
+  because this one is read while the store is being created. `const` is hoisted
+  but not initialised, so a default defined below the store is still in its
+  temporal dead zone when the initial state asks for it, and the whole module
+  throws on load. loadAudioSettings only escapes this by taking its default from
+  an import, which is initialised before any of the module body runs.
+*/
+const defaultNotifySettings: NotifySettings = {
+  enabled: true,
+  volume: 55,
+  events: { dm: true, message: true, join: true, leave: true, friend: true },
+};
+
+function loadNotifySettings(): NotifySettings {
+  try {
+    const raw = localStorage.getItem('chitchak.notify');
+    if (!raw) return defaultNotifySettings;
+    const saved = JSON.parse(raw) as Partial<NotifySettings>;
+    // Merged a level deep: a release that adds a sound should leave the ones
+    // somebody has already turned off alone, and default the new one to on
+    // rather than to undefined.
+    return {
+      ...defaultNotifySettings,
+      ...saved,
+      events: { ...defaultNotifySettings.events, ...saved.events },
+    };
+  } catch {
+    return defaultNotifySettings;
+  }
 }
 
 const memberKey = (guildId: string, userId: string) => `${guildId}:${userId}`;
@@ -397,6 +449,7 @@ export const useApp = create<AppState>((set, get) => ({
   transmitMode: (localStorage.getItem('chitchak.transmitMode') as TransmitMode) ?? 'voice-activity',
   pushToTalkActive: false,
   audioSettings: loadAudioSettings(),
+  notifySettings: loadNotifySettings(),
   userVolumes: loadUserVolumes(),
   streamVolumes: loadUserVolumes('chitchak.stream-volumes'),
   voiceError: null,
@@ -696,6 +749,18 @@ export const useApp = create<AppState>((set, get) => ({
     if (get().voiceChannelId) await getEngine().applySettings(audioSettings);
   },
 
+  setNotifySettings(patch) {
+    const notifySettings = { ...get().notifySettings, ...patch };
+    set({ notifySettings });
+    localStorage.setItem('chitchak.notify', JSON.stringify(notifySettings));
+  },
+
+  previewSound(name) {
+    // Straight to `play`: the whole point is to hear it now, so the rate limit
+    // and the "are you looking at it" rules have no business here.
+    play(name, get().notifySettings.volume / 100);
+  },
+
   setUserVolume(userId, percent) {
     const clamped = Math.max(0, Math.min(100, Math.round(percent)));
     // 100 is the default, so storing it would grow the map forever with
@@ -879,12 +944,32 @@ function applyServerMessage(
 
     case 'voice:state': {
       const state = message.d;
+
+      /*
+        Read before the write, because this event is not only about arriving
+        and leaving - it also fires every time somebody mutes, unmutes, deafens,
+        starts a camera or shares a screen. Playing a sound on the event itself
+        would chirp at every one of those. What makes it a join or a leave is
+        the channel having *changed*, and that can only be known by comparing.
+      */
+      const wasIn = get().voiceStates.get(state.userId)?.channelId ?? null;
+
       set((s) => {
         const voiceStates = new Map(s.voiceStates);
         if (state.channelId === null) voiceStates.delete(state.userId);
         else voiceStates.set(state.userId, state);
         return { voiceStates };
       });
+
+      {
+        const current = get();
+        // Only your own call, and never yourself. Every server-wide join would
+        // otherwise be audible from wherever you happened to be sitting.
+        if (state.userId !== current.user?.id && current.voiceChannelId && wasIn !== state.channelId) {
+          if (state.channelId === current.voiceChannelId) chime('join', current);
+          else if (wasIn === current.voiceChannelId) chime('leave', current);
+        }
+      }
       // Our own state can be changed by a moderator (server mute) or by another
       // of our clients, so mirror it rather than assuming we caused it.
       if (state.userId === get().user?.id) {
@@ -948,6 +1033,7 @@ function applyServerMessage(
     }
 
     case 'friend:request': {
+      chime('friend', get());
       const { user: person } = message.d;
       set((s) => ({
         people: new Map(s.people).set(person.id, person),
@@ -987,6 +1073,19 @@ function applyServerMessage(
         messages.set(created.channelId, [...existing, created]);
         return { messages };
       });
+
+      {
+        const state = get();
+        const isDm = state.dmChannels.has(created.channelId);
+        // Never your own, and never one you are already reading - a sound for
+        // a message you are watching arrive is noise by definition.
+        if (
+          created.authorId !== state.user?.id &&
+          !isWatching(state, created.channelId, isDm)
+        ) {
+          chime(isDm ? 'dm' : 'message', state);
+        }
+      }
       return;
     }
 
@@ -1177,6 +1276,48 @@ function loadAudioSettings(): AudioSettings {
 }
 
 /**
+ * When each sound last played, so a burst does not machine-gun.
+ *
+ * Six messages arriving together is one notification, not six - and the same
+ * goes for a call emptying out at the end of the night. Kept per sound so a DM
+ * is never swallowed by an unrelated channel being busy.
+ */
+const lastPlayed = new Map<SoundName, number>();
+const SOUND_GAP_MS = 1400;
+
+/**
+ * Plays a notification, if everything about the moment says it should.
+ *
+ * Deafened silences these too. Deafen is already the app's "I want quiet"
+ * control, and a second unrelated switch that also has to be found and thrown
+ * is how somebody ends up in a call being pinged by a channel they muted.
+ */
+function chime(name: SoundName, state: AppState): void {
+  const settings = state.notifySettings;
+  if (!settings.enabled || !settings.events[name]) return;
+  if (state.selfDeafened) return;
+
+  const now = Date.now();
+  if (now - (lastPlayed.get(name) ?? 0) < SOUND_GAP_MS) return;
+  lastPlayed.set(name, now);
+
+  play(name, settings.volume / 100);
+}
+
+/**
+ * Whether the message that just arrived is already on screen in front of them.
+ *
+ * Three things have to be true, and the third is the one that is easy to miss:
+ * being in the call view means the chat is not visible even though a channel is
+ * still selected behind it.
+ */
+function isWatching(state: AppState, channelId: string, isDm: boolean): boolean {
+  if (typeof document !== 'undefined' && !document.hasFocus()) return false;
+  if (state.mainView !== 'chat') return false;
+  return isDm ? state.selectedDmChannelId === channelId : state.selectedTextChannelId === channelId;
+}
+
+/**
  * A session ending anywhere empties the store, once.
  *
  * The path this exists for is not the Sign out button - that one clears up
@@ -1197,6 +1338,14 @@ api.onSessionEnded(() => {
 // DevTools console, e.g. `__chitchak.getState().joinVoice(id)`. Never in a build.
 if (import.meta.env.DEV) {
   (window as unknown as { __chitchak?: typeof useApp }).__chitchak = useApp;
+  // Pushes a synthetic event down the same path a real one takes. The rules
+  // about which notifications make a sound live in that path and nowhere else,
+  // so this is how they can be exercised - including the awkward ones, like a
+  // voice state that changed only because somebody muted - without arranging
+  // for a second person to be online.
+  (
+    window as unknown as { __serverMessage?: (message: ServerMessage) => void }
+  ).__serverMessage = (message) => applyServerMessage(message, useApp.setState, useApp.getState);
 }
 
 /** Stable colour for a user with no chosen accent, derived from their id. */

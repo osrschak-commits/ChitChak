@@ -99,6 +99,60 @@ textarea {
   transition: border-color 120ms var(--ease), box-shadow 120ms var(--ease);
 }
 
+/*
+ * Sliders, which until now were whatever the browser drew.
+ *
+ * The rule above gives every input a border, a background and padding, none of
+ * which mean anything to a range - so the three sliders in the app (per-person
+ * volume, stream volume, and notification volume) were rendering as the default
+ * blue track, the one control in a brass and graphite app that came from
+ * somewhere else. This is deliberately on the element rather than a class, so
+ * a slider added later is right without anyone remembering.
+ */
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: var(--graphite-700);
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 13px;
+  height: 13px;
+  border: none;
+  border-radius: 50%;
+  background: var(--brass-400);
+  transition: transform 100ms var(--ease);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border: none;
+  border-radius: 50%;
+  background: var(--brass-400);
+}
+
+input[type='range']:hover::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+input[type='range']:focus-visible {
+  outline: 2px solid var(--brass-400);
+  outline-offset: 4px;
+}
+
+input[type='range']:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
 textarea {
   resize: vertical;
   min-height: 76px;
@@ -911,6 +965,26 @@ textarea::placeholder {
   height: 16px;
   opacity: 0.66;
   transition: opacity 110ms var(--ease);
+}
+
+.notify__volume {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.notify__volume input[type='range'] {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Keeps the Play button and its switch on one baseline, and stops the button
+   stretching to whatever the longest label happens to be. */
+.notify__controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
 }
 
 .icon-btn:hover .icon-btn__art {

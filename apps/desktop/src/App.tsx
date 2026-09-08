@@ -16,6 +16,7 @@ import { TopBar } from './components/TopBar.js';
 import { VoiceSettingsDialog } from './components/VoiceSettingsDialog.js';
 import { usePushToTalk } from './hooks/usePushToTalk.js';
 import { serverHost } from './lib/api.js';
+import { unlockSounds } from './lib/sounds.js';
 import { useApp } from './store/app.js';
 
 type Overlay = 'none' | 'profile' | 'voice-settings' | 'server-settings' | 'create-guild' | 'join-guild';
@@ -53,6 +54,23 @@ export function App() {
 
   useEffect(() => {
     void window.chitchak?.getPushToTalkKey().then(setPttKey);
+  }, []);
+
+  /*
+    A browser keeps its audio context suspended until the page has been
+    interacted with, and the web client is a browser. Waking it on the first
+    click or key means the first notification actually makes a sound - which is
+    the one that matters, because a silent first notification is indis-
+    tinguishable from a broken feature.
+  */
+  useEffect(() => {
+    const wake = () => unlockSounds();
+    document.addEventListener('pointerdown', wake, { once: true });
+    document.addEventListener('keydown', wake, { once: true });
+    return () => {
+      document.removeEventListener('pointerdown', wake);
+      document.removeEventListener('keydown', wake);
+    };
   }, []);
 
   usePushToTalk(pttKey);

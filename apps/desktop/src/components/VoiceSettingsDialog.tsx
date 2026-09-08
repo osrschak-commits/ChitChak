@@ -1,13 +1,44 @@
 import { useEffect, useState } from 'react';
+import type { SoundName } from '../lib/sounds.js';
 import { listMediaDevices } from '../lib/voice.js';
 import { useApp } from '../store/app.js';
 import { Switch } from './primitives.js';
+
+/**
+ * The sounds, in the order somebody is likely to care about them.
+ *
+ * Each hint says when it does *not* play, because that is the part people
+ * cannot discover by using the app - a sound that stays quiet looks identical
+ * to one that is broken.
+ */
+const NOTIFY_SOUNDS: Array<{ name: SoundName; label: string; hint: string }> = [
+  {
+    name: 'dm',
+    label: 'Direct message',
+    hint: 'Someone messages you directly. Silent while you have that conversation open.',
+  },
+  {
+    name: 'message',
+    label: 'Server message',
+    hint: 'A message in a server channel. Silent for the channel you are reading.',
+  },
+  {
+    name: 'join',
+    label: 'Someone joins',
+    hint: 'Only your own voice channel, not every call on the server.',
+  },
+  { name: 'leave', label: 'Someone leaves', hint: 'The same, on the way out.' },
+  { name: 'friend', label: 'Friend request', hint: 'Somebody asks to be added.' },
+];
 
 export function VoiceSettingsDialog({ onClose }: { onClose(): void }) {
   const audioSettings = useApp((s) => s.audioSettings);
   const setAudioSettings = useApp((s) => s.setAudioSettings);
   const transmitMode = useApp((s) => s.transmitMode);
   const setTransmitMode = useApp((s) => s.setTransmitMode);
+  const notifySettings = useApp((s) => s.notifySettings);
+  const setNotifySettings = useApp((s) => s.setNotifySettings);
+  const previewSound = useApp((s) => s.previewSound);
 
   const [devices, setDevices] = useState<{
     inputs: MediaDeviceInfo[];
@@ -219,6 +250,73 @@ export function VoiceSettingsDialog({ onClose }: { onClose(): void }) {
                 onChange={(v) => void setAudioSettings({ autoGainControl: v })}
               />
             </div>
+          </div>
+
+          <div className="section">
+            <h3 className="section__title">Notification sounds</h3>
+
+            <div className="row">
+              <div>
+                <div className="row__label">Play sounds</div>
+                <div className="row__hint">
+                  Never for your own messages, and never for a channel you are already reading.
+                  Deafening yourself silences these too.
+                </div>
+              </div>
+              <Switch
+                label="Play notification sounds"
+                checked={notifySettings.enabled}
+                onChange={(v) => setNotifySettings({ enabled: v })}
+              />
+            </div>
+
+            <div className="field">
+              <label className="field__label" htmlFor="notify-volume">
+                Volume
+              </label>
+              <div className="notify__volume">
+                <input
+                  id="notify-volume"
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={notifySettings.volume}
+                  disabled={!notifySettings.enabled}
+                  onChange={(e) => setNotifySettings({ volume: Number(e.target.value) })}
+                  // Play on release rather than on every step, so dragging the
+                  // slider does not become its own noise.
+                  onPointerUp={() => notifySettings.enabled && previewSound('dm')}
+                  onKeyUp={() => notifySettings.enabled && previewSound('dm')}
+                />
+                <span className="mono row__hint">{notifySettings.volume}</span>
+              </div>
+            </div>
+
+            {NOTIFY_SOUNDS.map(({ name, label, hint }) => (
+              <div className="row" key={name}>
+                <div>
+                  <div className="row__label">{label}</div>
+                  <div className="row__hint">{hint}</div>
+                </div>
+                <div className="notify__controls">
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    disabled={!notifySettings.enabled || !notifySettings.events[name]}
+                    onClick={() => previewSound(name)}
+                  >
+                    Play
+                  </button>
+                  <Switch
+                    label={label}
+                    checked={notifySettings.events[name]}
+                    onChange={(v) =>
+                      setNotifySettings({ events: { ...notifySettings.events, [name]: v } })
+                    }
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
 
