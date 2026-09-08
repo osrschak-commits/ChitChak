@@ -318,12 +318,31 @@ The `/app` copy in that preview is built against the **live** API, which refuses
 
 ```bash
 git pull
-docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+# Migrate before restarting, when a release adds one. Starting the new server
+# first leaves a window where it is answering requests against a schema that has
+# not been applied yet.
 docker compose -f docker-compose.prod.yml --env-file .env.production \
   --profile tools run --rm --build migrate
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
 ```
 
 Server-only changes need no new installer.
+
+### Attachments need a writable directory, once
+
+The server runs as a non-root user, and `./uploads` is a bind mount — which
+Docker creates on the host as **root**. The container cannot write to it until
+it is handed over:
+
+```bash
+mkdir -p uploads
+chown -R "$(docker run --rm chitchak-server id -u):$(docker run --rm chitchak-server id -g)" uploads
+```
+
+Skip this and everything works perfectly until the first person attaches a file,
+at which point every upload fails with a permission error. The uid is looked up
+rather than written down because it comes from `adduser -S` in the image and is
+not a number worth trusting across a rebuild.
 
 ### Shipping a new version of the app
 
