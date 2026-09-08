@@ -186,8 +186,10 @@ textarea::placeholder {
 .scope-tabs {
   display: flex;
   align-self: stretch;
-  /* The bar's own left padding is the inset; the tabs supply the rest. */
-  margin-left: -2px;
+  /* A hair between them, so two lit tabs never read as one block. */
+  gap: 2px;
+  /* The bar's own left padding plus the tab's own is the inset. */
+  margin-left: -6px;
 }
 
 .scope-tab {
@@ -196,7 +198,13 @@ textarea::placeholder {
   align-items: center;
   gap: 9px;
   height: 100%;
-  padding: 0 12px;
+  /*
+   * Roomier than it looks like it needs to be. These are full height with a
+   * filled background, so the padding is holding the label off two edges at
+   * once rather than one - at 12px the name sat almost on the fill, and the
+   * count badge on the right harder still.
+   */
+  padding: 0 18px;
   max-width: 280px;
   color: var(--text-secondary);
   transition: background 120ms var(--ease), color 120ms var(--ease);
@@ -214,8 +222,10 @@ textarea::placeholder {
 .scope-tab--on::after {
   content: '';
   position: absolute;
-  left: 10px;
-  right: 10px;
+  /* Inset to sit under the label rather than the whole tab, and tracking the
+     padding above so the two stay in proportion. */
+  left: 14px;
+  right: 14px;
   bottom: -1px;
   height: 2px;
   border-radius: 2px 2px 0 0;
