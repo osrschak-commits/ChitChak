@@ -469,8 +469,26 @@ BACKUP_REMOTE=b2:chitchak-backups          # rclone: Backblaze B2, R2, S3...
 BACKUP_REMOTE=user@otherhost:/backups      # or plain scp
 ```
 
-The database compresses to about 50 KB, so every object-storage free tier covers
-it many times over. Backblaze B2 and Cloudflare R2 both have one.
+The dump and the uploads are handled differently, because they fail
+differently. The dump is copied nightly and kept by date. Uploaded files are
+**mirrored** — new files go up, nothing is ever deleted at the far end — because
+they never change once written, so dated snapshots of them would just be the
+same bytes over and over.
+
+That also means the remote keeps files the local sweeper has since removed,
+which is the right way round: it costs kilobytes, and the alternative is a
+deletion propagating to the copy that exists to survive deletions.
+
+The database compresses to about 90 KB, so it fits any free tier many times
+over. **Uploads are the part that grows** — they are the only thing here that
+cannot be rebuilt from the repository, and at a 100 MB cap per file the total is
+set by what people send rather than by anything in this document. Both
+Backblaze B2 and Cloudflare R2 have a free tier in the tens of gigabytes, which
+is a long way off for a group this size.
+
+An scp target needs `rsync` on both ends; a bucket needs `rclone` configured on
+the server (`rclone config`). Without them the dump still goes and the run says
+so rather than failing quietly.
 
 ### Restoring for real
 
