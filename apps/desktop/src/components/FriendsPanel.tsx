@@ -90,17 +90,25 @@ export function FriendsPanel() {
   }
 
   return (
-    <main className="main">
-      <div className="main__head">
-        <h2 className="main__title">Friends</h2>
-        <p className="main__sub">
+    /*
+      `pane`, the same shell the chat panel uses, because this occupies the
+      same column and should sit in it the same way. It previously used a
+      `main` family of its own that no stylesheet had ever defined, so the
+      whole panel rendered unstyled - flush to the left edge, with the buttons
+      running off the right.
+    */
+    <main className="pane">
+      <header className="pane__header">
+        <span className="pane__title">Friends</span>
+      </header>
+
+      <div className="pane__body">
+        <p className="pane__lede">
           {friends.size === 0
             ? 'Nobody yet. Add someone by their exact username.'
             : `${friends.size} ${friends.size === 1 ? 'friend' : 'friends'}. Pick one on the left to talk.`}
         </p>
-      </div>
 
-      <div className="main__body">
         <div className="section">
           <h3 className="section__title">Add a friend</h3>
           <form className="friends__add" onSubmit={submit}>
