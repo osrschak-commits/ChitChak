@@ -898,6 +898,25 @@ textarea::placeholder {
   transition: background 110ms var(--ease), color 110ms var(--ease);
 }
 
+/*
+ * A drawn icon inside a bar button.
+ *
+ * The rest of the bar's icons are strokes in `currentColor`, so they dim and
+ * brighten with the button for free. An image cannot, so it borrows the same
+ * rhythm through opacity - otherwise a white illustration sits brighter than
+ * every control around it and stays put when they respond.
+ */
+.icon-btn__art {
+  width: 16px;
+  height: 16px;
+  opacity: 0.66;
+  transition: opacity 110ms var(--ease);
+}
+
+.icon-btn:hover .icon-btn__art {
+  opacity: 1;
+}
+
 .icon-btn:hover {
   background: var(--graphite-750);
   color: var(--text-bright);

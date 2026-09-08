@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import voiceSettingsIcon from '../assets/voice-settings.svg';
 import { mediaUrl } from '../lib/api.js';
 import { useApp } from '../store/app.js';
 import { Avatar } from './primitives.js';
@@ -204,7 +205,17 @@ export function TopBar({
         title="Voice and video settings"
         aria-label="Voice and video settings"
       >
-        <GearIcon />
+        {/*
+          An <img> rather than an inlined SVG. This one is a drawing - twenty
+          paths of overlapping translucent shading and three gradients whose
+          ids are `gradient_0..2`, which become document-global the moment they
+          are inlined and would collide with the next SVG that names one the
+          same way. As an image its ids stay its own.
+
+          The cost is that it cannot take `currentColor` like the drawn icons
+          beside it, so it follows the bar by opacity instead.
+        */}
+        <img className="icon-btn__art" src={voiceSettingsIcon} alt="" draggable={false} />
       </button>
 
       {user && (
@@ -217,23 +228,6 @@ export function TopBar({
   );
 }
 
-function GearIcon() {
-  return (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.6}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="8" cy="8" r="2.2" />
-      <path d="M8 1.5v1.6M8 12.9v1.6M14.5 8h-1.6M3.1 8H1.5M12.6 3.4l-1.1 1.1M4.5 11.5l-1.1 1.1M12.6 12.6l-1.1-1.1M4.5 4.5 3.4 3.4" />
-    </svg>
-  );
-}
 
 /** Server icon, or its monogram when no icon has been uploaded. */
 export function GuildBadge({
