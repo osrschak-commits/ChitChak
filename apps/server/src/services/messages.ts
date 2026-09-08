@@ -5,6 +5,11 @@ import { db } from '../db/client.js';
 import { channels, messages } from '../db/schema.js';
 import { errors } from '../lib/errors.js';
 import { generateId } from '../lib/ids.js';
+import {
+  attachToMessage,
+  forMessages,
+  type SerializedAttachment,
+} from './attachments.js';
 import { requireChannelAccess, type ChannelAccess } from './permissions.js';
 
 /**
@@ -26,10 +31,15 @@ function audienceOf(access: ChannelAccess, userId: string): Audience {
 }
 
 const MAX_MESSAGE_LENGTH = 4000;
+/** Matches what the composer will let somebody stage before sending. */
+const MAX_ATTACHMENTS = 10;
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
 
-function toMessage(row: typeof messages.$inferSelect): Message {
+function toMessage(
+  row: typeof messages.$inferSelect,
+  files: SerializedAttachment[] = [],
+): Message {
   return {
     id: row.id,
     channelId: row.channelId,
@@ -37,19 +47,44 @@ function toMessage(row: typeof messages.$inferSelect): Message {
     content: row.content,
     createdAt: row.createdAt.toISOString(),
     editedAt: row.editedAt ? row.editedAt.toISOString() : null,
+    attachments: files,
   };
+}
+
+/**
+ * Attaches the files to a page of messages in one query rather than per row.
+ *
+ * History is read fifty at a time, and asking per message is fifty round trips
+ * to save writing this.
+ */
+async function withAttachments(rows: Array<typeof messages.$inferSelect>): Promise<Message[]> {
+  const grouped = await forMessages(rows.map((row) => row.id));
+  return rows.map((row) => toMessage(row, grouped.get(row.id) ?? []));
 }
 
 export async function createMessage(input: {
   authorId: string;
   channelId: unknown;
   content: unknown;
+  attachmentIds?: unknown;
 }): Promise<{ message: Message; audience: Audience }> {
   if (typeof input.channelId !== 'string') throw errors.invalid('channelId is required');
   if (typeof input.content !== 'string') throw errors.invalid('content is required');
 
+  const attachmentIds =
+    Array.isArray(input.attachmentIds) && input.attachmentIds.every((id) => typeof id === 'string')
+      ? (input.attachmentIds as string[])
+      : [];
+  if (attachmentIds.length > MAX_ATTACHMENTS) {
+    throw errors.invalid(`A message can carry at most ${MAX_ATTACHMENTS} files`);
+  }
+
   const content = input.content.trim();
-  if (content.length === 0) throw errors.invalid('Message cannot be empty');
+  // A message that is only files is a real message. The emptiness rule is about
+  // sending nothing at all, and a picture is not nothing.
+  if (content.length === 0 && attachmentIds.length === 0) {
+    throw errors.invalid('Message cannot be empty');
+  }
   if (content.length > MAX_MESSAGE_LENGTH) {
     throw errors.invalid(`Message cannot exceed ${MAX_MESSAGE_LENGTH} characters`);
   }
@@ -71,7 +106,13 @@ export async function createMessage(input: {
     .returning();
   if (!row) throw errors.invalid('Could not save message');
 
-  return { message: toMessage(row), audience: audienceOf(access, input.authorId) };
+  // Claimed after the message exists, and only rows this person uploaded and
+  // has not already used - which is what stops a message carrying a file
+  // somebody was merely told the id of.
+  await attachToMessage(attachmentIds, row.id, input.authorId);
+  const files = attachmentIds.length > 0 ? (await forMessages([row.id])).get(row.id) ?? [] : [];
+
+  return { message: toMessage(row, files), audience: audienceOf(access, input.authorId) };
 }
 
 /**
@@ -121,7 +162,7 @@ export async function listMessages(input: {
 
   // Return oldest-first: the client renders top to bottom and should not have
   // to reverse a list on every page load.
-  return rows.reverse().map(toMessage);
+  return withAttachments(rows.reverse());
 }
 
 /** How many results one search returns. Deliberately smaller than a history page. */
@@ -223,6 +264,10 @@ export async function searchMessages(input: {
     limit ${limit}
   `);
 
+  // Search results are rendered by the same component as the channel, so they
+  // carry their files too - a result whose whole content was a screenshot
+  // would otherwise come back as a blank row.
+  const grouped = await forMessages(rows.map((row) => row.id));
   return rows.map((row) => ({
     id: row.id,
     channelId: row.channel_id,
@@ -230,6 +275,7 @@ export async function searchMessages(input: {
     content: row.content,
     createdAt: new Date(row.created_at).toISOString(),
     editedAt: row.edited_at ? new Date(row.edited_at).toISOString() : null,
+    attachments: grouped.get(row.id) ?? [],
   }));
 }
 
@@ -264,7 +310,10 @@ export async function editMessage(input: {
     .returning();
   if (!row) throw errors.notFound('No such message');
 
-  return { message: toMessage(row), audience: audienceOf(access, input.userId) };
+  // Editing changes the words, never the files - so they are re-read rather
+  // than dropped, which is what returning a bare toMessage(row) would do.
+  const files = (await forMessages([row.id])).get(row.id) ?? [];
+  return { message: toMessage(row, files), audience: audienceOf(access, input.userId) };
 }
 
 /** Deleting your own needs nothing; deleting anyone else's needs MANAGE_MESSAGES. */

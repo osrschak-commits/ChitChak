@@ -111,6 +111,27 @@ export interface Invite {
   createdAt: string;
 }
 
+/**
+ * A file sent with a message.
+ *
+ * `url` is signed and expires, because it goes straight into an `<img src>`
+ * which cannot carry an Authorization header - so the URL has to be the
+ * credential. It is minted when the message is serialised, which means a
+ * message held in a client for longer than the link's life needs refetching
+ * rather than the link being permanent.
+ */
+export interface Attachment {
+  id: Snowflake;
+  name: string;
+  /** Sniffed from the bytes on upload, never what the client declared. */
+  mimeType: string;
+  bytes: number;
+  /** Images only, so the client can reserve the space before it loads. */
+  width: number | null;
+  height: number | null;
+  url: string;
+}
+
 export interface Message {
   id: Snowflake;
   channelId: Snowflake;
@@ -118,6 +139,7 @@ export interface Message {
   content: string;
   createdAt: string;
   editedAt: string | null;
+  attachments: Attachment[];
 }
 
 /**

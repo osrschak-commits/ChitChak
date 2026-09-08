@@ -214,9 +214,19 @@ to re-issue tokens on rank change.
 
 **Avatars and icons live in Postgres**, as `bytea` rows in the `images` table.
 At 256×256 that is tens of kilobytes each, it needs no second system, and there
-are no signed URLs to get wrong. It stops being the right answer the moment
-users upload full-size media — at that point the `images` table becomes a
-pointer into object storage and only `services/serialize.ts` changes.
+are no signed URLs to get wrong.
+
+**Message attachments do not.** They are files on disk under
+`CHITCHAK_UPLOAD_DIR`, content addressed by SHA-256, because a hundred-megabyte
+video in a `bytea` column would be in every `pg_dump` from then on. Not object
+storage either: that is a second system to run, credential and back up, and one
+VPS with a bind mount does the same job here. `scripts/backup.sh` archives the
+directory alongside the dump, in the same run — a database from Tuesday next to
+files from Sunday is messages pointing at attachments that are not there.
+
+The URLs are signed and expire after a day, because an `<img src>` cannot carry
+an Authorization header, so the URL has to be the credential. The permission
+check happens when the message is delivered, not on every fetch.
 
 **Screen share has no source picker of our own.** It uses the browser's
 `getDisplayMedia`, so Electron shows the system chooser. A custom picker with

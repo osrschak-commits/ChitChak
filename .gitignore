@@ -31,3 +31,7 @@ backups/
 
 .DS_Store
 Thumbs.db
+
+# Uploaded attachments. Bind-mounted into the server container in production
+# and backed up by scripts/backup.sh - never committed.
+/uploads/

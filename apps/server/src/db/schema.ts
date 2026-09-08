@@ -678,6 +678,59 @@ export const staffActions = pgTable(
   (table) => [index('staff_actions_actor_idx').on(table.actorId)],
 );
 
+/**
+ * Files sent with messages.
+ *
+ * The bytes are on disk, not in this table - see lib/storage.ts. Avatars are
+ * `bytea` because they are tens of kilobytes and having them inside the backup
+ * is a feature; a hundred-megabyte video is the opposite, and would make every
+ * `pg_dump` carry it forever.
+ *
+ * `sha256` is where the file is, not merely a checksum: storage is content
+ * addressed, so the same file sent twice is stored once and the second upload
+ * costs nothing. It also means a row can never point at a path that was
+ * computed differently from how it was written.
+ *
+ * `messageId` is nullable because an upload happens before the message exists -
+ * you pick a file, it uploads while you finish typing, and the message that
+ * carries it is created on send. A row that never gets a message is an
+ * abandoned upload, and is what the sweeper looks for.
+ */
+export const attachments = pgTable(
+  'attachments',
+  {
+    id: id(),
+    /** Null until the message carrying it is sent. */
+    messageId: text('message_id').references(() => messages.id, { onDelete: 'cascade' }),
+    uploaderId: text('uploader_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** As the uploader's filesystem had it, for the download name. */
+    name: text('name').notNull(),
+    /** What the bytes actually are, sniffed - never what the client declared. */
+    mimeType: text('mime_type').notNull(),
+    bytes: integer('bytes').notNull(),
+    sha256: text('sha256').notNull(),
+    /** Images only, so the client can reserve the space before it loads. */
+    width: integer('width'),
+    height: integer('height'),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index('attachments_message_idx').on(table.messageId),
+    // The sweeper's query: rows still waiting for a message, oldest first.
+    index('attachments_orphan_idx').on(table.messageId, table.createdAt),
+    // Whether any row still needs a file kept, asked once per delete.
+    index('attachments_sha_idx').on(table.sha256),
+  ],
+);
+
+export const attachmentsRelations = relations(attachments, ({ one }) => ({
+  message: one(messages, { fields: [attachments.messageId], references: [messages.id] }),
+  uploader: one(users, { fields: [attachments.uploaderId], references: [users.id] }),
+}));
+
+export type AttachmentRow = typeof attachments.$inferSelect;
 export type ChannelRow = typeof channels.$inferSelect;
 export type MessageRow = typeof messages.$inferSelect;
 export type VoiceStateRow = typeof voiceStates.$inferSelect;

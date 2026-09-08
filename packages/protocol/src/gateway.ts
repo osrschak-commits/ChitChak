@@ -52,7 +52,16 @@ export type ClientMessage =
   | { op: 'voice:leave'; d: Record<string, never> }
   | { op: 'voice:update'; d: VoiceUpdatePayload }
   | { op: 'presence:update'; d: { status: PresenceStatus } }
-  | { op: 'message:create'; d: { channelId: Snowflake; content: string; nonce?: string } }
+  | {
+      op: 'message:create';
+      d: {
+        channelId: Snowflake;
+        content: string;
+        /** Ids from POST /api/uploads, claimed as the message is created. */
+        attachmentIds?: Snowflake[];
+        nonce?: string;
+      };
+    }
   | { op: 'typing:start'; d: { channelId: Snowflake } };
 
 // ---------------------------------------------------------------------------

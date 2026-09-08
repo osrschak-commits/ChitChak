@@ -83,7 +83,8 @@ counts() {
         ||' channels='||(select count(*) from channels)
         ||' messages='||(select count(*) from messages)
         ||' friendships='||(select count(*) from friendships)
-        ||' images='||(select count(*) from images);"
+        ||' images='||(select count(*) from images)
+        ||' attachments='||(select count(*) from attachments);"
 }
 
 RESTORED=$(counts "$SCRATCH")
@@ -98,5 +99,32 @@ fi
 
 RESTORED_USERS=$(docker exec "$SCRATCH" psql -U "$DB_USER" -d "$DB_NAME" -tAc "select count(*) from users;")
 [ "$RESTORED_USERS" -gt 0 ] || { echo "PASSED THE RESTORE BUT HAS NO USERS" >&2; exit 1; }
+
+# --- The files that go with it ------------------------------------------------
+#
+# A restore that brings back the messages but not the attachments is a restore
+# that looks like it worked. The archive is named from the same timestamp as the
+# dump on purpose, so the pair can be checked without guessing.
+
+# Parameter expansion rather than sed: no backslashes to lose on the way
+# through a quoting layer, and the intent reads straight off the line.
+STAMP=$(basename "$BACKUP")
+STAMP=${STAMP#chitchak-}
+STAMP=${STAMP%.sql.gz}
+UPLOADS="$BACKUP_DIR/uploads-$STAMP.tar.gz"
+
+ATTACHMENTS=$(docker exec "$SCRATCH" psql -U "$DB_USER" -d "$DB_NAME" -tAc   "select count(*) from attachments;" 2>/dev/null || echo 0)
+
+if [ "$ATTACHMENTS" -gt 0 ]; then
+  if [ -f "$UPLOADS" ]; then
+    FILES=$(tar -tzf "$UPLOADS" 2>/dev/null | grep -c -v '/$' || true)
+    echo "uploads:  $(basename "$UPLOADS") holds $FILES files for $ATTACHMENTS attachment rows"
+    [ "$FILES" -gt 0 ] || { echo "THE UPLOADS ARCHIVE IS EMPTY" >&2; exit 1; }
+  else
+    echo "NO UPLOADS ARCHIVE FOR THIS BACKUP ($UPLOADS)" >&2
+    echo "The database references $ATTACHMENTS attachments whose files are not backed up." >&2
+    exit 1
+  fi
+fi
 
 echo "OK - the backup restores and has $RESTORED_USERS users in it"

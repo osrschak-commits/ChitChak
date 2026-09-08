@@ -85,6 +85,13 @@
       "when": 1788821633576,
       "tag": "0011_staff_actions",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1788875575333,
+      "tag": "0012_attachments",
+      "breakpoints": true
     }
   ]
 }

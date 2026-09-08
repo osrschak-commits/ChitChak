@@ -243,6 +243,7 @@ export class Session {
           authorId: this.userId,
           channelId: message.d?.channelId,
           content: message.d?.content,
+          attachmentIds: message.d?.attachmentIds,
         });
         registry.publishToAudience(
           created.audience,

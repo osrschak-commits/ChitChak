@@ -14,6 +14,8 @@ import { platformStaffCount } from './services/staff.js';
 import { billingRoutes } from './http/billing.routes.js';
 import { authRoutes } from './http/auth.routes.js';
 import { guildRoutes } from './http/guilds.routes.js';
+import { attachmentRoutes, uploadRoutes } from './http/attachments.routes.js';
+import { sweepOrphans } from './services/attachments.js';
 import { imageRoutes } from './http/images.routes.js';
 import { moderationRoutes } from './http/moderation.routes.js';
 import { rankRoutes } from './http/ranks.routes.js';
@@ -118,6 +120,11 @@ app.get('/health', async () => {
 await app.register(billingRoutes);
 await app.register(authRoutes);
 await app.register(imageRoutes);
+// Two registrations on purpose: uploading needs a signed-in user and a raw
+// body, downloading needs neither because the signed URL is the credential.
+// Separate scopes keep the upload body parser off every other route.
+await app.register(attachmentRoutes);
+await app.register(uploadRoutes);
 await app.register(userRoutes);
 await app.register(friendRoutes);
 await app.register(guildRoutes);
@@ -140,6 +147,30 @@ startVoiceXpTicker();
 
 await app.listen({ port: config.PORT, host: config.HOST });
 app.log.info(`gateway ready at ws://localhost:${config.PORT}/gateway`);
+
+/*
+  Uploads that never became a message.
+
+  Picking a file and then changing your mind leaves a row and a file with
+  nothing pointing at them. Left alone they only accumulate, and the first
+  anyone hears of it is the disk being full - so this runs hourly, deletes
+  nothing younger than a day, and never removes a file another row still
+  shares.
+
+  In-process rather than a cron entry: it is a handful of rows, it has to know
+  the same content-addressing rules as the writer, and one fewer thing to
+  install is one fewer thing to forget when the server moves.
+*/
+const SWEEP_EVERY_MS = 60 * 60 * 1000;
+const sweepTimer = setInterval(() => {
+  void sweepOrphans()
+    .then((count) => {
+      if (count > 0) app.log.info(`swept ${count} abandoned upload(s)`);
+    })
+    .catch((error: unknown) => app.log.error({ error }, 'orphan sweep failed'));
+}, SWEEP_EVERY_MS);
+// Never the reason the process stays alive.
+sweepTimer.unref();
 
 /**
  * Graceful shutdown: stop accepting new work, tell connected clients to

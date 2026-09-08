@@ -2,7 +2,9 @@ import { Fragment, useEffect, useRef, useState } from 'react';
 import { Permission } from '@chitchak/protocol';
 import { usePermissions } from '../hooks/usePermissions.js';
 import { usePersonPopover } from '../hooks/usePersonPopover.js';
+import { uploadFile } from '../lib/api.js';
 import { rememberEmoji } from '../lib/emoji.js';
+import { MessageAttachments, PendingAttachments, type Pending } from './Attachments.js';
 import { EmojiPicker } from './EmojiPicker.js';
 import { SearchPanel } from './SearchPanel.js';
 import { useApp } from '../store/app.js';
@@ -15,6 +17,9 @@ import { Avatar, MemberName } from './primitives.js';
  * are not modes to switch between.
  */
 const GROUPING_WINDOW_MS = 5 * 60 * 1000;
+
+/** Matches the server's cap, so the refusal happens before the upload. */
+const MAX_ATTACHMENTS = 10;
 
 /** The calendar day something happened on, in local time. */
 function dayKey(date: Date): string {
@@ -92,6 +97,60 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
   const [draft, setDraft] = useState('');
   const [emojiOpen, setEmojiOpen] = useState(false);
   const composerRef = useRef<HTMLInputElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState<Pending[]>([]);
+  const [dragging, setDragging] = useState(false);
+
+  /**
+   * Starts an upload per file and tracks it until it lands.
+   *
+   * Uploads run as soon as the file is chosen rather than on send, so the wait
+   * happens while the message is still being typed. By the time Enter is
+   * pressed the file is usually already there.
+   */
+  function stage(files: FileList | File[]): void {
+    const chosen = [...files].slice(0, MAX_ATTACHMENTS - pending.length);
+    for (const file of chosen) {
+      const key = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const preview = file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined;
+
+      setPending((items) => [
+        ...items,
+        { key, name: file.name, bytes: file.size, progress: 0, preview },
+      ]);
+
+      void uploadFile(file, (fraction) => {
+        setPending((items) =>
+          items.map((item) => (item.key === key ? { ...item, progress: fraction } : item)),
+        );
+      })
+        .then((attachment) => {
+          setPending((items) =>
+            items.map((item) => (item.key === key ? { ...item, attachment, progress: 1 } : item)),
+          );
+        })
+        .catch((error: unknown) => {
+          setPending((items) =>
+            items.map((item) =>
+              item.key === key
+                ? { ...item, error: error instanceof Error ? error.message : 'Upload failed' }
+                : item,
+            ),
+          );
+        });
+    }
+  }
+
+  function unstage(key: string): void {
+    setPending((items) => {
+      // Revoked here rather than on unmount: the blob is a real allocation, and
+      // a long session of previewing and removing files would otherwise hold on
+      // to every one of them.
+      const going = items.find((item) => item.key === key);
+      if (going?.preview) URL.revokeObjectURL(going.preview);
+      return items.filter((item) => item.key !== key);
+    });
+  }
   const [editingId, setEditingId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const person = usePersonPopover(selectedGuildId, { onEditProfile });
@@ -157,8 +216,24 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
   }, [history.length]);
 
   function submit() {
-    if (!draft.trim() || !selectedTextChannelId) return;
-    sendMessage(selectedTextChannelId, draft);
+    if (!selectedTextChannelId) return;
+
+    // Anything that failed is dropped rather than blocking the send; anything
+    // still uploading holds the message, because sending now would silently
+    // leave the file behind.
+    const ready = pending.filter((item) => item.attachment);
+    const busy = pending.some((item) => !item.attachment && !item.error);
+    if (busy) return;
+    if (!draft.trim() && ready.length === 0) return;
+
+    sendMessage(
+      selectedTextChannelId,
+      draft,
+      ready.map((item) => item.attachment!.id),
+    );
+
+    for (const item of pending) if (item.preview) URL.revokeObjectURL(item.preview);
+    setPending([]);
     setDraft('');
   }
 
@@ -322,14 +397,19 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
                         }}
                       />
                     ) : (
-                      <div className="msg__text">
-                        {message.content}
-                        {message.editedAt && (
-                          <span className="msg__edited" title={new Date(message.editedAt).toLocaleString()}>
-                            edited
-                          </span>
+                      <>
+                        {message.content && (
+                          <div className="msg__text">
+                            {message.content}
+                            {message.editedAt && (
+                              <span className="msg__edited" title={new Date(message.editedAt).toLocaleString()}>
+                                edited
+                              </span>
+                            )}
+                          </div>
                         )}
-                      </div>
+                        <MessageAttachments files={message.attachments ?? []} />
+                      </>
                     )}
                   </div>
 
@@ -361,7 +441,46 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
             })}
           </div>
 
-          <div className="composer">
+          <div
+            className={`composer ${dragging ? 'composer--drop' : ''}`}
+            /*
+              The drop target is the composer rather than the whole pane. A drop
+              anywhere in the window sounds friendlier until somebody drags an
+              image onto the conversation to look at it and accidentally sends
+              it to everyone.
+            */
+            onDragOver={(e) => {
+              if (!maySend || !e.dataTransfer.types.includes('Files')) return;
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={(e) => {
+              // Only when the pointer has actually left the composer, not when
+              // it crosses onto a child, which fires dragleave just the same.
+              if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+            }}
+            onDrop={(e) => {
+              if (!maySend) return;
+              e.preventDefault();
+              setDragging(false);
+              if (e.dataTransfer.files.length > 0) stage(e.dataTransfer.files);
+            }}
+          >
+            <PendingAttachments items={pending} onRemove={unstage} />
+
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              hidden
+              onChange={(e) => {
+                if (e.target.files) stage(e.target.files);
+                // Cleared so choosing the same file twice in a row still fires
+                // a change event.
+                e.target.value = '';
+              }}
+            />
+
             {emojiOpen && (
               <EmojiPicker
                 onClose={() => setEmojiOpen(false)}
@@ -418,7 +537,30 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
                   submit();
                 }
               }}
+              onPaste={(e) => {
+                // A screenshot on the clipboard arrives as a file with no name.
+                const files = [...e.clipboardData.files];
+                if (files.length > 0) {
+                  e.preventDefault();
+                  stage(files);
+                }
+              }}
             />
+
+            <button
+              type="button"
+              className="composer__attach"
+              disabled={!maySend || pending.length >= MAX_ATTACHMENTS}
+              title={
+                pending.length >= MAX_ATTACHMENTS
+                  ? `A message can carry ${MAX_ATTACHMENTS} files`
+                  : 'Attach a file'
+              }
+              aria-label="Attach a file"
+              onClick={() => fileRef.current?.click()}
+            >
+              📎
+            </button>
             <button
               type="button"
               className="composer__emoji"

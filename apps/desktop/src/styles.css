@@ -1577,12 +1577,14 @@ textarea::placeholder {
 .composer input {
   background: var(--graphite-800);
   border-color: var(--line-strong);
-  /* Room on the right for the button, so a long draft does not run under it. */
-  padding: 11px 44px 11px 14px;
+  /* Room on the right for the two buttons, so a long draft does not run under
+     them. */
+  padding: 11px 78px 11px 14px;
   border-radius: var(--radius);
 }
 
-.composer__emoji {
+.composer__emoji,
+.composer__attach {
   position: absolute;
   right: 6px;
   top: 0;
@@ -1597,15 +1599,197 @@ textarea::placeholder {
   transition: opacity 110ms var(--ease), background 110ms var(--ease);
 }
 
+/* Sits to the left of the emoji button, in the same well. */
+.composer__attach {
+  right: 40px;
+}
+
 .composer__emoji:hover:not(:disabled),
+.composer__attach:hover:not(:disabled),
 .composer__emoji[aria-expanded='true'] {
   opacity: 1;
   background: var(--graphite-750);
 }
 
-.composer__emoji:disabled {
+.composer__emoji:disabled,
+.composer__attach:disabled {
   opacity: 0.2;
   cursor: default;
+}
+
+/* Dragging a file over the composer. Only the field is a target - see the
+   handler for why the whole pane is not. */
+.composer--drop .composer__field input {
+  border-color: var(--brass-400);
+  background: var(--graphite-750);
+}
+
+/* --- Files waiting to be sent --------------------------------------------- */
+
+.tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 0 10px;
+}
+
+.tray__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  max-width: 260px;
+  background: var(--graphite-800);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+}
+
+.tray__item--failed {
+  border-color: var(--alert-400);
+}
+
+.tray__thumb {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex: none;
+  background: var(--graphite-700);
+}
+
+.tray__thumb--file {
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+}
+
+.tray__meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.tray__name {
+  font-size: 12.5px;
+  color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tray__size {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.tray__item--failed .tray__size {
+  color: var(--alert-400);
+}
+
+.tray__remove {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  color: var(--text-muted);
+  flex: none;
+}
+
+.tray__remove:hover {
+  background: var(--graphite-700);
+  color: var(--text-bright);
+}
+
+/* A thin line along the bottom of the chip, so progress does not need its own
+   row and the chip does not change height when it finishes. */
+.tray__bar {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  bottom: 1px;
+  height: 2px;
+  border-radius: 0 0 var(--radius) var(--radius);
+  overflow: hidden;
+  background: var(--graphite-700);
+}
+
+.tray__fill {
+  display: block;
+  height: 100%;
+  background: var(--brass-400);
+  transition: width 140ms var(--ease);
+}
+
+/* --- Files on a message --------------------------------------------------- */
+
+.atts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.att {
+  display: block;
+  border-radius: var(--radius);
+  overflow: hidden;
+  text-decoration: none;
+}
+
+.att--image {
+  background: var(--graphite-800);
+  border: 1px solid var(--line);
+  max-width: 100%;
+}
+
+.att--image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.att--file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--graphite-800);
+  border: 1px solid var(--line-strong);
+  max-width: 320px;
+  transition: border-color 110ms var(--ease);
+}
+
+.att--file:hover {
+  border-color: var(--brass-400);
+}
+
+.att__glyph {
+  font-size: 17px;
+}
+
+.att__meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 1px;
+}
+
+.att__name {
+  font-size: 13px;
+  color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.att__size {
+  font-size: 10px;
+  color: var(--text-muted);
 }
 
 /* --- Emoji picker --------------------------------------------------------- */

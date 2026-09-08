@@ -100,6 +100,13 @@ services:
       PADDLE_PRICE_KEYS_5: ${PADDLE_PRICE_KEYS_5:-}
       PADDLE_PRICE_KEYS_15: ${PADDLE_PRICE_KEYS_15:-}
       PADDLE_PRICE_KEYS_40: ${PADDLE_PRICE_KEYS_40:-}
+      CHITCHAK_UPLOAD_DIR: /data/uploads
+    volumes:
+      # A bind mount rather than a named volume, so the files are somewhere a
+      # person can see them: scripts/backup.sh archives this path directly, and
+      # a restore is a tar extracted next to the repo rather than a docker
+      # volume to work out how to write into.
+      - ./uploads:/data/uploads
     healthcheck:
       test: ['CMD', 'node', '-e', "fetch('http://127.0.0.1:4000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s

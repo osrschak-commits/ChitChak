@@ -167,7 +167,7 @@ interface AppState {
   /** Refresh membership after creating or joining a server, then open it. */
   enterGuild(guildId: string): Promise<void>;
   loadMessages(channelId: string): Promise<void>;
-  sendMessage(channelId: string, content: string): void;
+  sendMessage(channelId: string, content: string, attachmentIds?: string[]): void;
   editMessage(messageId: string, content: string): Promise<void>;
   deleteMessage(messageId: string): Promise<void>;
   joinVoice(channelId: string): void;
@@ -594,10 +594,15 @@ export const useApp = create<AppState>((set, get) => ({
     }
   },
 
-  sendMessage(channelId, content) {
+  sendMessage(channelId, content, attachmentIds = []) {
     const trimmed = content.trim();
-    if (!trimmed) return;
-    gateway.send({ op: 'message:create', d: { channelId, content: trimmed } });
+    // A message that is only files is a message. Refusing on empty text alone
+    // would make it impossible to send a picture without captioning it.
+    if (!trimmed && attachmentIds.length === 0) return;
+    gateway.send({
+      op: 'message:create',
+      d: { channelId, content: trimmed, attachmentIds },
+    });
   },
 
   async editMessage(messageId, content) {

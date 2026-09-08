@@ -1,5 +1,6 @@
 import type {
   ApiError,
+  Attachment,
   Progress,
   AuthResponse,
   Ban,
@@ -717,6 +718,71 @@ class ApiClient {
     if (!this.session) return;
     this.persist({ ...this.session, user });
   }
+}
+
+/**
+ * Uploads one file and reports progress.
+ *
+ * XMLHttpRequest rather than fetch, for the one thing fetch still cannot do in
+ * a browser: tell you how far a request body has got. A hundred-megabyte upload
+ * with no progress is indistinguishable from a hung one, and the person waiting
+ * has no way to tell whether to keep waiting.
+ *
+ * The body is the file itself rather than a multipart form. There is only ever
+ * one file per request, so the envelope would carry nothing the query string and
+ * the headers do not - and the browser streams a File body without reading it
+ * into memory first.
+ */
+export function uploadFile(
+  file: File,
+  onProgress?: (fraction: number) => void,
+  signal?: AbortSignal,
+): Promise<Attachment> {
+  return new Promise((resolve, reject) => {
+    const token = api.accessToken;
+    if (!token) {
+      reject(new Error('Not signed in'));
+      return;
+    }
+
+    const request = new XMLHttpRequest();
+    request.open('POST', `${API_BASE}/api/uploads?name=${encodeURIComponent(file.name)}`);
+    request.setRequestHeader('Authorization', `Bearer ${token}`);
+    // The server sniffs the bytes and ignores this, but sending nothing at all
+    // makes some proxies guess, and a guess is worse than a declaration.
+    request.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+
+    request.upload.addEventListener('progress', (event) => {
+      if (event.lengthComputable) onProgress?.(event.loaded / event.total);
+    });
+
+    request.addEventListener('load', () => {
+      if (request.status >= 200 && request.status < 300) {
+        try {
+          resolve(JSON.parse(request.responseText) as Attachment);
+        } catch {
+          reject(new Error('The server sent back something unreadable'));
+        }
+        return;
+      }
+      // The API's error shape, so a size refusal reads as the sentence the
+      // server wrote rather than as a status code.
+      let message = `Upload failed (${request.status})`;
+      try {
+        const body = JSON.parse(request.responseText) as { error?: { message?: string } };
+        if (body.error?.message) message = body.error.message;
+      } catch {
+        // Keep the status-code message.
+      }
+      reject(new Error(message));
+    });
+
+    request.addEventListener('error', () => reject(new Error('Upload failed. Check your connection.')));
+    request.addEventListener('abort', () => reject(new DOMException('Upload cancelled', 'AbortError')));
+    signal?.addEventListener('abort', () => request.abort(), { once: true });
+
+    request.send(file);
+  });
 }
 
 /** Absolute URL for an avatar or icon path returned by the API. */
