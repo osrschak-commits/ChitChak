@@ -31,12 +31,8 @@ export function TopBar({
   const members = useApp((s) => s.members);
   const user = useApp((s) => s.user);
 
-  const dmChannels = useApp((s) => s.dmChannels);
-  const people = useApp((s) => s.people);
-  const selectDmChannel = useApp((s) => s.selectDmChannel);
-
-  /** Which menu is down, if either. Only ever one. */
-  const [open, setOpen] = useState<'servers' | 'friends' | null>(null);
+  /** Whether the server menu is down. */
+  const [open, setOpen] = useState(false);
   const barRef = useRef<HTMLElement>(null);
 
   // Close on an outside click or Escape - a menu that can only be dismissed by
@@ -44,10 +40,10 @@ export function TopBar({
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (event: PointerEvent) => {
-      if (!barRef.current?.contains(event.target as Node)) setOpen(null);
+      if (!barRef.current?.contains(event.target as Node)) setOpen(false);
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setOpen(null);
+      if (event.key === 'Escape') setOpen(false);
     };
     document.addEventListener('pointerdown', onPointerDown);
     document.addEventListener('keydown', onKeyDown);
@@ -65,11 +61,6 @@ export function TopBar({
     ? [...members.values()].filter((m) => m.guildId === guild.id).length
     : 0;
 
-  const friendNames = [...dmChannels]
-    .map(([channelId, otherId]) => ({ channelId, person: people.get(otherId) }))
-    .filter((entry) => entry.person)
-    .sort((a, b) => a.person!.displayName.localeCompare(b.person!.displayName));
-
   return (
     <header className="topbar" ref={barRef}>
       {/*
@@ -81,9 +72,9 @@ export function TopBar({
       <div className="switcher">
         <button
           className="switcher__button"
-          aria-expanded={open === 'servers'}
+          aria-expanded={open}
           aria-haspopup="menu"
-          onClick={() => setOpen((v) => (v === 'servers' ? null : 'servers'))}
+          onClick={() => setOpen((v) => !v)}
         >
           <GuildBadge guild={guild} size={20} />
           <span className="switcher__name">{guild?.name ?? 'No server'}</span>
@@ -92,7 +83,7 @@ export function TopBar({
           </span>
         </button>
 
-        {open === 'servers' && (
+        {open && (
           <div className="switcher__menu" role="menu">
             {guilds.map((item) => (
               <button
@@ -103,7 +94,7 @@ export function TopBar({
                 }`}
                 onClick={() => {
                   selectGuild(item.id);
-                  setOpen(null);
+                  setOpen(false);
                 }}
               >
                 <GuildBadge guild={item} size={24} />
@@ -117,7 +108,7 @@ export function TopBar({
               role="menuitem"
               className="switcher__item"
               onClick={() => {
-                setOpen(null);
+                setOpen(false);
                 onCreateServer();
               }}
             >
@@ -128,7 +119,7 @@ export function TopBar({
               role="menuitem"
               className="switcher__item"
               onClick={() => {
-                setOpen(null);
+                setOpen(false);
                 onJoinServer();
               }}
             >
@@ -143,60 +134,26 @@ export function TopBar({
         Friends is its own control rather than an entry in the server menu.
         It is not a server, and burying it among them made the one surface that
         is about people the hardest of them to reach.
+
+        A button, not a menu. There is one place it goes, and a menu whose only
+        job is to offer a single destination asks for a second click to say
+        nothing. Whether you are already there is shown by the button's own
+        state instead.
       */}
-      <div className="switcher">
-        <button
-          className={`switcher__button ${scope === 'friends' ? 'switcher__button--on' : ''}`}
-          aria-expanded={open === 'friends'}
-          aria-haspopup="menu"
-          onClick={() => setOpen((v) => (v === 'friends' ? null : 'friends'))}
-        >
-          <FriendsBadge size={20} />
-          <span className="switcher__name">Friends</span>
-          {/* On the closed button too: a request nobody can see until they go
-              looking is a request nobody answers. */}
-          {requestCount > 0 && <span className="switcher__badge mono">{requestCount}</span>}
-          <span className="switcher__chevron" aria-hidden="true">
-            ▼
-          </span>
-        </button>
-
-        {open === 'friends' && (
-          <div className="switcher__menu" role="menu">
-            <button
-              role="menuitem"
-              className={`switcher__item ${scope === 'friends' ? 'switcher__item--active' : ''}`}
-              onClick={() => {
-                openFriends();
-                setOpen(null);
-              }}
-            >
-              <FriendsBadge size={24} />
-              <span className="switcher__name">All friends</span>
-              {requestCount > 0 && <span className="switcher__badge mono">{requestCount}</span>}
-            </button>
-
-            {friendNames.length > 0 && <div className="switcher__divider" />}
-
-            {/* Straight into a conversation, rather than to a list that then
-                has to be searched for the person you already had in mind. */}
-            {friendNames.map(({ channelId, person }) => (
-              <button
-                key={channelId}
-                role="menuitem"
-                className="switcher__item"
-                onClick={() => {
-                  selectDmChannel(channelId);
-                  setOpen(null);
-                }}
-              >
-                <Avatar user={person!} size={24} />
-                <span className="switcher__name">{person!.displayName}</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      <button
+        className={`switcher__button ${scope === 'friends' ? 'switcher__button--on' : ''}`}
+        aria-pressed={scope === 'friends'}
+        onClick={() => {
+          setOpen(false);
+          openFriends();
+        }}
+      >
+        <FriendsBadge size={20} />
+        <span className="switcher__name">Friends</span>
+        {/* A request nobody can see until they go looking is a request nobody
+            answers. */}
+        {requestCount > 0 && <span className="switcher__badge mono">{requestCount}</span>}
+      </button>
 
       {guild && (
         <button

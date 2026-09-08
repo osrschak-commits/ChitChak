@@ -192,7 +192,11 @@ textarea::placeholder {
 }
 
 .switcher__button:hover,
-.switcher__button[aria-expanded='true'] {
+.switcher__button[aria-expanded='true'],
+/* Friends is a plain button rather than a menu, so "you are here" is the only
+   state it has to show. Without this it reads as untouched while you are
+   looking straight at the screen it opens. */
+.switcher__button[aria-pressed='true'] {
   background: var(--graphite-750);
   border-color: var(--line-strong);
 }
