@@ -19,6 +19,12 @@ The database compresses to about 50 KB, so Cloudflare R2 and Backblaze B2 both
 cover it inside their free tiers, permanently. See the Offsite section in
 DEPLOY.md.
 
+This got sharper the day attachments shipped. The database was small enough that
+losing the VPS meant losing a 50 KB file nobody had copied; uploaded files live
+on the same disk and are the one thing here that cannot be rebuilt from the
+repo. `scripts/backup.sh` already archives and ships them when `BACKUP_REMOTE`
+is set — it is still just a bucket and a credential away.
+
 ## Email
 
 `SMTP_URL` is unset in production, so password resets are written to the server
@@ -84,13 +90,10 @@ When approved:
    `PADDLE_ENV=production`, redeploy.
 5. Regenerate the sandbox API key - the current one passed through a chat log.
 
-Also outstanding: the subscription grants 2 keys, the plates, and 1080p60
-streams. Still to build: custom emoji (subscriber-uploaded), and file uploads
-with a larger cap for subscribers — uploads do not exist at all yet, so that one
-is a missing core feature with a premium tier on the limit rather than a premium
-feature.
+The subscription now grants 2 keys, the plates, 1080p60 streams and a 100MB
+upload cap against 10MB free. Standard emoji are in for everybody.
 
-Previously noted, now partly done: the subscription is described as including
-premium features and currently grants 2 keys and the plates. Either say that plainly or build the
-features - bigger uploads, more custom emoji, higher stream quality, longer
-history are the candidates that do not buy authority over anyone.
+Still to build: **custom emoji**, subscriber-uploaded. The hard half of that is
+already here — attachments gave us storage, sniffing, size caps and serving — so
+what is left is a per-guild emoji table, a name, and turning `:name:` into an
+image on the way out. It is the one thing still promised and not delivered.
