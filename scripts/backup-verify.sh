@@ -24,6 +24,7 @@ LIVE_CONTAINER="${POSTGRES_CONTAINER:-chitchak-postgres}"
 DB_USER="${POSTGRES_USER:-chitchak}"
 DB_NAME="${POSTGRES_DB:-chitchak}"
 IMAGE="${POSTGRES_IMAGE:-postgres:17-alpine}"
+UPLOAD_DIR="${UPLOAD_DIR:-$REPO_DIR/uploads}"
 
 SCRATCH="chitchak-restore-check-$$"
 
@@ -102,29 +103,39 @@ RESTORED_USERS=$(docker exec "$SCRATCH" psql -U "$DB_USER" -d "$DB_NAME" -tAc "s
 
 # --- The files that go with it ------------------------------------------------
 #
-# A restore that brings back the messages but not the attachments is a restore
-# that looks like it worked. The archive is named from the same timestamp as the
-# dump on purpose, so the pair can be checked without guessing.
+# Uploads are not in the dump. They are files on disk, mirrored offsite rather
+# than archived by date - so the question here is not "is there an archive" but
+# "does every attachment the restored database knows about still have its
+# bytes". A restore that brings back the messages and not the pictures is a
+# restore that looks like it worked.
+#
+# The path is derived the same way the server derives it, from the content hash,
+# because a check that computes the path differently from the writer proves
+# nothing about the writer.
 
-# Parameter expansion rather than sed: no backslashes to lose on the way
-# through a quoting layer, and the intent reads straight off the line.
-STAMP=$(basename "$BACKUP")
-STAMP=${STAMP#chitchak-}
-STAMP=${STAMP%.sql.gz}
-UPLOADS="$BACKUP_DIR/uploads-$STAMP.tar.gz"
-
-ATTACHMENTS=$(docker exec "$SCRATCH" psql -U "$DB_USER" -d "$DB_NAME" -tAc   "select count(*) from attachments;" 2>/dev/null || echo 0)
+ATTACHMENTS=$(docker exec "$SCRATCH" psql -U "$DB_USER" -d "$DB_NAME" -tAc \
+  "select count(*) from attachments;" 2>/dev/null || echo 0)
 
 if [ "$ATTACHMENTS" -gt 0 ]; then
-  if [ -f "$UPLOADS" ]; then
-    FILES=$(tar -tzf "$UPLOADS" 2>/dev/null | grep -c -v '/$' || true)
-    echo "uploads:  $(basename "$UPLOADS") holds $FILES files for $ATTACHMENTS attachment rows"
-    [ "$FILES" -gt 0 ] || { echo "THE UPLOADS ARCHIVE IS EMPTY" >&2; exit 1; }
-  else
-    echo "NO UPLOADS ARCHIVE FOR THIS BACKUP ($UPLOADS)" >&2
-    echo "The database references $ATTACHMENTS attachments whose files are not backed up." >&2
+  MISSING=0
+  CHECKED=0
+  while read -r SHA; do
+    [ -n "$SHA" ] || continue
+    CHECKED=$((CHECKED + 1))
+    FILE="$UPLOAD_DIR/${SHA:0:2}/${SHA:2:2}/$SHA"
+    if [ ! -f "$FILE" ]; then
+      MISSING=$((MISSING + 1))
+      [ "$MISSING" -le 5 ] && echo "  missing: $FILE" >&2
+    fi
+  done <<SHAS
+$(docker exec "$SCRATCH" psql -U "$DB_USER" -d "$DB_NAME" -tAc "select distinct sha256 from attachments;")
+SHAS
+
+  if [ "$MISSING" -gt 0 ]; then
+    echo "$MISSING of $CHECKED attachment files are not on disk" >&2
     exit 1
   fi
+  echo "uploads:  $CHECKED files present for $ATTACHMENTS attachment rows"
 fi
 
 echo "OK - the backup restores and has $RESTORED_USERS users in it"

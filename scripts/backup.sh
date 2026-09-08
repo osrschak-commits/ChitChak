@@ -2,15 +2,15 @@
 #
 # Nightly database backup.
 #
-# Two things matter. Postgres holds accounts, servers, channels, private
-# conversations and the avatars, which are rows rather than files. Uploaded
-# attachments are files on disk, because a hundred-megabyte video has no
-# business inside a dump - so they are archived separately, in the same run.
+# Two things matter, and they are backed up differently because they fail
+# differently. Postgres holds accounts, servers, channels, private conversations
+# and the avatars, which are rows rather than files - it is dumped nightly and
+# kept by date. Uploaded attachments are files on disk, immutable once written,
+# and are mirrored offsite rather than archived by date.
 #
-# It has to be the same run. A database restored from Tuesday next to files
-# from Sunday is a set of messages pointing at attachments that are not there,
-# and the discovery happens when somebody scrolls back rather than when the
-# restore is done.
+# Only the dump is kept locally. Copying the uploads directory onto the disk it
+# already lives on protects against nothing and fills that disk; the copy that
+# matters for those is the offsite one.
 #
 # Redis holds only presence and rate-limit counters, which rebuild themselves,
 # and the updates directory is build output that can be produced again.
@@ -103,47 +103,63 @@ fi
 mv "$TEMP" "$TARGET"
 log "wrote $(basename "$TARGET") ($(numfmt --to=iec "$SIZE" 2>/dev/null || echo "$SIZE bytes"))"
 
-# --- Attachments --------------------------------------------------------------
-#
-# Content addressed, so the archive is almost entirely new files each night and
-# tar's own dedupe does nothing - but the same is true of any scheme, and a
-# plain tar is a thing anyone can open in ten years without this script.
-
-UPLOADS_TARGET=""
-if [ -d "$UPLOAD_DIR" ]; then
-  UPLOADS_TARGET="$BACKUP_DIR/uploads-$STAMP.tar.gz"
-  UPLOADS_TEMP="$UPLOADS_TARGET.partial"
-
-  if tar -czf "$UPLOADS_TEMP" -C "$(dirname "$UPLOAD_DIR")" "$(basename "$UPLOAD_DIR")"; then
-    gzip -t "$UPLOADS_TEMP" || fail "the uploads archive is corrupt"
-    mv "$UPLOADS_TEMP" "$UPLOADS_TARGET"
-    log "wrote $(basename "$UPLOADS_TARGET") ($(du -h "$UPLOADS_TARGET" | cut -f1))"
-  else
-    rm -f "$UPLOADS_TEMP"
-    fail "could not archive $UPLOAD_DIR"
-  fi
-else
-  log "no uploads directory at $UPLOAD_DIR - nothing to archive"
-fi
-
 # --- Offsite ------------------------------------------------------------------
+#
+# The database goes as a dated dump. The uploads go as a mirror, and the two are
+# treated differently because they fail differently.
+#
+# A database is one file whose contents change every minute, so what you want is
+# last night's copy and the one before it. Uploaded files never change once
+# written - the store is content addressed, so a file's name *is* its contents -
+# which makes dated snapshots of them pure duplication. Seven nightly archives
+# of a ten-gigabyte directory is seventy gigabytes to hold one directory, on a
+# disk with a hundred.
+#
+# So uploads are copied, never synced, and nothing is ever deleted at the far
+# end. New files go up and everything already there stays - which also means the
+# remote keeps files the local sweeper has since removed. That is the right way
+# round: the cost is kilobytes, and the alternative is a deletion propagating
+# offsite.
+#
+# There is deliberately no local copy of the uploads directory. A second copy on
+# the same disk survives none of the failures a backup is for, and fills that
+# disk at the rate people send pictures.
 
 if [ -n "$REMOTE" ]; then
   case "$REMOTE" in
     *:/*|*@*:*)
       log "copying to $REMOTE over scp"
       scp -q -o BatchMode=yes "$TARGET" "$REMOTE/" || fail "scp to $REMOTE failed"
-      [ -n "$UPLOADS_TARGET" ] && { scp -q -o BatchMode=yes "$UPLOADS_TARGET" "$REMOTE/"         || fail "scp of the uploads archive failed"; }
+
+      if [ -d "$UPLOAD_DIR" ]; then
+        # rsync rather than scp for the files: it sends only what is not already
+        # there, which is the entire point of mirroring instead of archiving.
+        if command -v rsync >/dev/null 2>&1; then
+          rsync -a --ignore-existing "$UPLOAD_DIR/" "$REMOTE/uploads/" \
+            || fail "rsync of uploads to $REMOTE failed"
+          log "uploads mirrored over rsync"
+        else
+          log "WARNING: rsync is not installed, so uploaded files were NOT copied offsite"
+        fi
+      fi
       ;;
     *)
       log "copying to $REMOTE with rclone"
       rclone copy "$TARGET" "$REMOTE" || fail "rclone to $REMOTE failed"
-      [ -n "$UPLOADS_TARGET" ] && { rclone copy "$UPLOADS_TARGET" "$REMOTE"         || fail "rclone of the uploads archive failed"; }
+
+      if [ -d "$UPLOAD_DIR" ]; then
+        rclone copy "$UPLOAD_DIR" "$REMOTE/uploads" || fail "rclone of uploads to $REMOTE failed"
+        log "uploads mirrored ($(find "$UPLOAD_DIR" -type f | wc -l) files here)"
+      fi
       ;;
   esac
   log "offsite copy done"
 else
   log "BACKUP_REMOTE is not set - this copy lives only on the machine it backs up"
+  if [ -d "$UPLOAD_DIR" ] && [ -n "$(find "$UPLOAD_DIR" -type f -print -quit 2>/dev/null)" ]; then
+    log "  and there are uploaded files here, which are the one thing that cannot"
+    log "  be rebuilt from the repository if this disk is lost"
+  fi
 fi
 
 # --- Prune --------------------------------------------------------------------
@@ -162,16 +178,4 @@ if [ "$TOTAL" -gt "$KEEP_MINIMUM" ]; then
       done
 fi
 
-UPLOAD_TOTAL=$(find "$BACKUP_DIR" -maxdepth 1 -name 'uploads-*.tar.gz' | wc -l)
-if [ "$UPLOAD_TOTAL" -gt "$KEEP_MINIMUM" ]; then
-  find "$BACKUP_DIR" -maxdepth 1 -name 'uploads-*.tar.gz' -printf '%T@ %p
-'     | sort -rn | tail -n +$((KEEP_MINIMUM + 1)) | cut -d' ' -f2-     | while read -r old; do
-        if [ -n "$(find "$old" -mtime "+$KEEP_DAYS")" ]; then
-          rm -f "$old"
-          log "pruned $(basename "$old")"
-        fi
-      done
-fi
-
 log "$(find "$BACKUP_DIR" -maxdepth 1 -name 'chitchak-*.sql.gz' | wc -l) database backups on disk"
-log "$(find "$BACKUP_DIR" -maxdepth 1 -name 'uploads-*.tar.gz' | wc -l) upload archives on disk"
