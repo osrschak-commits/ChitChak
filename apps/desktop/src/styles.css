@@ -1753,6 +1753,158 @@ textarea::placeholder {
   object-fit: cover;
 }
 
+/* --- Looking at a picture -------------------------------------------------- */
+
+/*
+ * Over the app, not in a browser.
+ *
+ * Electron sends every target=_blank to the system browser, so a picture in a
+ * chat used to open Chrome. This is the alternative: the same window, dismissed
+ * with Escape or a click on the background.
+ */
+.viewer {
+  position: fixed;
+  inset: 0;
+  /*
+   * Above everything, including the celebration toasts at 300.
+   *
+   * This is the one surface in the app that is meant to be the only thing you
+   * are looking at, and it is dismissed by a single key. An XP toast floating
+   * over somebody's photograph is the toast being wrong about its importance.
+   */
+  z-index: 400;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  background: rgba(8, 8, 10, 0.94);
+  /* The window is frameless and draggable by its background; without this the
+     backdrop would drag the whole app instead of closing. */
+  -webkit-app-region: no-drag;
+  animation: viewer-in 120ms var(--ease);
+}
+
+@keyframes viewer-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viewer { animation: none; }
+}
+
+.viewer__bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.viewer__name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-bright);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viewer__meta {
+  font-size: 11px;
+  color: var(--text-muted);
+  /* Pushes the actions to the right and keeps the name hard left. */
+  margin-right: auto;
+  white-space: nowrap;
+}
+
+.viewer__action {
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: background 110ms var(--ease), color 110ms var(--ease);
+}
+
+.viewer__action:hover {
+  background: var(--graphite-750);
+  color: var(--text-bright);
+}
+
+/*
+ * Flex with an explicit height, not a centring grid.
+ *
+ * `max-height: 100%` on the image only constrains it if this box has a height
+ * to be a percentage *of*. A grid's implicit row is sized to its content, so
+ * the percentage resolved against the image's own height and constrained
+ * nothing - a 1024px picture rendered at 1024px in a 715px window and the
+ * "fit" mode quietly scrolled instead of fitting.
+ */
+.viewer__stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: 0;
+  padding: 20px;
+  overflow: auto;
+}
+
+.viewer__image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  cursor: zoom-in;
+  border-radius: 2px;
+}
+
+/* Actual size: the picture stops being constrained and the stage scrolls. A
+   screenshot is usually opened to read something in it, which cannot be done
+   at chat-column width. */
+/* Actual size: stop constraining, and pin to the top-left so a picture larger
+   than the window is scrolled from its beginning rather than its middle. */
+.viewer__stage--actual {
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.viewer__stage--actual .viewer__image {
+  max-width: none;
+  max-height: none;
+  cursor: zoom-out;
+}
+
+.viewer__step {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 64px;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  line-height: 1;
+  color: var(--text-secondary);
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: var(--radius);
+  transition: background 110ms var(--ease), color 110ms var(--ease);
+}
+
+.viewer__step:hover {
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--text-bright);
+}
+
+.viewer__step--back { left: 14px; }
+.viewer__step--next { right: 14px; }
+
+/* An image in the conversation is a button now, so it needs the border and
+   padding a button brings resetting. */
+.att--image {
+  padding: 0;
+  cursor: zoom-in;
+}
+
 .att--file {
   display: flex;
   align-items: center;
