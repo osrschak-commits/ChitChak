@@ -575,7 +575,7 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
               aria-label="Attach a file"
               onClick={() => fileRef.current?.click()}
             >
-              📎
+              <PaperclipIcon />
             </button>
             <button
               type="button"
@@ -599,6 +599,33 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
 
       {person.popovers}
     </main>
+  );
+}
+
+/**
+ * A paperclip, drawn rather than the 📎 emoji.
+ *
+ * The emoji was the obvious thing and the wrong one: every platform draws it
+ * differently, several draw it at an angle that reads as a stray mark at 16px,
+ * and it renders in colour beside a row of monochrome controls. Drawn, it says
+ * "attach" at any size and takes its colour from the button like every other
+ * icon in the app.
+ */
+function PaperclipIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12.5 7.2 7.7 12a2.9 2.9 0 0 1-4.1-4.1l5.2-5.2a1.9 1.9 0 0 1 2.7 2.7l-5.2 5.2a.9.9 0 0 1-1.3-1.3l4.6-4.6" />
+    </svg>
   );
 }
 

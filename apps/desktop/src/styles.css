@@ -1577,16 +1577,23 @@ textarea::placeholder {
 .composer input {
   background: var(--graphite-800);
   border-color: var(--line-strong);
-  /* Room on the right for the two buttons, so a long draft does not run under
+  /* Room on the left for the two buttons, so a long draft does not run under
      them. */
-  padding: 11px 78px 11px 14px;
+  padding: 11px 14px 11px 78px;
   border-radius: var(--radius);
 }
 
 .composer__emoji,
 .composer__attach {
   position: absolute;
-  right: 6px;
+  /*
+    Left of the field, not right.
+
+    They are things you reach for before writing - pick a file, pick a face -
+    so they belong at the start of the line rather than past the end of what
+    you have typed.
+  */
+  left: 40px;
   top: 0;
   bottom: 0;
   width: 32px;
@@ -1599,9 +1606,10 @@ textarea::placeholder {
   transition: opacity 110ms var(--ease), background 110ms var(--ease);
 }
 
-/* Sits to the left of the emoji button, in the same well. */
+/* First of the two, so the order matches the order of the thought: a file, then
+   something to say about it. */
 .composer__attach {
-  right: 40px;
+  left: 6px;
 }
 
 .composer__emoji:hover:not(:disabled),
