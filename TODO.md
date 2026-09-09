@@ -20,34 +20,26 @@ Two things to know about the setup:
 - The remote needs `region=auto` in the rclone config. Without it R2 answers
   every request with 403, which reads like a bad credential and is not one.
 
-## Email — waiting on a provider account, nothing else
+## Email — done
 
-`SMTP_URL` is unset in production, so password resets are written to the server
-log instead of being sent and someone has to read them out by hand. Fine for
-friends, unworkable the moment somebody you cannot message forgets a password.
+Password resets are sent through Resend. Free tier: 3,000/month, 100/day, which
+is a long way above what resets will ever need.
 
-**The code is verified working.** It had never run — the send path is only
-reached when a real mail server answers, so it had executed zero times since it
-was written. Tested against a real SMTP server on 2026-09-09, the whole loop:
-ask for a reset, the mail is delivered with the right sender and subject, the
-link points at `APP_URL`, the token works, the new password signs in, the old
-one is dead, and replaying the link is refused. An unknown address gets the same
-204 and sends nothing, so the endpoint cannot be used to test which addresses
-have accounts.
+Verified on 2026-09-09 twice over: against a local SMTP server (the whole loop -
+link works, new password signs in, old one dead, replay refused, unknown address
+sends nothing) and then against the live deployment, which logged `mail sent`
+for a real reset to a real address.
 
-`SMTP_URL`, `MAIL_FROM` and `APP_URL` are already wired through
-docker-compose.prod.yml. So all that is left is an account:
-
-1. Pick a provider — Resend, Postmark, SES, Fastmail, anything that gives you
-   an SMTP username and password.
-2. Set both `SMTP_URL` and `MAIL_FROM` in `.env.production`. `MAIL_FROM` must be
-   an address the provider will let you send as; left blank it defaults to
-   `noreply@localhost`, which every provider will reject.
-3. Add the SPF and DKIM records they give you to the chitchak.com DNS. Without
-   them the mail lands in spam, which for a password reset is the same as not
-   sending it.
-4. Restart the server, then actually request a reset for a real address and
-   check it arrives.
+- DNS is at **Fasthosts** (`ns1/2/3.livedns.co.uk`), not IONOS - that is the
+  server's host, not the domain's.
+- Resend uses CNAMEs for sending (`rsend`, `send`) rather than a TXT SPF record,
+  plus a DKIM TXT at `resend._domainkey`. DMARC was left off: it is optional and
+  `p=none` only collects reports nobody reads.
+- `MAIL_FROM` must be a verified domain. Blank falls back to `noreply@localhost`
+  and every provider rejects it.
+- The API key passed through a chat log, so it is worth rotating at some point -
+  Resend keys are sending-access only and revoking one is two clicks. Same note
+  as the Paddle sandbox key.
 
 ## Platform-level moderation — done
 
