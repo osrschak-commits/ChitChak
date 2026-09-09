@@ -123,6 +123,16 @@ interface AppState {
   streamPreset: StreamPreset;
   /** Whether they are subscribed. Decides what the quality copy says, nothing else. */
   subscribed: boolean;
+  /**
+   * Whether a screen share carries the computer's sound.
+   *
+   * On by default and no longer asked when starting a share - sharing a game
+   * or a video silently is almost never what anybody meant. It stays turnable
+   * off because on Windows this is a tap of the whole output mix, so it also
+   * carries the call itself back to everyone in it, and the only cure for that
+   * loop is not sending it.
+   */
+  shareComputerSound: boolean;
   /** What each preset is worth here, so the settings can show real numbers. */
   videoPresets: VideoQualityOptions | null;
   speaking: Set<string>;
@@ -183,6 +193,7 @@ interface AppState {
   deleteMessage(messageId: string): Promise<void>;
   joinVoice(channelId: string): void;
   setStreamPreset(preset: StreamPreset): void;
+  setShareComputerSound(on: boolean): void;
   leaveVoice(): Promise<void>;
   toggleMute(): void;
   toggleDeafen(): void;
@@ -454,6 +465,7 @@ export const useApp = create<AppState>((set, get) => ({
   streamPreset: loadStreamPreset(),
   subscribed: false,
   videoPresets: null,
+  shareComputerSound: loadShareComputerSound(),
   speaking: new Set(),
   levels: new Map(),
   videoFeeds: [],
@@ -651,6 +663,15 @@ export const useApp = create<AppState>((set, get) => ({
    * are sharing it from - the desktop that streams games and the laptop that
    * shows spreadsheets want different answers from the same person.
    */
+  setShareComputerSound(on) {
+    set({ shareComputerSound: on });
+    try {
+      localStorage.setItem('chitchak.share-sound', on ? 'on' : 'off');
+    } catch {
+      // Non-fatal: the choice simply will not survive a restart.
+    }
+  },
+
   setStreamPreset(preset) {
     set({ streamPreset: preset });
     try {
@@ -1336,6 +1357,15 @@ function loadUserVolumes(key = 'chitchak.volumes'): Record<string, number> {
     );
   } catch {
     return {};
+  }
+}
+
+function loadShareComputerSound(): boolean {
+  try {
+    // On unless explicitly turned off, so a fresh install shares sound.
+    return localStorage.getItem('chitchak.share-sound') !== 'off';
+  } catch {
+    return true;
   }
 }
 

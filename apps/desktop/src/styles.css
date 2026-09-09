@@ -2847,18 +2847,15 @@ textarea::placeholder {
   gap: 16px;
 }
 
+/* A statement now, not a checkbox. It used to be a label wrapping an input
+   beside a stacked label/hint pair, so the row was horizontal and the text
+   column was a child; with the input gone the text is the whole thing, and
+   stacking has to move up here or the label and hint run together on one line. */
 .picker__audio {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-  cursor: pointer;
-  max-width: 340px;
-}
-
-.picker__audio > span {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  max-width: 340px;
 }
 
 .picker__actions {

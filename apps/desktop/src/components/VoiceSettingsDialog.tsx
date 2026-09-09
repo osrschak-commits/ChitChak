@@ -43,6 +43,11 @@ export function VoiceSettingsDialog({ onClose }: { onClose(): void }) {
   const setStreamPreset = useApp((s) => s.setStreamPreset);
   const subscribed = useApp((s) => s.subscribed);
   const videoPresets = useApp((s) => s.videoPresets);
+  const shareComputerSound = useApp((s) => s.shareComputerSound);
+  const setShareComputerSound = useApp((s) => s.setShareComputerSound);
+  // Windows is the only platform where Chromium implements a system-audio tap,
+  // so elsewhere this setting would be a switch that does nothing.
+  const canShareAudio = window.chitchak?.platform === 'win32';
   // Null until a call has been joined, since the server is what says what each
   // preset is worth here. The numbers are simply omitted until then.
   const current = videoPresets?.[streamPreset] ?? null;
@@ -331,6 +336,27 @@ export function VoiceSettingsDialog({ onClose }: { onClose(): void }) {
                 would look like the stream dropping to everyone watching.
               </div>
             </div>
+
+            {canShareAudio && (
+              <div className="row">
+                <div>
+                  <div className="row__label">Share computer sound</div>
+                  {/* The honest version, because the failure is invisible from
+                      the sharer's seat: they hear everything perfectly and are
+                      the only person in the call who does not hear the echo. */}
+                  <div className="row__hint">
+                    On by default, and included automatically when you share. Windows can only
+                    tap the whole output mix, so this also carries the call itself back to
+                    everyone in it — turn it off if people start hearing themselves.
+                  </div>
+                </div>
+                <Switch
+                  label="Share computer sound"
+                  checked={shareComputerSound}
+                  onChange={setShareComputerSound}
+                />
+              </div>
+            )}
           </div>
 
           <div className="section">

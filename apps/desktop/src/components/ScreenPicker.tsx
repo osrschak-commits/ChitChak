@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useApp } from '../store/app.js';
 
 interface Source {
   id: string;
@@ -23,23 +24,22 @@ export function ScreenPicker({
 }) {
   const [sources, setSources] = useState<Source[] | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  // Off by default. Sharing computer sound captures everything playing on the
-  // machine - other calls, music, notifications - not just what is on screen.
   // Computer sound is a Windows-only capability - see the loopback comment in
-  // electron/main.ts - so the checkbox is not shown where ticking it would do
-  // nothing.
+  // electron/main.ts - so elsewhere the answer is always no, whatever the
+  // setting says.
   const canShareAudio = window.chitchak?.platform === 'win32';
 
-  /**
-   * On by default where it works.
-   *
-   * Sharing a game, a video or a call without its sound is almost never what
-   * somebody meant to do, and the failure is silent on both ends: the sharer
-   * hears everything perfectly and nobody thinks to mention it for a while. The
-   * warning underneath is the reason this can be a default rather than a trap -
-   * it says plainly what gets sent, before anything is sent.
-   */
-  const [withAudio, setWithAudio] = useState(canShareAudio);
+  /*
+    No longer a question asked here.
+
+    Sharing a game, a video or a call without its sound is almost never what
+    somebody meant to do, and the failure is silent on both ends: the sharer
+    hears everything perfectly and nobody thinks to mention it for a while. So
+    sound now comes as standard, and the one setting that turns it off lives in
+    voice settings for the case that needs it.
+  */
+  const shareComputerSound = useApp((s) => s.shareComputerSound);
+  const withAudio = canShareAudio && shareComputerSound;
   const [error, setError] = useState<string | null>(null);
   // macOS gates screen capture behind a system permission and, unhelpfully,
   // grants a useless version of it when denied: sources still come back, just
@@ -108,7 +108,7 @@ export function ScreenPicker({
           <h2 className="modal__title">Share your screen</h2>
           <p className="modal__sub">
             Everyone in the call sees this until you stop.
-            {canShareAudio && ' Computer sound can go with it.'}
+            {withAudio && ' Computer sound goes with it.'}
           </p>
         </div>
 
@@ -137,21 +137,20 @@ export function ScreenPicker({
         </div>
 
         <div className="modal__foot">
+          {/* Said rather than asked. What gets sent is worth knowing before it
+              is sent - especially that it is everything, including the call
+              itself - but it is not a decision to make every single time. */}
           {canShareAudio && (
-            <label className="picker__audio" style={{ marginRight: 'auto' }}>
-              <input
-                type="checkbox"
-                style={{ width: 'auto' }}
-                checked={withAudio}
-                onChange={(e) => setWithAudio(e.target.checked)}
-              />
-              <span>
-                <span className="row__label">Share computer sound</span>
-                <span className="row__hint">
-                  Sends everything your PC is playing, not just this window.
-                </span>
+            <span className="picker__audio" style={{ marginRight: 'auto' }}>
+              <span className="row__label">
+                {withAudio ? 'Computer sound included' : 'Computer sound off'}
               </span>
-            </label>
+              <span className="row__hint">
+                {withAudio
+                  ? 'Everything your PC is playing, including other people in this call.'
+                  : 'Turn it back on in voice settings.'}
+              </span>
+            </span>
           )}
 
           <button className="btn btn--ghost" onClick={onClose}>
