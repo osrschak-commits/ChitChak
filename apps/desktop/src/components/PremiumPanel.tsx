@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { BrassChest } from './BrassChest.js';
 import { api, type CosmeticItem, type PremiumState } from '../lib/api.js';
 
 /**
@@ -156,6 +157,17 @@ export function PremiumPanel() {
       </div>
 
       {error && <div className="notice">{error}</div>}
+
+      {state.chest && (
+        <BrassChest
+          status={state.chest}
+          keys={state.keys}
+          // Refetched rather than patched from the result: the item is now
+          // owned, which changes the shop below as well as the balance, and
+          // one source of truth is cheaper than keeping two in step.
+          onOpened={() => void refresh()}
+        />
+      )}
 
       {slots.map((slot) => (
         <div className="section" key={slot}>

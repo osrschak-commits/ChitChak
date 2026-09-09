@@ -1771,6 +1771,206 @@ textarea::placeholder {
   .offer__mark--wait { animation: none; }
 }
 
+/* --- Brass chest ----------------------------------------------------------- */
+
+.chest {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.chest__box {
+  position: relative;
+  width: 92px;
+  height: 76px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: linear-gradient(160deg, #6b5327, #3a2c14);
+  border: 1px solid #8a6a33;
+  box-shadow: inset 0 -8px 16px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+/* The lid. A band across the top that lifts and stays lifted, so the box
+   still reads as open while the prize is on screen. */
+.chest__lid {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 30px;
+  background: linear-gradient(180deg, #9a7638, #6b5327);
+  border-bottom: 1px solid #22190b;
+  transform-origin: top center;
+  transition: transform 420ms cubic-bezier(0.3, 0, 0.2, 1);
+}
+
+.chest__mark {
+  position: relative;
+  font-size: 18px;
+  filter: saturate(0.4);
+}
+
+/* What comes out of the gap, once the lid moves. */
+.chest__glow {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: radial-gradient(circle at 50% 30%, rgba(255, 226, 160, 0.95), transparent 68%);
+}
+
+.chest__box--opening .chest__lid {
+  transform: rotateX(105deg) translateY(-4px);
+}
+
+.chest__box--opening .chest__glow {
+  animation: chest-glow 1.4s ease-out forwards;
+}
+
+.chest__box--opening {
+  animation: chest-shake 0.5s ease-in-out 2;
+}
+
+.chest__box--revealed .chest__lid {
+  transform: rotateX(105deg) translateY(-4px);
+}
+
+.chest__box--revealed .chest__glow {
+  opacity: 0.5;
+}
+
+/* Builds rather than flashes: the wait is the point, and a light that grows is
+   a wait with a direction. */
+@keyframes chest-glow {
+  0% { opacity: 0; }
+  60% { opacity: 0.35; }
+  100% { opacity: 1; }
+}
+
+@keyframes chest-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-2px); }
+  75% { transform: translateX(2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chest__box--opening,
+  .chest__box--opening .chest__glow { animation: none; }
+  .chest__lid { transition: none; }
+}
+
+.chest__side,
+.chest__prize {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.chest__prize {
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  animation: chest-arrive 260ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+@keyframes chest-arrive {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chest__prize { animation: none; }
+}
+
+.chest__won {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin-right: auto;
+}
+
+.chest__name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.chest__rarity {
+  font-size: 10px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.chest__count {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+/* The won item, drawn as it will look when worn. */
+.chest__plate {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  flex: none;
+  border: 1px solid var(--line-strong);
+}
+
+.chest__badge {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  font-size: 22px;
+  color: var(--brass-300);
+  background: var(--graphite-750);
+  border: 1px solid var(--line-strong);
+}
+
+.chest__odds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chest__odd {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--graphite-800);
+  border: 1px solid var(--line);
+  font-size: 11px;
+}
+
+.chest__odd-name {
+  color: var(--text-secondary);
+}
+
+/*
+ * One colour per tier, used for the odds and for the rarity on a win.
+ *
+ * Kept away from the app's brass and signal colours, which already mean
+ * "subscription" and "live audio" - a rarity that borrowed either would be
+ * saying something it does not mean.
+ */
+.chest__odd--common .chest__odd-name, .chest__prize--common .chest__rarity { color: #9aa0a6; }
+.chest__odd--uncommon .chest__odd-name, .chest__prize--uncommon .chest__rarity { color: #6fb26f; }
+.chest__odd--rare .chest__odd-name, .chest__prize--rare .chest__rarity { color: #5c9ad4; }
+.chest__odd--epic .chest__odd-name, .chest__prize--epic .chest__rarity { color: #a882d8; }
+.chest__odd--legendary .chest__odd-name, .chest__prize--legendary .chest__rarity { color: #d9a45b; }
+
+.chest__actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 /* --- Looking at a picture -------------------------------------------------- */
 
 /*

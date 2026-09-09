@@ -23,6 +23,16 @@ import { standingOf } from './subscriptions.js';
 /** One thing may be worn per slot. */
 export type Slot = 'plate' | 'badge';
 
+/**
+ * How often a chest gives one out. Nothing else depends on it.
+ *
+ * Deliberately not a price and not a quality ranking. A common plate somebody
+ * actually wears is worth more to them than a legendary they never equip, and
+ * the moment rarity is wired to a number the catalogue starts being designed
+ * around the number rather than around what looks good.
+ */
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+
 export interface Cosmetic {
   id: string;
   name: string;
@@ -49,6 +59,13 @@ export interface Cosmetic {
    * client decides how to render a finish, but which finish is the server's.
    */
   value: string;
+  /**
+   * Which tier of the chest it comes out of.
+   *
+   * Absent means it is not in the chest at all - the subscription plates are
+   * included with Brass and would be a strange thing to also win.
+   */
+  rarity?: Rarity;
 }
 
 export const COSMETICS: Cosmetic[] = [
@@ -97,6 +114,7 @@ export const COSMETICS: Cosmetic[] = [
     slot: 'badge',
     blurb: 'For being here before it was finished.',
     price: 6,
+    rarity: 'legendary',
     value: '◆',
   },
   {
@@ -105,6 +123,7 @@ export const COSMETICS: Cosmetic[] = [
     slot: 'badge',
     blurb: 'Three bars, the mark this app is named after.',
     price: 3,
+    rarity: 'uncommon',
     value: '▮▮▮',
   },
   {
@@ -113,7 +132,137 @@ export const COSMETICS: Cosmetic[] = [
     slot: 'badge',
     blurb: 'The lamp above a studio door.',
     price: 3,
+    rarity: 'common',
     value: '●',
+  },
+
+  /*
+    The rest of the chest.
+
+    Bought as well as won on purpose: somebody who wants one specific thing
+    should be able to go and get it rather than roll for it, which is the
+    difference between a shop with a chest in it and a chest with a shop
+    attached. Prices climb with rarity because a rarer item is a longer wait,
+    not because it is better.
+  */
+  {
+    id: 'badge.wave',
+    name: 'Wave',
+    slot: 'badge',
+    blurb: 'A signal, moving.',
+    price: 3,
+    rarity: 'common',
+    value: '〜',
+  },
+  {
+    id: 'badge.pin',
+    name: 'Pin',
+    slot: 'badge',
+    blurb: 'For the ones who never miss a thread.',
+    price: 3,
+    rarity: 'common',
+    value: '✦',
+  },
+  {
+    id: 'badge.cassette',
+    name: 'Cassette',
+    slot: 'badge',
+    blurb: 'Rewound, taped over, handed round.',
+    price: 4,
+    rarity: 'uncommon',
+    value: '⊞',
+  },
+  {
+    id: 'badge.night',
+    name: 'Night shift',
+    slot: 'badge',
+    blurb: 'Still here at four in the morning.',
+    price: 4,
+    rarity: 'uncommon',
+    value: '☾',
+  },
+  {
+    id: 'badge.antenna',
+    name: 'Antenna',
+    slot: 'badge',
+    blurb: 'Picks up everything, says little.',
+    price: 6,
+    rarity: 'rare',
+    value: '⟟',
+  },
+  {
+    id: 'badge.relay',
+    name: 'Relay',
+    slot: 'badge',
+    blurb: 'Passes it on without dropping a word.',
+    price: 6,
+    rarity: 'rare',
+    value: '⇄',
+  },
+  {
+    id: 'badge.eclipse',
+    name: 'Eclipse',
+    slot: 'badge',
+    blurb: 'Rare, brief, and worth looking up for.',
+    price: 10,
+    rarity: 'epic',
+    value: '◑',
+  },
+  {
+    id: 'badge.crown',
+    name: 'Brass crown',
+    slot: 'badge',
+    blurb: 'Not awarded. Found.',
+    price: 16,
+    rarity: 'legendary',
+    value: '♛',
+  },
+
+  // --- Plates that are won rather than included ----------------------------
+  {
+    id: 'plate.slate',
+    name: 'Slate plate',
+    slot: 'plate',
+    blurb: 'Wet stone, and nothing else.',
+    price: 4,
+    rarity: 'common',
+    value: 'linear-gradient(135deg, #4a4f57, #23262b)',
+  },
+  {
+    id: 'plate.moss',
+    name: 'Moss plate',
+    slot: 'plate',
+    blurb: 'The green that grows on the north side.',
+    price: 4,
+    rarity: 'common',
+    value: 'linear-gradient(135deg, #5c7052, #2c3a28)',
+  },
+  {
+    id: 'plate.tide',
+    name: 'Tide plate',
+    slot: 'plate',
+    blurb: 'Cold water under a grey sky.',
+    price: 5,
+    rarity: 'uncommon',
+    value: 'linear-gradient(135deg, #43708f, #1d3243)',
+  },
+  {
+    id: 'plate.ember',
+    name: 'Ember plate',
+    slot: 'plate',
+    blurb: 'The last hour of a fire.',
+    price: 7,
+    rarity: 'rare',
+    value: 'linear-gradient(135deg, #c96a3a, #5a2416)',
+  },
+  {
+    id: 'plate.aurora',
+    name: 'Aurora plate',
+    slot: 'plate',
+    blurb: 'Seen once, described badly ever after.',
+    price: 12,
+    rarity: 'epic',
+    value: 'linear-gradient(135deg, #4fd6c4, #8a7fd4 55%, #d97b6c)',
   },
 ];
 

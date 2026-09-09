@@ -26,12 +26,16 @@ export interface Flair {
   badge: string | null;
 }
 
+export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+
 export interface CosmeticItem {
   id: string;
   name: string;
   slot: 'plate' | 'badge';
   blurb: string;
   price: number;
+  /** Present only for things the chest can give. */
+  rarity?: Rarity;
   /** Included with a subscription rather than bought with keys. */
   requiresSubscription?: boolean;
   /** How to draw it - a gradient for a plate, a glyph for a badge. */
@@ -47,6 +51,23 @@ export interface PremiumState {
   keys: number;
   keysPerPeriod: number;
   items: CosmeticItem[];
+  chest: ChestStatus;
+}
+
+export interface ChestStatus {
+  cost: number;
+  /** Published odds, as percentages. The same numbers the server rolls against. */
+  rates: Record<Rarity, number>;
+  collected: number;
+  total: number;
+}
+
+export interface ChestResult {
+  cosmetic: CosmeticItem;
+  keys: number;
+  remaining: number;
+  collected: number;
+  total: number;
 }
 
 export interface KeyEntry {
@@ -311,6 +332,11 @@ class ApiClient {
   /** Catalogue, ownership, balance and subscription, in one request. */
   premium(): Promise<PremiumState> {
     return this.request('/api/premium');
+  }
+
+  /** Spends a key and returns what came out. The roll happens on the server. */
+  openChest(): Promise<ChestResult> {
+    return this.request('/api/premium/chest', { method: 'POST' });
   }
 
   buyCosmetic(cosmeticId: string): Promise<{ keys: number }> {

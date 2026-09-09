@@ -25,6 +25,7 @@ import {
 import { registry } from '../gateway/registry.js';
 import { errors } from '../lib/errors.js';
 import { verifyPassword } from '../lib/password.js';
+import * as chest from '../services/chest.js';
 import * as cosmetics from '../services/cosmetics.js';
 import * as keysService from '../services/keys.js';
 import { levelOf, progress, progressFor } from '../services/progress.js';
@@ -355,6 +356,21 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
    * subscription. One round trip because they are always read together - a shop
    * that shows prices without saying what you can afford is not a shop.
    */
+  /**
+   * Open a chest.
+   *
+   * POST because it spends something and cannot be repeated safely - a retried
+   * GET would open a second chest, and no amount of caching headers makes that
+   * the right shape.
+   */
+  app.post('/api/premium/chest', {
+    preHandler: authenticate,
+    handler: async (request) => {
+      const { userId } = requireUser(request);
+      return chest.open(userId);
+    },
+  });
+
   app.get('/api/premium', {
     preHandler: authenticate,
     handler: async (request) => {
@@ -373,6 +389,7 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         },
         keys: standing.keys,
         keysPerPeriod: keysService.KEYS_PER_PERIOD,
+        chest: await chest.status(userId),
         items: cosmetics.COSMETICS.map((item) => ({
           ...item,
           owned: ownedIds.has(item.id),
