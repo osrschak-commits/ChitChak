@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { staffActions, subscriptions, users } from '../db/schema.js';
 import { errors } from '../lib/errors.js';
@@ -100,9 +100,75 @@ export async function issueBlackCard(input: {
   return { username: target.username, standing: await standingOf(target.id), cardId };
 }
 
+/**
+ * Takes a card back.
+ *
+ * Only a card. The provider check is the whole safety of this: a black card
+ * writes `provider: 'blackcard'`, and a Paddle subscription writes 'paddle' to
+ * the same row - so without it, revoking a card from somebody who had since
+ * paid would cancel a subscription they are being charged for. That is a
+ * refund conversation, not an admin button.
+ *
+ * The keys are clawed back, but only what is left. Twenty-four were granted and
+ * some may already be spent - on a chest, which cannot be un-opened - so the
+ * ledger takes back at most the current balance. Better a person keeps a few
+ * keys they were given by mistake than owes a debt they cannot see or clear.
+ */
+export async function revokeBlackCard(input: {
+  actorId: string;
+  username: string;
+}): Promise<{ username: string; keysTaken: number }> {
+  const target = await db.query.users.findFirst({
+    where: eq(users.username, input.username.trim().toLowerCase()),
+  });
+  if (!target) throw errors.notFound(`Nobody here is called "${input.username}"`);
+
+  const existing = await db.query.subscriptions.findFirst({
+    where: eq(subscriptions.userId, target.id),
+  });
+  if (!existing) throw errors.invalid('They have no subscription to take back');
+  if (existing.provider !== 'blackcard') {
+    throw errors.invalid(
+      'That subscription was paid for, not given. Cancel it through the billing provider instead.',
+    );
+  }
+
+  // Written before the change, like the issue above: the actions worth
+  // recording are the ones that might go wrong halfway.
+  await db.insert(staffActions).values({
+    id: generateId(),
+    actorId: input.actorId,
+    action: 'black_card_revoke',
+    subjectId: target.id,
+    detail: `card ${existing.providerId ?? 'unknown'} revoked`,
+  });
+
+  await db.delete(subscriptions).where(eq(subscriptions.userId, target.id));
+
+  const balance = await keys.balanceOf(target.id);
+  const keysTaken = Math.min(CARD_KEYS, Math.max(0, balance));
+  if (keysTaken > 0) {
+    await keys.record({
+      userId: target.id,
+      amount: -keysTaken,
+      reason: 'spend',
+      reference: `blackcard-revoke:${existing.providerId ?? target.id}:${Date.now()}`,
+    });
+  }
+
+  return { username: target.username, keysTaken };
+}
+
 /** Every card ever handed out, newest first. */
 export async function issuedCards(limit = 50): Promise<
-  Array<{ at: string; actor: string; subject: string | null; detail: string | null }>
+  Array<{
+    at: string;
+    actor: string;
+    subject: string | null;
+    detail: string | null;
+    /** 'black_card' or 'black_card_revoke' - a taken card must not read as a given one. */
+    action: string;
+  }>
 > {
   const rows = await db
     .select({
@@ -110,9 +176,10 @@ export async function issuedCards(limit = 50): Promise<
       actorId: staffActions.actorId,
       subjectId: staffActions.subjectId,
       detail: staffActions.detail,
+      action: staffActions.action,
     })
     .from(staffActions)
-    .where(eq(staffActions.action, 'black_card'))
+    .where(inArray(staffActions.action, ['black_card', 'black_card_revoke']))
     .orderBy(staffActions.createdAt)
     .limit(limit);
 
@@ -129,6 +196,7 @@ export async function issuedCards(limit = 50): Promise<
       actor: names.get(row.actorId) ?? row.actorId,
       subject: row.subjectId ? (names.get(row.subjectId) ?? row.subjectId) : null,
       detail: row.detail,
+      action: row.action,
     }))
     .reverse();
 }

@@ -319,7 +319,28 @@ class ApiClient {
     });
   }
 
-  listBlackCards(): Promise<{ cards: Array<{ at: string; actor: string; subject: string | null; detail: string | null }> }> {
+  /**
+   * Takes a card back. Refuses on a subscription that was paid for.
+   *
+   * `keysTaken` is what was actually reclaimed, which may be fewer than the
+   * twenty-four granted - the rest were already spent.
+   */
+  revokeBlackCard(username: string): Promise<{ username: string; keysTaken: number }> {
+    return this.request('/api/admin/black-card', {
+      method: 'DELETE',
+      body: JSON.stringify({ username }),
+    });
+  }
+
+  listBlackCards(): Promise<{
+    cards: Array<{
+      at: string;
+      actor: string;
+      subject: string | null;
+      detail: string | null;
+      action: string;
+    }>;
+  }> {
     return this.request('/api/admin/black-cards');
   }
 

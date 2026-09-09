@@ -15,8 +15,16 @@ export function StaffPanel() {
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [cards, setCards] = useState<
-    Array<{ at: string; actor: string; subject: string | null; detail: string | null }>
+    Array<{
+      at: string;
+      actor: string;
+      subject: string | null;
+      detail: string | null;
+      action: string;
+    }>
   >([]);
+  /** Who is one click from losing a card. Confirming is deliberate - see below. */
+  const [confirming, setConfirming] = useState<string | null>(null);
 
   const refresh = () =>
     void api
@@ -25,6 +33,35 @@ export function StaffPanel() {
       .catch(() => setCards([]));
 
   useEffect(refresh, []);
+
+  /**
+   * Takes a card back.
+   *
+   * Behind a confirmation, because it is the one action here that removes
+   * something somebody already has, and there is no undo - re-issuing gives a
+   * fresh year rather than the remainder of the one taken away.
+   */
+  async function revoke(name: string) {
+    setBusy(true);
+    setError(null);
+    setNote(null);
+    try {
+      const result = await api.revokeBlackCard(name);
+      setNote(
+        result.keysTaken > 0
+          ? `${result.username} no longer has Brass. ${result.keysTaken} unspent ${
+              result.keysTaken === 1 ? 'key' : 'keys'
+            } taken back.`
+          : `${result.username} no longer has Brass. Their keys were already spent.`,
+      );
+      setConfirming(null);
+      refresh();
+    } catch (problem) {
+      setError(problem instanceof Error ? problem.message : 'That did not work');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function give() {
     const name = username.trim();
@@ -72,21 +109,54 @@ export function StaffPanel() {
       </div>
 
       <div className="section">
-        <h3 className="section__title">Cards given ({cards.length})</h3>
+        <h3 className="section__title">Cards ({cards.length})</h3>
         {cards.length === 0 ? (
           <p className="empty__body">None yet.</p>
         ) : (
           <div className="shop">
-            {cards.map((card) => (
-              <div key={card.at + card.subject} className="shopitem">
-                <div className="shopitem__text">
-                  <span className="shopitem__name">{card.subject ?? 'unknown'}</span>
-                  <span className="shopitem__blurb">
-                    by {card.actor} · {new Date(card.at).toLocaleString()}
-                  </span>
+            {cards.map((card) => {
+              const taken = card.action === 'black_card_revoke';
+              const name = card.subject ?? 'unknown';
+              return (
+                <div key={card.at + name} className="shopitem">
+                  <div className="shopitem__text">
+                    <span className="shopitem__name">
+                      {name}
+                      {/* A revocation sitting in a list of grants has to say so,
+                          or the history reads as though the card is still held. */}
+                      {taken && <span className="staff__taken mono">taken back</span>}
+                    </span>
+                    <span className="shopitem__blurb">
+                      by {card.actor} · {new Date(card.at).toLocaleString()}
+                    </span>
+                  </div>
+
+                  {!taken &&
+                    (confirming === name ? (
+                      <div className="staff__confirm">
+                        <button
+                          className="btn btn--danger btn--sm"
+                          disabled={busy}
+                          onClick={() => void revoke(name)}
+                        >
+                          {busy ? 'Taking…' : 'Take it back'}
+                        </button>
+                        <button
+                          className="btn btn--ghost btn--sm"
+                          disabled={busy}
+                          onClick={() => setConfirming(null)}
+                        >
+                          Keep
+                        </button>
+                      </div>
+                    ) : (
+                      <button className="btn btn--ghost btn--sm" onClick={() => setConfirming(name)}>
+                        Revoke
+                      </button>
+                    ))}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

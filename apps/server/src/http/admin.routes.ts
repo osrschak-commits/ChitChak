@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { errors } from '../lib/errors.js';
-import { issueBlackCard, issuedCards } from '../services/blackcard.js';
+import { issueBlackCard, issuedCards, revokeBlackCard } from '../services/blackcard.js';
 import { isPlatformStaff, requirePlatformStaff } from '../services/staff.js';
 import { authenticate, requireUser } from './authenticate.js';
 
@@ -42,6 +42,26 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
       request.log.info(
         { actor: userId, subject: result.username, card: result.cardId },
         '[staff] black card issued',
+      );
+      return result;
+    },
+  });
+
+  app.delete<{ Body: { username?: string } }>('/api/admin/black-card', {
+    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+    handler: async (request) => {
+      const { userId } = requireUser(request);
+      requirePlatformStaff(userId);
+
+      const username = request.body?.username;
+      if (typeof username !== 'string' || username.trim().length === 0) {
+        throw errors.invalid('Whose card is it?');
+      }
+
+      const result = await revokeBlackCard({ actorId: userId, username });
+      request.log.warn(
+        { actor: userId, subject: result.username, keysTaken: result.keysTaken },
+        '[staff] black card revoked',
       );
       return result;
     },
