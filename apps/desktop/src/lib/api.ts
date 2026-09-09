@@ -17,13 +17,23 @@ import type {
   SelfUser,
 } from '@chitchak/protocol';
 
+/** A badge somebody is wearing, with enough to draw it and to explain it. */
+export interface WornBadge {
+  id: string;
+  name: string;
+  /** What the badge is for. Shown on hover. */
+  blurb: string;
+  /** The glyph, drawn when there is no artwork for this badge yet. */
+  value: string;
+  rarity?: Rarity;
+}
+
 /** What somebody's card shows beyond their name. */
 export interface Flair {
   level: number;
   /** A CSS background for the card's plate, or null. */
   plate: string | null;
-  /** A glyph shown beside their name, or null. */
-  badge: string | null;
+  badge: WornBadge | null;
 }
 
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';

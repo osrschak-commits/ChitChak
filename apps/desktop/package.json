@@ -15,7 +15,8 @@
     "dist:win": "node scripts/icons-ready.mjs && node scripts/build.mjs && electron-builder --win --config electron-builder.yml --publish never",
     "dist:mac": "node scripts/icons-ready.mjs && node scripts/build.mjs && electron-builder --mac --config electron-builder.yml --publish never",
     "typecheck": "tsc --noEmit",
-    "logo": "electron scripts/import-logo.cjs build/logo-source.png"
+    "logo": "electron scripts/import-logo.cjs build/logo-source.png",
+    "badges": "electron scripts/trim-badges.cjs"
   },
   "//": "livekit-client is pinned exactly, not with a caret. It negotiates an RTC protocol version with the SFU, and a client newer than the server in docker-compose.yml connects, silently falls back, and then reports 'reconnecting' forever while media actually flows. Upgrade this and the livekit-server image together.",
   "dependencies": {

@@ -4357,12 +4357,86 @@ textarea::placeholder {
   mask-image: linear-gradient(to bottom, #000, transparent);
 }
 
-.plate__badge {
+/* --- A badge beside a name ------------------------------------------------- */
+
+.badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
   margin-left: 7px;
+  vertical-align: middle;
+  outline: none;
+}
+
+/*
+ * 18px tall, and as wide as the artwork needs.
+ *
+ * Taller than the glyph it replaces, because a drawn badge is a picture rather
+ * than a letter - at 11px a winged mark is a smudge, and at 18 the shape reads
+ * while still sitting inside a line of text. Width is left alone so a badge
+ * keeps its own proportions instead of being squeezed into a square.
+ */
+.badge__art {
+  height: 18px;
+  width: auto;
+  display: block;
+}
+
+/* The fallback, for a badge nobody has drawn yet. */
+.badge__glyph {
   font-size: 11px;
   color: var(--brass-300);
   letter-spacing: 1px;
-  vertical-align: middle;
+}
+
+.badge__tip {
+  position: absolute;
+  /*
+    Below the badge, not above it.
+
+    A badge sits on the first line of a profile card, and a card opened near the
+    top of the window puts that line within a few pixels of the edge - so a
+    tooltip above it renders off-screen and the explanation is invisible exactly
+    where it is needed. Below, it opens into the card.
+  */
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 80;
+  width: max-content;
+  max-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--graphite-900);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5);
+  /* Hidden by opacity rather than display, so it can fade and so the layout
+     under it never moves. */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 110ms var(--ease);
+}
+
+/* Focus as well as hover: a badge is reachable by keyboard, and an explanation
+   only a mouse can get to is one most people never see. */
+.badge:hover .badge__tip,
+.badge:focus-visible .badge__tip {
+  opacity: 1;
+}
+
+.badge__tip-name {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.badge__tip-blurb {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--text-secondary);
 }
 
 .brass__buy {

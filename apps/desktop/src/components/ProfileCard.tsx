@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Badge } from './Badge.js';
 import { api, mediaUrl, type Flair } from '../lib/api.js';
 import { outranks } from '../lib/permissions.js';
 import { usePermissions, useRanks } from '../hooks/usePermissions.js';
@@ -161,11 +162,7 @@ export function ProfileCard({
         <div className="plate__titles">
           <div className="plate__name" style={target.color ? { color: target.color } : undefined}>
             {displayName}
-            {flair?.badge && (
-              <span className="plate__badge mono" title="Wearing a badge">
-                {flair.badge}
-              </span>
-            )}
+            {flair?.badge && <Badge badge={flair.badge} />}
           </div>
           <div className="plate__handle mono">@{member.user.username}</div>
           <div className="plate__live">

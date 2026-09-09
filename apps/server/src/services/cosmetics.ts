@@ -390,13 +390,38 @@ async function owns(userId: string, cosmeticId: string): Promise<boolean> {
  * job to get wrong, nothing to be out of date, and the choice survives - a
  * lapsed subscriber's plate reappears the moment they subscribe again.
  */
-export async function wornBy(userId: string): Promise<Record<Slot, string | null>> {
+export interface WornBadge {
+  /** So the client can find the artwork for it. */
+  id: string;
+  name: string;
+  /** Shown when somebody hovers it - what this badge is for. */
+  blurb: string;
+  /** The glyph, still sent: it is what a client without the artwork draws. */
+  value: string;
+  rarity?: Rarity;
+}
+
+export interface Worn {
+  /** A CSS background, or null. Plates have nothing to describe. */
+  plate: string | null;
+  /**
+   * The badge itself rather than its glyph.
+   *
+   * A mark beside a name that nobody can identify is decoration; the point of
+   * a badge is that it says something, so it has to carry what it says. The
+   * catalogue lives on the server, so the alternative would be shipping it to
+   * every client to look up one string.
+   */
+  badge: WornBadge | null;
+}
+
+export async function wornBy(userId: string): Promise<Worn> {
   const rows = await db
     .select()
     .from(ownedCosmetics)
     .where(and(eq(ownedCosmetics.userId, userId), eq(ownedCosmetics.equipped, true)));
 
-  const worn: Record<Slot, string | null> = { plate: null, badge: null };
+  const worn: Worn = { plate: null, badge: null };
   if (rows.length === 0) return worn;
 
   const items = rows
@@ -409,7 +434,17 @@ export async function wornBy(userId: string): Promise<Record<Slot, string | null
 
   for (const item of items) {
     if (item.requiresSubscription && !subscribed) continue;
-    worn[item.slot] = item.value;
+    if (item.slot === 'plate') {
+      worn.plate = item.value;
+    } else {
+      worn.badge = {
+        id: item.id,
+        name: item.name,
+        blurb: item.blurb,
+        value: item.value,
+        ...(item.rarity ? { rarity: item.rarity } : {}),
+      };
+    }
   }
   return worn;
 }
