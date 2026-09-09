@@ -431,6 +431,21 @@ export class VoiceEngine {
           height: this.video.height,
           frameRate: this.video.frameRate,
         },
+        /*
+          Tell the encoder this is text, not a face.
+
+          Without a content hint Chromium treats a screen capture like camera
+          video, and camera video has a rule: when bandwidth tightens, keep the
+          motion smooth and shed resolution. That is right for a face and
+          catastrophic for an IDE - the first thing to go is exactly the detail
+          somebody pressed Watch to read, and no amount of bitrate gets it back
+          because the pixels were thrown away before encoding.
+
+          'text' asks for the opposite trade: hold the resolution, drop frames
+          if something has to give. A screen share that stutters is readable; a
+          smooth one you cannot read is not a screen share.
+        */
+        contentHint: 'text',
       });
       for (const track of tracks) {
         // Told to the SFU as well as to the capture: a browser that hands back
@@ -440,10 +455,49 @@ export class VoiceEngine {
           track,
           track instanceof LocalVideoTrack
             ? {
-                videoEncoding: {
+                /*
+                  `screenShareEncoding`, not `videoEncoding`.
+
+                  livekit keeps two separate encoding settings and picks by the
+                  track's source, so everything we said in `videoEncoding` was
+                  read for cameras and ignored here - screen shares went out at
+                  livekit's own default of 2.5 Mbps no matter what the server
+                  said. Free accounts were quietly getting more than their tier,
+                  and subscribers were getting half of the 5 Mbps they pay for,
+                  which is the more embarrassing half of the same bug.
+                */
+                screenShareEncoding: {
                   maxBitrate: this.video.maxBitrate,
                   maxFramerate: this.video.frameRate,
                 },
+                /*
+                  Three overrides of the room defaults, all for the same reason:
+                  those defaults are written for cameras, and this is not one.
+
+                  simulcast off. Simulcast encodes the same picture two or three
+                  times at descending sizes so the SFU can hand each viewer one
+                  their connection can take - and it pays for that out of a
+                  single bitrate budget. On a call full of faces that is a good
+                  trade. On a screen share it means the layer everybody actually
+                  watches gets a fraction of the 1.8 Mbps, and the rest is spent
+                  encoding small blurry copies nobody asks for. This is the
+                  single biggest thing standing between the current picture and
+                  a sharp one.
+
+                  VP9 rather than VP8. Screen content is large flat areas and
+                  hard edges, which is the case VP9 is dramatically better at -
+                  the same bitrate buys visibly sharper text. VP8 is the room
+                  default because it is the safest thing to send an unknown
+                  browser; both ends of a ChitChak call are Chromium, so there
+                  is no compatibility to protect here.
+
+                  And degradation preference, said out loud at the sender as
+                  well as hinted at the capture. contentHint is a request the
+                  encoder may interpret; this is the instruction.
+                */
+                simulcast: false,
+                videoCodec: 'vp9',
+                degradationPreference: 'maintain-resolution',
               }
             : {
                 /*
@@ -461,6 +515,19 @@ export class VoiceEngine {
                 red: true,
               },
         );
+        /*
+          Set again, after publishing, because livekit sets its own.
+
+          The hint passed to createScreenTracks is overwritten on the way out -
+          livekit marks screen shares as 'motion', which is the opposite trade
+          from the one we want and is what the sender was actually reporting.
+          The track object is the same one either way, so writing the hint here
+          is the last word on it.
+        */
+        if (track instanceof LocalVideoTrack) {
+          track.mediaStreamTrack.contentHint = 'text';
+        }
+
         this.screenTracks.push(track);
       }
     } catch (error) {
