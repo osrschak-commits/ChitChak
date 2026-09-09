@@ -86,9 +86,43 @@ When approved:
 5. Regenerate the sandbox API key - the current one passed through a chat log.
 
 The subscription now grants 2 keys, the plates, 1080p60 streams and a 100MB
-upload cap against 10MB free. Standard emoji are in for everybody.
+upload cap against 10MB free. Standard emoji are in for everybody, and custom
+per-guild emoji shipped for subscribers — everything promised is now built.
 
-Still to build: **custom emoji**, subscriber-uploaded. The hard half of that is
-already here — attachments gave us storage, sniffing, size caps and serving — so
-what is left is a per-guild emoji table, a name, and turning `:name:` into an
-image on the way out. It is the one thing still promised and not delivered.
+## Turn off PRE_LAUNCH on launch day
+
+`PRE_LAUNCH=true` is set in `.env.production`, so every account created gets the
+Founder badge. Set it to `false` and restart the server on the day the doors
+open properly, or the badge quietly stops meaning anything — a mark for being
+here first is worth exactly as much as the claim is true.
+
+    # on the box, launch day
+    sed -i 's/^PRE_LAUNCH=true/PRE_LAUNCH=false/' .env.production
+    docker compose -f docker-compose.prod.yml --env-file .env.production up -d server
+
+Nothing reminds you. This file is the reminder.
+
+## Key packs buy chest openings
+
+Keys are sold for money, and keys now open a chest that returns a random
+cosmetic. That is a paid loot box, whatever it is called in the interface, and
+in several countries it is a regulated one — the UK, Belgium and the Netherlands
+have all taken a view.
+
+The mitigation already in place is that cosmetics cannot be sold, traded or
+cashed out, which is the line most regulators actually draw. It holds only while
+that stays true: building the marketplace or trade system that has been talked
+about would cross it, and would want proper advice first.
+
+Parked deliberately rather than forgotten. The options, if it needs settling:
+sell chest openings directly rather than a currency, disclose odds at the point
+of purchase (they are already shown), or restrict paid openings by age.
+
+## The stream fixes have never been tested with two people
+
+`adaptiveStream` and `dynacast` are off, screen audio is captured without AGC,
+noise suppression or echo cancellation, and it is published at 96kbps with DTX
+off and RED on. All of that was reasoned from the symptoms — quiet audio, a
+stream that vanished, a long wait before it played — and none of it has been
+watched by a second person on a second machine, which is the only test that
+counts. Worth doing before anyone is invited who would be annoyed by it.
