@@ -15,7 +15,7 @@ import {
   createLocalVideoTrack,
 } from 'livekit-client';
 import type { LocalTrack, Participant, RemoteTrack, RemoteTrackPublication } from 'livekit-client';
-import type { VideoQuality } from '@chitchak/protocol';
+import type { StreamPreset, VideoQuality, VideoQualityOptions } from '@chitchak/protocol';
 
 /**
  * The voice engine: everything that touches actual media.
@@ -154,10 +154,41 @@ export class VoiceEngine {
    * nothing here can accidentally publish more than it should by being asked
    * before the answer arrives.
    */
-  private video: VideoQuality = { width: 1280, height: 720, frameRate: 30, maxBitrate: 1_800_000 };
+  private video: VideoQuality = { width: 1920, height: 1080, frameRate: 30, maxBitrate: 1_800_000 };
 
-  setVideoQuality(quality: VideoQuality): void {
+  /**
+   * What each preset is worth to this person, as the server worked it out.
+   *
+   * Held rather than recomputed so that switching preset is instant and cannot
+   * drift from what the server would allow - the client picks between two
+   * answers it was given, and never invents a third.
+   */
+  private presets: VideoQualityOptions | null = null;
+  private preset: StreamPreset = 'detail';
+
+  setVideoQuality(quality: VideoQuality, presets?: VideoQualityOptions): void {
     this.video = quality;
+    if (presets) {
+      this.presets = presets;
+      this.video = presets[this.preset];
+    }
+  }
+
+  /**
+   * Choose how to spend the bitrate.
+   *
+   * Takes effect on the next share rather than the current one: changing it
+   * live means republishing the track, which every viewer sees as the stream
+   * dropping and coming back. Somebody who wants the other preset mid-call can
+   * stop and start the share, which is at least an action they chose.
+   */
+  setStreamPreset(preset: StreamPreset): void {
+    this.preset = preset;
+    if (this.presets) this.video = this.presets[preset];
+  }
+
+  get streamPreset(): StreamPreset {
+    return this.preset;
   }
 
   constructor(private readonly callbacks: VoiceCallbacks) {}

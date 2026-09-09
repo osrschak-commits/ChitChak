@@ -136,13 +136,55 @@ export interface VideoQuality {
   maxBitrate: number;
 }
 
+/**
+ * Which way to spend the bitrate, named by what is being shared.
+ *
+ * The two are a genuine trade rather than better and worse: at a fixed bitrate
+ * every frame per second is bits taken off each frame. Sixty of them is right
+ * for a game and actively wrong for an IDE, where it halves the sharpness of
+ * text to smooth motion nobody is watching for.
+ *
+ * Named for the content rather than the numbers, because "1080p60" tells you
+ * what you are getting and not which one you want.
+ */
+export type StreamPreset = 'detail' | 'motion';
+
+/**
+ * What each preset means for this particular person.
+ *
+ * Both are computed on the server, so entitlement is never a client-side sum -
+ * the client's only job is to pick one. That also lets the free tier's presets
+ * be a different shape from a subscriber's rather than a scaled-down copy: on a
+ * small bitrate, "motion" is worth more as fewer pixels at sixty frames than as
+ * full resolution starved of them.
+ */
+export interface VideoQualityOptions {
+  detail: VideoQuality;
+  motion: VideoQuality;
+}
+
 export interface VoiceCredentials {
   channelId: Snowflake;
   /** WebSocket URL of the SFU, e.g. ws://localhost:7880 */
   url: string;
   /** JWT the client passes to the SFU. Grants publish+subscribe on this room only. */
   token: string;
+  /**
+   * The default preset's settings.
+   *
+   * Kept alongside `videoPresets` so a client from before presets existed still
+   * finds what it expects rather than publishing at whatever it defaults to.
+   */
   video: VideoQuality;
+  videoPresets: VideoQualityOptions;
+  /**
+   * Whether this account is subscribed.
+   *
+   * Not "may they use Motion" - everybody may. It is what Motion is worth that
+   * differs, so the client is told the plain fact and decides what to say about
+   * it rather than being handed a permission that does not exist.
+   */
+  subscribed: boolean;
 }
 
 export type ServerMessage =

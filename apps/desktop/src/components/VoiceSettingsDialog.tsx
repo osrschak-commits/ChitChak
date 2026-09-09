@@ -39,6 +39,13 @@ export function VoiceSettingsDialog({ onClose }: { onClose(): void }) {
   const notifySettings = useApp((s) => s.notifySettings);
   const setNotifySettings = useApp((s) => s.setNotifySettings);
   const previewSound = useApp((s) => s.previewSound);
+  const streamPreset = useApp((s) => s.streamPreset);
+  const setStreamPreset = useApp((s) => s.setStreamPreset);
+  const subscribed = useApp((s) => s.subscribed);
+  const videoPresets = useApp((s) => s.videoPresets);
+  // Null until a call has been joined, since the server is what says what each
+  // preset is worth here. The numbers are simply omitted until then.
+  const current = videoPresets?.[streamPreset] ?? null;
 
   const [devices, setDevices] = useState<{
     inputs: MediaDeviceInfo[];
@@ -249,6 +256,80 @@ export function VoiceSettingsDialog({ onClose }: { onClose(): void }) {
                 checked={audioSettings.autoGainControl}
                 onChange={(v) => void setAudioSettings({ autoGainControl: v })}
               />
+            </div>
+          </div>
+
+          <div className="section">
+            <h3 className="section__title">Screen sharing</h3>
+
+            <div className="row">
+              <div>
+                <div className="row__label">What you usually share</div>
+                {/* The trade, said in one sentence, because the numbers do not
+                    explain themselves: at a fixed bitrate every extra frame per
+                    second is bits taken off each frame. */}
+                <div className="row__hint">
+                  Every frame per second costs detail in each frame. Pick the one that matches
+                  what people will be looking at.
+                </div>
+              </div>
+              {/* Neither option is locked. What a subscription changes is what
+                  Motion is worth - 720p at the free bitrate, 1080p above it -
+                  which the numbers below say better than a disabled button. */}
+              <div className="segmented row__control">
+                <button
+                  aria-pressed={streamPreset === 'detail'}
+                  onClick={() => setStreamPreset('detail')}
+                  title="Sharpest picture. Best for code, documents, anything being read."
+                >
+                  Text &amp; detail
+                </button>
+                <button
+                  aria-pressed={streamPreset === 'motion'}
+                  onClick={() => setStreamPreset('motion')}
+                  title="Smoothest picture. Best for games and video."
+                >
+                  Motion
+                </button>
+              </div>
+            </div>
+
+            <div className="row">
+              <div className="row__hint">
+                {streamPreset === 'detail'
+                  ? 'Sharpest picture. Text stays readable even when the connection tightens.'
+                  : 'Smooth motion, at some cost to fine detail.'}
+                {/* Real numbers, from what the server actually granted this
+                    account - not a guess the client made, and not present at
+                    all until a call has said what they are. */}
+                {current && (
+                  <>
+                    {' '}
+                    <span className="mono">
+                      {current.height}p · {current.frameRate}fps ·{' '}
+                      {(current.maxBitrate / 1_000_000).toFixed(1)} Mbps
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Shown to people who are NOT subscribed - this was gated the wrong
+                way round at first and advertised a subscription to subscribers. */}
+            {!subscribed && (
+              <div className="row">
+                <div className="row__hint">
+                  A subscription makes Motion 1080p rather than 720p, with nearly three times the
+                  bitrate behind it.
+                </div>
+              </div>
+            )}
+
+            <div className="row">
+              <div className="row__hint">
+                A change applies to your next share, not the one you are in — swapping it live
+                would look like the stream dropping to everyone watching.
+              </div>
             </div>
           </div>
 

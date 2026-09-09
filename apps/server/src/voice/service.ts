@@ -1,4 +1,9 @@
-import type { VideoQuality, VoiceCredentials, VoiceState, VoiceUpdatePayload } from '@chitchak/protocol';
+import type {
+  VideoQualityOptions,
+  VoiceCredentials,
+  VoiceState,
+  VoiceUpdatePayload,
+} from '@chitchak/protocol';
 import { Permission, has } from '@chitchak/protocol';
 import { and, count, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
@@ -125,7 +130,7 @@ export async function joinVoiceChannel(
   registry.publishToGuild(channel.guildId, { op: 'voice:state', d: state }, userId);
 
   return {
-    credentials: { channelId, url: livekitUrl, token, video: await videoQualityFor(userId) },
+    credentials: await creditentialsFor(channelId, livekitUrl, token, userId),
     state,
   };
 }
@@ -205,33 +210,71 @@ export async function resumeVoiceChannel(
 /**
  * What a subscription is worth in pixels.
  *
- * The free tier is not a punishment - 720p30 is a perfectly good screen share,
- * and most people watching are looking at a window a third of their screen.
- * What a subscription buys is the difference that shows when somebody is
- * presenting something detailed, or playing something fast.
+ * Resolution is no longer the thing it buys. 720p sounded reasonable until you
+ * remember it is being downscaled from a 1440p or 4K monitor before the encoder
+ * ever sees it, and text that has been through a 2x downscale is gone - no
+ * bitrate brings it back. Everybody gets 1080p now, because being able to read
+ * what somebody is showing you is not a premium feature.
+ *
+ * What a subscription buys is headroom and smoothness: nearly three times the
+ * bitrate, and sixty frames at full resolution.
  */
-const FREE_VIDEO: VideoQuality = {
-  width: 1280,
-  height: 720,
-  frameRate: 30,
-  maxBitrate: 1_800_000,
+
+/** 1080p is the ceiling for everyone. Sixty frames at it is not. */
+const DETAIL_FPS = 30;
+const MOTION_FPS = 60;
+
+const FREE_BITRATE = 1_800_000;
+const SUBSCRIBER_BITRATE = 5_000_000;
+
+const FREE_VIDEO: VideoQualityOptions = {
+  detail: { width: 1920, height: 1080, frameRate: DETAIL_FPS, maxBitrate: FREE_BITRATE },
+  /*
+    720p60, not 1080p60.
+
+    A free share has 1.8 Mbps to spend, and sixty frames of 1080p out of that
+    budget is worse than thirty in every way that shows - each frame gets half
+    the bits and the whole thing turns to mush in motion, which is precisely
+    when somebody picked this preset. Dropping to 720p buys the frames honestly.
+  */
+  motion: { width: 1280, height: 720, frameRate: MOTION_FPS, maxBitrate: FREE_BITRATE },
 };
 
-const SUBSCRIBER_VIDEO: VideoQuality = {
-  width: 1920,
-  height: 1080,
-  frameRate: 60,
-  maxBitrate: 5_000_000,
+const SUBSCRIBER_VIDEO: VideoQualityOptions = {
+  detail: { width: 1920, height: 1080, frameRate: DETAIL_FPS, maxBitrate: SUBSCRIBER_BITRATE },
+  motion: { width: 1920, height: 1080, frameRate: MOTION_FPS, maxBitrate: SUBSCRIBER_BITRATE },
 };
 
-async function videoQualityFor(userId: string): Promise<VideoQuality> {
+/** Both presets, plus which of them this account may actually use. */
+async function creditentialsFor(
+  channelId: string,
+  url: string,
+  token: string,
+  userId: string,
+): Promise<VoiceCredentials> {
+  const { presets, subscribed } = await videoQualityFor(userId);
+  return {
+    channelId,
+    url,
+    token,
+    // Detail is the default: most shares are something being read.
+    video: presets.detail,
+    videoPresets: presets,
+    subscribed,
+  };
+}
+
+async function videoQualityFor(
+  userId: string,
+): Promise<{ presets: VideoQualityOptions; subscribed: boolean }> {
   try {
-    return (await standingOf(userId)).active ? SUBSCRIBER_VIDEO : FREE_VIDEO;
+    const subscribed = (await standingOf(userId)).active;
+    return { presets: subscribed ? SUBSCRIBER_VIDEO : FREE_VIDEO, subscribed };
   } catch (error) {
     // A subscription lookup that fails must not stop somebody joining a call.
     // The free tier is the safe answer: it works for everybody.
     console.error('[voice] could not read a subscription for video quality', { userId, error });
-    return FREE_VIDEO;
+    return { presets: FREE_VIDEO, subscribed: false };
   }
 }
 

@@ -11,6 +11,8 @@ import type {
   Rank,
   SelfUser,
   ServerMessage,
+  StreamPreset,
+  VideoQualityOptions,
   VoiceState,
 } from '@chitchak/protocol';
 import { create } from 'zustand';
@@ -117,6 +119,12 @@ interface AppState {
 
   voiceChannelId: string | null;
   voiceConnection: VoiceConnectionState;
+  /** How the bitrate is spent on a screen share. Persists between calls. */
+  streamPreset: StreamPreset;
+  /** Whether they are subscribed. Decides what the quality copy says, nothing else. */
+  subscribed: boolean;
+  /** What each preset is worth here, so the settings can show real numbers. */
+  videoPresets: VideoQualityOptions | null;
   speaking: Set<string>;
   /** Continuous 0..1 audio level per user, sampled from the SFU. Drives the meters. */
   levels: Map<string, number>;
@@ -174,6 +182,7 @@ interface AppState {
   editMessage(messageId: string, content: string): Promise<void>;
   deleteMessage(messageId: string): Promise<void>;
   joinVoice(channelId: string): void;
+  setStreamPreset(preset: StreamPreset): void;
   leaveVoice(): Promise<void>;
   toggleMute(): void;
   toggleDeafen(): void;
@@ -442,6 +451,9 @@ export const useApp = create<AppState>((set, get) => ({
 
   voiceChannelId: null,
   voiceConnection: 'disconnected',
+  streamPreset: loadStreamPreset(),
+  subscribed: false,
+  videoPresets: null,
   speaking: new Set(),
   levels: new Map(),
   videoFeeds: [],
@@ -630,6 +642,23 @@ export const useApp = create<AppState>((set, get) => ({
 
   async deleteMessage(messageId) {
     await api.deleteMessage(messageId);
+  },
+
+  /**
+   * Remembered on this machine rather than on the account.
+   *
+   * Which trade somebody wants is a property of what they share and what they
+   * are sharing it from - the desktop that streams games and the laptop that
+   * shows spreadsheets want different answers from the same person.
+   */
+  setStreamPreset(preset) {
+    set({ streamPreset: preset });
+    try {
+      localStorage.setItem('chitchak.stream-preset', preset);
+    } catch {
+      // Non-fatal: the choice simply will not survive a restart.
+    }
+    getEngine().setStreamPreset(preset);
   },
 
   joinVoice(channelId) {
@@ -947,12 +976,16 @@ function applyServerMessage(
     }
 
     case 'voice:credentials': {
-      const { url, token, channelId, video } = message.d;
+      const { url, token, channelId, video, videoPresets, subscribed } = message.d;
       set({ voiceChannelId: channelId, cameraOn: false, screenShareOn: false });
       const engineToJoin = getEngine();
       // Before connecting, so a share started immediately after joining is
       // already at the right quality rather than the default.
-      engineToJoin.setVideoQuality(video);
+      engineToJoin.setStreamPreset(get().streamPreset);
+      engineToJoin.setVideoQuality(video, videoPresets);
+      // Remembered so the settings dialog can say whether Motion is theirs
+      // without asking the server again.
+      set({ subscribed: Boolean(subscribed), videoPresets });
       // Before connecting, so the levels are already in place when the first
       // audio track arrives rather than a moment after everyone is audible.
       engineToJoin.setParticipantVolumes(
@@ -1303,6 +1336,15 @@ function loadUserVolumes(key = 'chitchak.volumes'): Record<string, number> {
     );
   } catch {
     return {};
+  }
+}
+
+function loadStreamPreset(): StreamPreset {
+  try {
+    // Detail is the default because most shares are something being read.
+    return localStorage.getItem('chitchak.stream-preset') === 'motion' ? 'motion' : 'detail';
+  } catch {
+    return 'detail';
   }
 }
 

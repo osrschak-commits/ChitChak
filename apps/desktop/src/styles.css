@@ -2750,6 +2750,18 @@ textarea::placeholder {
   font-weight: 600;
 }
 
+/* An option that is not yours yet - the Motion preset without a subscription.
+   Dimmed rather than hidden, because knowing an option exists is the point;
+   the hover title says what would unlock it. */
+.segmented button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.segmented button:disabled:hover {
+  color: var(--text-secondary);
+}
+
 /* Switch */
 .switch {
   width: 38px;
