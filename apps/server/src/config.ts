@@ -35,6 +35,23 @@ const envSchema = z.object({
   SIGNUP_CODE: blankIsUnset(z.string().min(4).optional()),
 
   /**
+   * Before the doors open properly.
+   *
+   * While this is 'true', every account created is given the Founder badge,
+   * which is not for sale and not in the chest. Turning it off is what makes
+   * the badge mean something: from that moment nobody new can ever have one,
+   * and the accounts that do are exactly the ones that were here first.
+   *
+   * A string rather than a coerced boolean on purpose - `z.coerce.boolean()`
+   * reads "false" as true, which is precisely the mistake that would keep
+   * handing out Founder badges for ever after launch.
+   */
+  PRE_LAUNCH: z
+    .preprocess((value) => (value === '' ? undefined : value), z.enum(['true', 'false']))
+    .default('false')
+    .transform((value) => value === 'true'),
+
+  /**
    * Paddle, who take the money.
    *
    * All optional, and deliberately so: without them the server runs, the shop

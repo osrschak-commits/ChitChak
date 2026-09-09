@@ -48,6 +48,10 @@ export interface CosmeticItem {
   rarity?: Rarity;
   /** Included with a subscription rather than bought with keys. */
   requiresSubscription?: boolean;
+  /** Given out rather than sold - the server only lists one you have. */
+  awarded?: boolean;
+  /** Earned by having had an account this long. */
+  earnedAfterDays?: number;
   /** How to draw it - a gradient for a plate, a glyph for a badge. */
   value: string;
   owned: boolean;

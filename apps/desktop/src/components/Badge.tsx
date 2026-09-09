@@ -26,7 +26,7 @@ const ARTWORK = import.meta.glob('../assets/badges/*.svg', {
   import: 'default',
 }) as Record<string, string>;
 
-function artworkFor(id: string): string | null {
+export function artworkFor(id: string): string | null {
   const match = Object.entries(ARTWORK).find(([path]) => path.endsWith(`/${id}.svg`));
   return match ? match[1] : null;
 }

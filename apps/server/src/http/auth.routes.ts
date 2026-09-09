@@ -25,6 +25,7 @@ import {
   resetTokenExpiry,
   signAccessToken,
 } from '../lib/tokens.js';
+import { AWARDED_AT_SIGNUP, award } from '../services/cosmetics.js';
 import { toSelfUser } from '../services/serialize.js';
 
 function toAuthResponse(
@@ -105,6 +106,27 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         })
         .returning();
       if (!user) throw errors.invalid('Could not create account');
+
+      /*
+        Everybody who registers before launch is a founder.
+
+        Deliberately not fatal. The account exists and is theirs whatever
+        happens here, and refusing to sign somebody up because a decoration
+        could not be written would be a strange trade; a failure is logged so
+        the backfill can put it right, which it is built to do anyway.
+      */
+      if (config.PRE_LAUNCH) {
+        for (const cosmeticId of AWARDED_AT_SIGNUP) {
+          try {
+            await award(user.id, cosmeticId);
+          } catch (error: unknown) {
+            request.log.error(
+              { error, userId: user.id, cosmeticId },
+              'could not award signup badge',
+            );
+          }
+        }
+      }
 
       return reply.code(201).send(await issueSession(user, request.headers['user-agent']));
     },

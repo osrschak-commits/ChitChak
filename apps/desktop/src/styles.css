@@ -4318,11 +4318,26 @@ textarea::placeholder {
   justify-content: center;
 }
 
+/* Wider than the plate swatch, and wider than a square.
+
+   Badge artwork is drawn about twice as wide as it is tall, so a 34px square
+   squeezes it to half the height the row has room for. Every badge swatch is
+   the same rectangle - including the glyph ones - so the names beside them
+   still line up down the column. */
 .shopitem__swatch--badge {
+  width: 48px;
   background: var(--graphite-750);
   color: var(--brass-300);
   font-size: 12px;
   letter-spacing: 1px;
+}
+
+/* Bounded on both axes so any shape of artwork fits, and `contain` so none of
+   it is ever stretched to do so. */
+.shopitem__art {
+  height: 22px;
+  max-width: 44px;
+  object-fit: contain;
 }
 
 .shopitem__text {

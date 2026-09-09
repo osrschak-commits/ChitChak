@@ -375,11 +375,27 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
     preHandler: authenticate,
     handler: async (request) => {
       const { userId } = requireUser(request);
-      const [standing, owned] = await Promise.all([
+      const [standing, owned, ageDays] = await Promise.all([
         subscriptionsService.standingOf(userId),
         cosmetics.ownedBy(userId),
+        cosmetics.accountAgeDays(userId),
       ]);
       const ownedIds = new Map(owned.map((row) => [row.cosmeticId, row]));
+
+      /**
+       * Whether it can be worn right now.
+       *
+       * Three different questions collapsed into the one the interface asks. A
+       * badge is available once bought; a plate is available while subscribed,
+       * and stops being so when that lapses without anybody having lost
+       * anything they paid for; a time badge is available once the account is
+       * old enough, and never stops.
+       */
+      const available = (item: cosmetics.Cosmetic): boolean => {
+        if (item.requiresSubscription) return standing.active;
+        if (item.earnedAfterDays !== undefined) return ageDays >= item.earnedAfterDays;
+        return ownedIds.has(item.id);
+      };
 
       return {
         subscription: {
@@ -390,20 +406,22 @@ export async function userRoutes(app: FastifyInstance): Promise<void> {
         keys: standing.keys,
         keysPerPeriod: keysService.KEYS_PER_PERIOD,
         chest: await chest.status(userId),
-        items: cosmetics.COSMETICS.map((item) => ({
-          ...item,
-          owned: ownedIds.has(item.id),
-          equipped: ownedIds.get(item.id)?.equipped ?? false,
-          /**
-           * Whether it can be worn right now.
-           *
-           * Two different questions collapsed into the one the interface
-           * actually asks. A badge is available once bought; a plate is
-           * available while subscribed, and stops being so when that lapses
-           * without anybody having lost anything they paid for.
-           */
-          available: item.requiresSubscription ? standing.active : ownedIds.has(item.id),
-        })),
+        items: cosmetics.COSMETICS
+          /*
+            An awarded badge is only listed to somebody who has it.
+
+            The shop is a place things are bought, and there is nothing to buy
+            here - showing Founder to an account that will never be able to get
+            one is an advert for a closed door. Owning it puts it back in the
+            list, because the shop is also where anything is put on.
+          */
+          .filter((item) => !item.awarded || available(item))
+          .map((item) => ({
+            ...item,
+            owned: ownedIds.has(item.id),
+            equipped: ownedIds.get(item.id)?.equipped ?? false,
+            available: available(item),
+          })),
       };
     },
   });

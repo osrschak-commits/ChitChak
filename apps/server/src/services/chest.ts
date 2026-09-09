@@ -49,8 +49,17 @@ export const DROP_RATES: Record<Rarity, number> = {
 
 const TIERS: Rarity[] = ['common', 'uncommon', 'rare', 'epic', 'legendary'];
 
-/** Everything the chest can ever give. */
-export const CHEST_POOL: Cosmetic[] = COSMETICS.filter((item) => Boolean(item.rarity));
+/**
+ * Everything the chest can ever give.
+ *
+ * A rarity is what puts an item in here. `awarded` is checked as well and not
+ * because anything currently sets both - it is a second lock on the one thing
+ * that must never happen: a badge that means "you were here first" coming out
+ * of a chest a year later because somebody gave it a rarity by habit.
+ */
+export const CHEST_POOL: Cosmetic[] = COSMETICS.filter(
+  (item) => Boolean(item.rarity) && !item.awarded,
+);
 
 export interface Opened {
   cosmetic: Cosmetic;

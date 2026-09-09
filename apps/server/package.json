@@ -11,7 +11,8 @@
     "db:migrate": "tsx --env-file=../../.env src/db/migrate.ts",
     "db:seed": "tsx --env-file=../../.env src/db/seed.ts",
     "db:backfill": "tsx --env-file=../../.env src/db/backfill-ranks.ts",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:award-founder": "tsx --env-file=../../.env src/db/award-founder.ts"
   },
   "dependencies": {
     "@chitchak/protocol": "*",

@@ -1,6 +1,6 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { ownedCosmetics } from '../db/schema.js';
+import { ownedCosmetics, users } from '../db/schema.js';
 import { errors } from '../lib/errors.js';
 import * as keys from './keys.js';
 import { standingOf } from './subscriptions.js';
@@ -66,6 +66,26 @@ export interface Cosmetic {
    * included with Brass and would be a strange thing to also win.
    */
   rarity?: Rarity;
+  /**
+   * Given, never sold and never won.
+   *
+   * A badge that says "you were here first" is worth exactly as much as the
+   * claim is true, so it cannot also be something a latecomer buys or rolls
+   * for. These are handed out by `award`, refused by `buy`, and kept out of
+   * the chest pool; the shop only shows one to somebody who already has it, so
+   * it can be worn from the same place as everything else.
+   */
+  awarded?: boolean;
+  /**
+   * Earned by having had an account this long, and by nothing else.
+   *
+   * Derived rather than granted, for the same reason the subscription plates
+   * are: it is a question with an answer at the moment somebody is drawn, so
+   * there is no scheduled job to fail overnight, nothing to be out of date,
+   * and no way for the badge to appear a day late because a sweep was slow.
+   * Nobody owns one - the account's age is the entitlement.
+   */
+  earnedAfterDays?: number;
 }
 
 export const COSMETICS: Cosmetic[] = [
@@ -107,16 +127,39 @@ export const COSMETICS: Cosmetic[] = [
     value: 'linear-gradient(135deg, #7d2f34, #3a1417)',
   },
 
-  // --- Badges: a small mark beside your name --------------------------------
+  /*
+    --- Badges nobody can buy ------------------------------------------------
+
+    These are records of when somebody turned up, and a record that can be
+    bought later is not a record of anything - so they are out of the shop and
+    out of the chest, which is what `awarded` means.
+
+    They are earned two different ways. Founder is handed out at registration
+    while `PRE_LAUNCH` is on, and stops for good the day it is turned off. Year
+    one is not handed out at all: it is a question asked about the account's
+    age, so it appears on its own the day it is true.
+  */
   {
     id: 'badge.founder',
     name: 'Founder',
     slot: 'badge',
-    blurb: 'For being here before it was finished.',
-    price: 6,
-    rarity: 'legendary',
+    blurb: 'Here before it was finished. Given, never sold.',
+    price: 0,
+    awarded: true,
     value: '◆',
   },
+  {
+    id: 'badge.1year',
+    name: 'Year one',
+    slot: 'badge',
+    blurb: 'A year on ChitChak, to the day.',
+    price: 0,
+    awarded: true,
+    earnedAfterDays: 365,
+    value: '❶',
+  },
+
+  // --- Badges: a small mark beside your name --------------------------------
   {
     id: 'badge.meter',
     name: 'Meter',
@@ -300,6 +343,7 @@ export async function buy(userId: string, cosmeticId: string): Promise<void> {
   if (item.requiresSubscription) {
     throw errors.invalid('That comes with a subscription rather than being bought');
   }
+  if (item.awarded) throw errors.invalid('That one is given out, not sold');
 
   const claimed = await db
     .insert(ownedCosmetics)
@@ -323,6 +367,68 @@ export async function buy(userId: string, cosmeticId: string): Promise<void> {
 }
 
 /**
+ * The badges handed to every account that exists before launch.
+ *
+ * Listed here rather than derived from `awarded`, because the two are not the
+ * same question: `awarded` says an item cannot be bought, and this says which
+ * ones are currently being given away. A badge retired at launch keeps the
+ * first and leaves the second.
+ */
+export const AWARDED_AT_SIGNUP = ['badge.founder'] as const;
+
+/** Whole days since the account was made. */
+export async function accountAgeDays(userId: string): Promise<number> {
+  const row = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+    columns: { createdAt: true },
+  });
+  if (!row) return 0;
+  return Math.floor((Date.now() - row.createdAt.getTime()) / 86_400_000);
+}
+
+/**
+ * Whether somebody may wear this right now.
+ *
+ * The two derived entitlements are asked lazily and only when something worn
+ * actually depends on one, so drawing a name costs no extra queries in the
+ * ordinary case where nobody is wearing a subscription plate or a time badge.
+ */
+async function entitled(
+  userId: string,
+  item: Cosmetic,
+  cache: { subscribed?: boolean; ageDays?: number },
+): Promise<boolean> {
+  if (item.requiresSubscription) {
+    cache.subscribed ??= (await standingOf(userId)).active;
+    return cache.subscribed;
+  }
+  if (item.earnedAfterDays !== undefined) {
+    cache.ageDays ??= await accountAgeDays(userId);
+    return cache.ageDays >= item.earnedAfterDays;
+  }
+  return owns(userId, item.id);
+}
+
+/**
+ * Give somebody a cosmetic without taking anything for it.
+ *
+ * Returns whether this granted it, so a caller can tell "given" from "already
+ * had", and so running a backfill twice reports honestly the second time.
+ * Nothing is spent, so unlike `buy` there is no failure that has to be undone.
+ */
+export async function award(userId: string, cosmeticId: string): Promise<boolean> {
+  if (!COSMETICS_BY_ID.has(cosmeticId)) throw errors.notFound('No such item');
+
+  const claimed = await db
+    .insert(ownedCosmetics)
+    .values({ userId, cosmeticId })
+    .onConflictDoNothing()
+    .returning({ cosmeticId: ownedCosmetics.cosmeticId });
+
+  return claimed.length > 0;
+}
+
+/**
  * Wear one, or take it off.
  *
  * At most one per slot, enforced by clearing the slot first. A unique index
@@ -335,10 +441,11 @@ export async function equip(userId: string, cosmeticId: string | null, slot: Slo
     if (!item) throw errors.notFound('No such item');
     if (item.slot !== slot) throw errors.invalid('That does not go there');
 
-    if (item.requiresSubscription) {
-      const standing = await standingOf(userId);
-      if (!standing.active) throw errors.forbidden('That comes with a subscription');
-    } else if (!(await owns(userId, cosmeticId))) {
+    if (!(await entitled(userId, item, {}))) {
+      if (item.requiresSubscription) throw errors.forbidden('That comes with a subscription');
+      if (item.earnedAfterDays !== undefined) {
+        throw errors.forbidden('You have not had an account that long yet');
+      }
       throw errors.forbidden('You do not own that');
     }
   }
@@ -428,12 +535,18 @@ export async function wornBy(userId: string): Promise<Worn> {
     .map((row) => COSMETICS_BY_ID.get(row.cosmeticId))
     .filter((item): item is Cosmetic => Boolean(item));
 
-  // Only asked when something worn actually depends on it.
-  const needsSubscription = items.some((item) => item.requiresSubscription);
-  const subscribed = needsSubscription ? (await standingOf(userId)).active : false;
+  // Asked at most once each, and only if something worn depends on it.
+  const cache: { subscribed?: boolean; ageDays?: number } = {};
 
   for (const item of items) {
-    if (item.requiresSubscription && !subscribed) continue;
+    // Ownership is already proved by the row being here and equipped, so the
+    // only questions left are the derived ones.
+    if (
+      (item.requiresSubscription || item.earnedAfterDays !== undefined) &&
+      !(await entitled(userId, item, cache))
+    ) {
+      continue;
+    }
     if (item.slot === 'plate') {
       worn.plate = item.value;
     } else {

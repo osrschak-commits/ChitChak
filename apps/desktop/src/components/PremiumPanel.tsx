@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { artworkFor } from './Badge.js';
 import { BrassChest } from './BrassChest.js';
 import { api, type CosmeticItem, type PremiumState } from '../lib/api.js';
 
@@ -22,7 +23,8 @@ const SLOT_NAMES: Record<string, string> = {
 
 const SLOT_BLURBS: Record<string, string> = {
   plate: 'The finish on your profile card. Included with a subscription.',
-  badge: 'A small mark beside your name. Bought with keys, and yours to keep.',
+  // Not "bought with keys" any more: the first one in the list is given out.
+  badge: 'A small mark beside your name. Bought, won, or awarded - and yours to keep.',
 };
 
 export function PremiumPanel() {
@@ -210,6 +212,8 @@ function ShopItem({
   onBuy(): void;
   onWear(): void;
 }) {
+  const art = item.slot === 'badge' ? artworkFor(item.id) : null;
+
   return (
     <div className={`shopitem ${item.equipped ? 'shopitem--worn' : ''}`}>
       {/* The item shows itself rather than describing itself: a plate is its
@@ -219,7 +223,15 @@ function ShopItem({
         style={item.slot === 'plate' ? { background: item.value } : undefined}
         aria-hidden="true"
       >
-        {item.slot === 'badge' ? item.value : null}
+        {/* The drawn badge where there is one, so the shop shows the thing
+            that will appear beside your name rather than its stand-in. */}
+        {item.slot === 'badge' ? (
+          art ? (
+            <img className="shopitem__art" src={art} alt="" draggable={false} />
+          ) : (
+            item.value
+          )
+        ) : null}
       </span>
 
       <div className="shopitem__text">
@@ -235,6 +247,11 @@ function ShopItem({
         // Nothing to buy and nothing to click. Saying what would unlock it is
         // more use than a disabled button that explains nothing.
         <span className="shopitem__locked mono">Subscribers</span>
+      ) : item.awarded ? (
+        // The server only sends an awarded item to somebody who has it, so
+        // this is the fallback for an older client rather than a normal state.
+        // Never a price: these are not for sale at any number.
+        <span className="shopitem__locked mono">Awarded</span>
       ) : (
         <button className="btn btn--sm" disabled={busy} onClick={onBuy}>
           {busy ? '…' : `${item.price} ${item.price === 1 ? 'key' : 'keys'}`}
