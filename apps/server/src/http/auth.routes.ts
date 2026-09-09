@@ -27,6 +27,7 @@ import {
 } from '../lib/tokens.js';
 import { AWARDED_AT_SIGNUP, award } from '../services/cosmetics.js';
 import { toSelfUser } from '../services/serialize.js';
+import { currentSuspension, explain } from '../services/suspensions.js';
 
 function toAuthResponse(
   user: typeof users.$inferSelect,
@@ -153,6 +154,21 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         throw errors.unauthorized('Incorrect email or password');
       }
 
+      /*
+        Checked after the password, never before.
+
+        Telling somebody their account is suspended is telling them the account
+        exists, so it is only said to whoever proved they own it. Answering the
+        wrong password with a suspension notice would turn this endpoint into a
+        way of testing which addresses are registered.
+
+        Refused here rather than letting them in: a session that every
+        subsequent request rejects is an app that looks broken, and the point of
+        a suspension is that the person knows what happened.
+      */
+      const suspension = currentSuspension(user);
+      if (suspension) throw errors.suspended(explain(suspension));
+
       // Opportunistic upgrade: the only moment we hold the plaintext is here.
       if (needsRehash(user.passwordHash)) {
         const passwordHash = await hashPassword(parsed.data.password);
@@ -199,6 +215,18 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
       const user = await db.query.users.findFirst({ where: eq(users.id, stored.userId) });
       if (!user) throw errors.unauthorized('Account no longer exists');
+
+      /*
+        A suspended account does not get a fresh token.
+
+        The token it would be handed is useless - every authenticated route
+        checks - but handing it over is worse than useless. A client that is
+        refused on the socket refreshes and reconnects, so leaving this open
+        makes a suspended person reconnect for ever instead of being told what
+        happened. The refusal is what ends the loop.
+      */
+      const suspension = currentSuspension(user);
+      if (suspension) throw errors.suspended(explain(suspension));
 
       const next = generateRefreshToken();
       const nextId = generateId();

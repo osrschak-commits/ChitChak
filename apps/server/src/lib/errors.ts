@@ -32,6 +32,14 @@ export const errors = {
   unauthorized: (message = 'Authentication required') => new AppError(401, 'invalid_token', message),
   forbidden: (message = 'You do not have access to that') => new AppError(403, 'forbidden', message),
   /**
+   * The account is locked out, and the message says why.
+   *
+   * 403 rather than 401 on purpose: a 401 makes the client refresh and retry,
+   * then sign in again, which for a suspended account is a loop that cannot
+   * succeed and never shows anybody the reason.
+   */
+  suspended: (message: string) => new AppError(403, 'suspended', message),
+  /**
    * `not_found`, not `unknown_channel`.
    *
    * Every 404 in the app used to claim to be about a channel, including "no such

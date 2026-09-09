@@ -38,6 +38,39 @@ export interface Flair {
 
 export type Rarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
 
+export type ReportStatus = 'open' | 'actioned' | 'dismissed';
+
+export interface QueuedReport {
+  id: string;
+  at: string;
+  status: ReportStatus;
+  reason: string;
+  /** The message as it read when it was reported - kept even if it is deleted. */
+  quoted: string | null;
+  reporter: string;
+  subject: string;
+  subjectId: string;
+  subjectSuspended: boolean;
+  /** How many reports this person has in all. Context one row cannot give. */
+  subjectReports: number;
+  guildId: string | null;
+  channelId: string | null;
+  messageId: string | null;
+  handledBy: string | null;
+  handledAt: string | null;
+  outcome: string | null;
+}
+
+export interface SuspendedAccount {
+  userId: string;
+  username: string;
+  displayName: string;
+  at: string;
+  /** null means indefinitely. */
+  until: string | null;
+  reason: string;
+}
+
 export interface CosmeticItem {
   id: string;
   name: string;
@@ -220,8 +253,44 @@ class ApiClient {
       message: `Unexpected ${response.status} response`,
     }))) as unknown;
 
+    /*
+      A suspension ends the session, wherever it is noticed.
+
+      Every authenticated route answers this way once an account is locked out,
+      so without it the app sits in a signed-in shell where nothing works and
+      nothing explains itself. Clearing the session drops the person back to
+      the sign-in screen, which then refuses them with the same reason - the
+      one place where being told is any use.
+    */
+    if (!response.ok && (payload as ApiError)?.error === 'suspended') {
+      this.suspendedMessage = (payload as ApiError).message;
+      if (this.session) this.persist(null);
+    }
+
     if (!response.ok) throw new ApiRequestError(response.status, payload as ApiError);
     return payload as T;
+  }
+
+  /**
+   * Why the last session ended, when it ended in a suspension.
+   *
+   * Read by the sign-in screen so somebody who was thrown out mid-session sees
+   * the reason immediately, rather than only after trying to sign in again and
+   * being refused a second time.
+   */
+  suspendedMessage: string | null = null;
+
+  /**
+   * Ends the session because the account has been suspended.
+   *
+   * Called from the gateway, which learns about a suspension before any HTTP
+   * request does - the socket is closed the moment staff act, while the next
+   * API call might be minutes away. Without this the client would sit in a
+   * signed-in shell reconnecting to a socket that will never accept it.
+   */
+  endSessionAsSuspended(message: string): void {
+    this.suspendedMessage = message;
+    if (this.session) this.persist(null);
   }
 
   private async refresh(): Promise<boolean> {
@@ -356,6 +425,58 @@ class ApiClient {
     }>;
   }> {
     return this.request('/api/admin/black-cards');
+  }
+
+  // --- Moderation -----------------------------------------------------------
+
+  /**
+   * Report a message, or a person.
+   *
+   * The only route in this section an ordinary account can call. Nothing comes
+   * back but an id: what happens next is about somebody else's account, and is
+   * not the reporter's to be told.
+   */
+  fileReport(input: {
+    messageId?: string;
+    username?: string;
+    reason: string;
+  }): Promise<{ id: string }> {
+    return this.request('/api/reports', { method: 'POST', body: JSON.stringify(input) });
+  }
+
+  /** Lock an account out. `days` omitted means indefinitely. */
+  suspendAccount(input: {
+    username: string;
+    reason: string;
+    days?: number | null;
+  }): Promise<{ username: string; until: string | null; reason: string }> {
+    return this.request('/api/admin/suspend', { method: 'POST', body: JSON.stringify(input) });
+  }
+
+  liftSuspension(username: string): Promise<{ username: string }> {
+    return this.request('/api/admin/suspend', {
+      method: 'DELETE',
+      body: JSON.stringify({ username }),
+    });
+  }
+
+  listSuspended(): Promise<{ accounts: SuspendedAccount[] }> {
+    return this.request('/api/admin/suspended');
+  }
+
+  listReports(status?: ReportStatus): Promise<{ reports: QueuedReport[]; open: number }> {
+    return this.request(`/api/admin/reports${status ? `?status=${status}` : ''}`);
+  }
+
+  resolveReport(
+    reportId: string,
+    status: 'actioned' | 'dismissed',
+    outcome?: string,
+  ): Promise<QueuedReport> {
+    return this.request(`/api/admin/reports/${reportId}`, {
+      method: 'POST',
+      body: JSON.stringify({ status, outcome }),
+    });
   }
 
   // --- Premium --------------------------------------------------------------

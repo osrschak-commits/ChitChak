@@ -24,7 +24,15 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated(): void }) {
    */
   const [signupCodeRequired, setSignupCodeRequired] = useState(true);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [formError, setFormError] = useState<string | null>(null);
+  /*
+    Why the last session ended, when it ended in a suspension.
+
+    Somebody suspended mid-session is dropped here with no explanation
+    otherwise - the app simply stops being signed in, which looks like a bug
+    rather than a decision. Read once, on the way in, so the reason is on
+    screen before they try to sign in again and are refused a second time.
+  */
+  const [formError, setFormError] = useState<string | null>(api.suspendedMessage);
   const [busy, setBusy] = useState(false);
 
   const isRegister = mode === 'register';
@@ -33,6 +41,7 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated(): void }) {
   /** Switching modes should not carry the previous one's errors with it. */
   function goTo(next: 'login' | 'register' | 'forgot') {
     setMode(next);
+    api.suspendedMessage = null;
     setFormError(null);
     setFieldErrors({});
     setResetRequested(false);

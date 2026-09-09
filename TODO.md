@@ -28,12 +28,32 @@ friends, unworkable beyond that. Needs a provider, and the SPF and DKIM records
 it gives you, or the mail lands in spam — which for a password reset is the same
 as not sending it.
 
-## Platform-level moderation
+## Platform-level moderation — done
 
-Moderation today is per-server: kick, ban and mute inside a guild. There is no
-way to remove someone from the platform, and no way for anyone to report
-anything. Both become necessary the moment registration opens to strangers, and
-neither is urgent while the signup code is on.
+Anyone can report a message or a person; staff read the queue and can suspend an
+account, or lift a suspension, from the Staff tab. Reports snapshot the message
+when they are filed, so the evidence survives it being deleted, and every
+suspension and decision is recorded in `staff_actions` against a name.
+
+A suspension is not deletion and not a guild ban: nothing is erased, and lifting
+it gives back the servers, friends and history untouched. It reaches the session
+the person is sitting in - their sockets are closed, their tokens invalidated,
+and refresh is refused - and it says why, to them, on the sign-in screen.
+
+**`PLATFORM_ADMINS` has to be set for any of it to be reachable.** It is a
+comma-separated list of user ids read at boot, and it is empty by default, so a
+deployment nobody has configured has no staff: reports can be filed and nobody
+can read them. See `.env.production.example`.
+
+Two things deliberately left:
+
+- No appeals route. Somebody suspended is told the reason and nothing else; if
+  they want to argue they have to find an operator another way. Fine while that
+  is one person; a real gap once it is not.
+- Staff cannot be suspended through the API. Removing an operator means taking
+  them out of `PLATFORM_ADMINS` and redeploying, which is deliberate - an app
+  that can lock out its own operators is one compromised session away from
+  having none.
 
 ## An update that Macs can install themselves
 

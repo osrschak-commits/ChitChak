@@ -10,6 +10,7 @@ import { startVoiceXpTicker, stopVoiceXpTicker } from './voice/xp-ticker.js';
 import * as presence from './gateway/presence.js';
 import { registry } from './gateway/registry.js';
 import { adminRoutes } from './http/admin.routes.js';
+import { reportsRoutes } from './http/reports.routes.js';
 import { platformStaffCount } from './services/staff.js';
 import { billingRoutes } from './http/billing.routes.js';
 import { authRoutes } from './http/auth.routes.js';
@@ -135,6 +136,7 @@ await app.register(guildRoutes);
 await app.register(rankRoutes);
 await app.register(moderationRoutes);
 await app.register(adminRoutes);
+await app.register(reportsRoutes);
 await app.register(gatewayPlugin);
 
 // Said out loud at boot. An account that can act on anyone should never be a

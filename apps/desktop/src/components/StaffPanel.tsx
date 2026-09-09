@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
+import { ModerationPanel } from './ModerationPanel.js';
 
 /**
  * The operator's panel.
@@ -83,6 +84,10 @@ export function StaffPanel() {
 
   return (
     <>
+      {/* Reports first: a card is something you give when you feel like it, a
+          report is somebody waiting. */}
+      <ModerationPanel />
+
       <div className="section">
         <h3 className="section__title">Black card</h3>
         <p className="row__hint" style={{ marginBottom: 12, maxWidth: 420 }}>
@@ -166,7 +171,8 @@ export function StaffPanel() {
         <p className="row__hint" style={{ maxWidth: 440 }}>
           Moderate in any server, including ones you are not in and including their owners. It does
           not let you read private conversations or join channels you were not admitted to — the
-          reach is over behaviour, not over what people say. Every card given is recorded.
+          reach is over behaviour, not over what people say. Every card, suspension and report
+          decision is recorded against your name.
         </p>
       </div>
     </>

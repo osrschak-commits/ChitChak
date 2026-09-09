@@ -66,6 +66,29 @@ export const users = pgTable(
      * threads can still hang from.
      */
     deletedAt: timestamp('deleted_at', { withTimezone: true }),
+    /**
+     * Locked out by platform staff.
+     *
+     * Deliberately not deletion and deliberately not a guild ban: the account
+     * and everything in it stays exactly as it was, and lifting the suspension
+     * puts the person back with their servers, friends and history intact. It
+     * is the only remedy that is reversible, which is what makes it the right
+     * default for a mistake nobody can undo otherwise.
+     *
+     * Null means not suspended. `suspendedUntil` null while suspended means
+     * indefinitely - a permanent removal is a suspension nobody has lifted,
+     * rather than a separate state with its own rules.
+     */
+    suspendedAt: timestamp('suspended_at', { withTimezone: true }),
+    suspendedUntil: timestamp('suspended_until', { withTimezone: true }),
+    /**
+     * Shown to the suspended person, not just to staff.
+     *
+     * An account that stops working without saying why is indistinguishable
+     * from a broken one, and someone who cannot find out what they did cannot
+     * stop doing it.
+     */
+    suspendedReason: text('suspended_reason'),
   },
   (table) => [
     // Both columns are normalised to lowercase before insert (see auth routes),
@@ -767,6 +790,79 @@ export const guildEmoji = pgTable(
   ],
 );
 
+/**
+ * Something a person wants staff to look at.
+ *
+ * Moderation before this was entirely per-server: kick, ban and mute inside a
+ * guild you have a rank in. That leaves nowhere at all to take behaviour by
+ * someone who owns the server they are doing it in, and no way for anyone to
+ * raise anything without knowing an operator personally.
+ *
+ * Two things here are load-bearing:
+ *
+ * `quoted` and `quotedAuthor` are a snapshot taken when the report is filed,
+ * not a join. A reported message is very often deleted moments later - by the
+ * author, or by the server owner who was the problem - and a queue of reports
+ * pointing at nothing is a queue nobody can act on. The copy is what staff read.
+ *
+ * `messageId` is ON DELETE SET NULL for the same reason: the link is a
+ * convenience, the snapshot is the evidence.
+ */
+export const reports = pgTable(
+  'reports',
+  {
+    id: id(),
+    reporterId: text('reporter_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Who is being reported. Always present - a report is about a person. */
+    subjectId: text('subject_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** The message that prompted it, where there was one. */
+    messageId: text('message_id').references(() => messages.id, { onDelete: 'set null' }),
+    /** Where it happened, so staff can find it. Null for a DM. */
+    guildId: text('guild_id').references(() => guilds.id, { onDelete: 'set null' }),
+    channelId: text('channel_id').references(() => channels.id, { onDelete: 'set null' }),
+    /** The message as it read when it was reported. */
+    quoted: text('quoted'),
+    /** What the reporter said about it. */
+    reason: text('reason').notNull(),
+    /** 'open' | 'actioned' | 'dismissed'. Text so a new outcome needs no migration. */
+    status: text('status').notNull().default('open'),
+    handledById: text('handled_by_id').references(() => users.id, { onDelete: 'set null' }),
+    handledAt: timestamp('handled_at', { withTimezone: true }),
+    /** What staff did about it, in their own words. */
+    outcome: text('outcome'),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    // The queue is read as "open, oldest first", which is exactly this index.
+    index('reports_status_idx').on(table.status, table.createdAt),
+    index('reports_subject_idx').on(table.subjectId),
+    // One report per person per message. Reporting the same thing ten times
+    // should not make it ten times as loud, and a queue is easier to work
+    // through when each row is a distinct thing rather than a tally.
+    uniqueIndex('reports_one_per_message_idx').on(table.reporterId, table.messageId),
+  ],
+);
+
+/**
+ * Three separate links to `users` from one row, so each needs naming.
+ *
+ * Drizzle cannot tell which foreign key a relation means when a table points at
+ * the same table more than once, and this one points at users three times - who
+ * complained, who they complained about, and who dealt with it.
+ */
+export const reportsRelations = relations(reports, ({ one }) => ({
+  reporter: one(users, { fields: [reports.reporterId], references: [users.id] }),
+  subject: one(users, { fields: [reports.subjectId], references: [users.id] }),
+  handledBy: one(users, { fields: [reports.handledById], references: [users.id] }),
+  message: one(messages, { fields: [reports.messageId], references: [messages.id] }),
+  guild: one(guilds, { fields: [reports.guildId], references: [guilds.id] }),
+  channel: one(channels, { fields: [reports.channelId], references: [channels.id] }),
+}));
+
 export const guildEmojiRelations = relations(guildEmoji, ({ one }) => ({
   guild: one(guilds, { fields: [guildEmoji.guildId], references: [guilds.id] }),
   creator: one(users, { fields: [guildEmoji.creatorId], references: [users.id] }),
@@ -783,3 +879,4 @@ export type SubscriptionRow = typeof subscriptions.$inferSelect;
 export type KeyLedgerRow = typeof keyLedger.$inferSelect;
 export type OwnedCosmeticRow = typeof ownedCosmetics.$inferSelect;
 export type StaffActionRow = typeof staffActions.$inferSelect;
+export type ReportRow = typeof reports.$inferSelect;

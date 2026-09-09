@@ -4527,4 +4527,142 @@ textarea::placeholder {
   border-color: var(--brass-500);
 }
 
+/* --- Moderation: the report queue ---------------------------------------- */
+
+/* How many are waiting, beside the heading. The number is the reason anybody
+   opens this tab, so it belongs where the eye lands first. */
+.staff__count {
+  margin-left: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--alert-400);
+  border: 1px solid var(--alert-400);
+  vertical-align: middle;
+}
+
+.reports {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.report {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--graphite-800);
+  border: 1px solid var(--line-strong);
+  /* A report waiting is a live thing; one already dealt with is a record. The
+     stripe is what separates the two at a glance down a long list. */
+  border-left: 3px solid var(--alert-400);
+}
+
+.report--done {
+  border-left-color: var(--line-strong);
+  opacity: 0.68;
+}
+
+.report__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.report__who {
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.report__tally {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--alert-400);
+  border: 1px solid var(--alert-400);
+}
+
+.report__meta {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.report__reason {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  /* Somebody else's words, typed in anger, of any length and possibly with no
+     spaces in it at all. It wraps rather than stretching the panel. */
+  overflow-wrap: anywhere;
+}
+
+.report__quoted {
+  margin-top: 10px;
+}
+
+/* Without this the quote is an unlabelled box of text directly above a real
+   input, and reads as a field somebody has already filled in. */
+.report__quote-label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+}
+
+/* The reported message, quoted. Distinct from the reporter's own words above:
+   one is an account of what happened, the other is the evidence. */
+.report__quote {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 2px solid var(--brass-500);
+  background: var(--graphite-900);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  /* Long enough to judge, bounded so one wall of text cannot bury the queue. */
+  max-height: 180px;
+  overflow-y: auto;
+}
+
+.report__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+/* Multi-line, because "what is wrong with it" is not a one-line question. */
+.field__area {
+  width: 100%;
+  resize: vertical;
+  min-height: 84px;
+  background: var(--graphite-900);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.field__area:focus {
+  outline: none;
+  border-color: var(--brass-500);
+}
+
 /* Which of the two switchers you are actually looking at. */

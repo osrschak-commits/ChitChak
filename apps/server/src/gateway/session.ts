@@ -14,11 +14,11 @@ import type { WebSocket } from 'ws';
 import { db } from '../db/client.js';
 import { channels } from '../db/schema.js';
 import { isAppError } from '../lib/errors.js';
-import { sessionIsStillValid } from '../lib/session-validity.js';
+import { checkSession } from '../lib/session-validity.js';
 import { dmParticipants } from '../services/dms.js';
 import { areFriends } from '../services/friends.js';
 import { scoreMessage } from '../services/progress.js';
-import { verifyAccessToken } from '../lib/tokens.js';
+import { verifyAccessToken, type AccessTokenClaims } from '../lib/tokens.js';
 import { buildReadySnapshot, guildIdsForUser } from '../services/snapshot.js';
 import { createMessage } from '../services/messages.js';
 import {
@@ -44,6 +44,16 @@ const MAX_FRAME_BYTES = 16 * 1024;
 const RATE_LIMIT_OPS = 60;
 const RATE_LIMIT_WINDOW_MS = 10_000;
 
+/**
+ * How often an open socket re-asks whether it is still allowed to be open.
+ *
+ * A poll, and a deliberately slow one: suspending closes that user's sockets
+ * directly, so this only has to catch the socket the closing could not reach -
+ * one held by a different server instance. A minute of that is a fair trade
+ * against a database lookup per socket per ten seconds.
+ */
+const REVALIDATE_EVERY_MS = 60_000;
+
 export class Session {
   readonly id: string;
   userId = '';
@@ -61,6 +71,10 @@ export class Session {
   private identifyTimer: NodeJS.Timeout | undefined;
   private heartbeatTimer: NodeJS.Timeout | undefined;
   private lastHeartbeat = Date.now();
+
+  /** Kept so the session can be re-checked later, not only at identify. */
+  private claims: AccessTokenClaims | undefined;
+  private lastRevalidatedAt = Date.now();
 
   private opCount = 0;
   private windowStartedAt = Date.now();
@@ -311,14 +325,18 @@ export class Session {
     }
 
     // Same check the HTTP side makes: the signature can be perfect and the
-    // account still be deleted, or every session revoked since it was issued.
-    if (!(await sessionIsStillValid(claims))) {
-      this.sendError('invalid_token', 'Session is no longer valid, please sign in again');
-      this.close(GatewayCloseCode.AuthenticationFailed, 'revoked token');
+    // account still be deleted, suspended, or every session revoked since it
+    // was issued.
+    const verdict = await checkSession(claims);
+    if (!verdict.ok) {
+      this.sendError(verdict.reason === 'suspended' ? 'suspended' : 'invalid_token', verdict.message);
+      this.close(GatewayCloseCode.AuthenticationFailed, verdict.reason);
       return;
     }
 
     this.userId = claims.userId;
+    this.claims = claims;
+    this.lastRevalidatedAt = Date.now();
     this.identified = true;
     clearTimeout(this.identifyTimer);
     this.identifyTimer = undefined;
@@ -378,8 +396,39 @@ export class Session {
         // here is what stops them lingering in a voice channel as a ghost.
         this.log.debug({ silentFor }, 'heartbeat timeout, closing session');
         this.close(GatewayCloseCode.SessionTimeout, 'heartbeat timeout');
+        return;
       }
+      void this.revalidate();
     }, HEARTBEAT_INTERVAL_MS / 2);
+  }
+
+  /**
+   * Asks again whether this session is still allowed to exist.
+   *
+   * The session was checked once, when it identified, and a socket can then
+   * stay open for hours. Suspending somebody has to reach the connection they
+   * are already sitting in - otherwise the account is locked out of the API
+   * while the person carries on talking in a voice channel, which is not what
+   * anybody means by suspended.
+   *
+   * Suspending also closes that user's sockets directly, which is what makes it
+   * immediate. This is the backstop for the case that cannot reach: another
+   * server instance, where the account is suspended over here and the socket is
+   * over there. Throttled, because it is a poll and the direct close is what
+   * carries the normal path.
+   */
+  private async revalidate(): Promise<void> {
+    if (!this.identified || !this.claims) return;
+    const now = Date.now();
+    if (now - this.lastRevalidatedAt < REVALIDATE_EVERY_MS) return;
+    this.lastRevalidatedAt = now;
+
+    const verdict = await checkSession(this.claims);
+    if (verdict.ok) return;
+
+    this.log.info({ reason: verdict.reason }, 'session no longer valid, closing');
+    this.sendError(verdict.reason === 'suspended' ? 'suspended' : 'invalid_token', verdict.message);
+    this.close(GatewayCloseCode.AuthenticationFailed, verdict.reason);
   }
 
   private withinRateLimit(): boolean {

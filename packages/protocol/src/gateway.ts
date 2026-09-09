@@ -203,6 +203,15 @@ export type GatewayErrorCode =
   /** Something was asked for that does not exist. Not always a channel. */
   | 'not_found'
   | 'forbidden'
+  /**
+   * Locked out by platform staff.
+   *
+   * Its own code rather than a plain 'forbidden' so the client can tell the one
+   * refusal that is about the account itself from the many that are about one
+   * action. A suspended person needs signing out and showing why; everything
+   * else forbidden just needs the message.
+   */
+  | 'suspended'
   | 'channel_full'
   | 'invalid_payload'
   | 'internal';

@@ -7,6 +7,7 @@ import { rememberEmoji } from '../lib/emoji.js';
 import { MessageAttachments, PendingAttachments, type Pending } from './Attachments.js';
 import { RichText } from './RichText.js';
 import { EmojiPicker } from './EmojiPicker.js';
+import { ReportDialog } from './ReportDialog.js';
 import { SearchPanel } from './SearchPanel.js';
 import { useApp } from '../store/app.js';
 import { Avatar, MemberName } from './primitives.js';
@@ -97,6 +98,12 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
 
   const [draft, setDraft] = useState('');
   const [emojiOpen, setEmojiOpen] = useState(false);
+  /** The message being reported, if any. Held here so the dialog outlives the hover. */
+  const [reporting, setReporting] = useState<{
+    subject: string;
+    messageId: string;
+    quoted: string;
+  } | null>(null);
   const composerRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<Pending[]>([]);
@@ -306,6 +313,15 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
         />
       )}
 
+      {reporting && (
+        <ReportDialog
+          subject={reporting.subject}
+          messageId={reporting.messageId}
+          quoted={reporting.quoted}
+          onClose={() => setReporting(null)}
+        />
+      )}
+
       {!channel ? (
         <div className="empty">
           <div className="empty__inner">
@@ -439,7 +455,7 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
                     )}
                   </div>
 
-                  {editingId !== message.id && (isAuthor || mayManageMessages) && (
+                  {editingId !== message.id && (
                     <div className="msg__actions">
                       {isAuthor && (
                         <button
@@ -451,14 +467,34 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
                           ✎
                         </button>
                       )}
-                      <button
-                        className="icon-btn icon-btn--danger"
-                        style={{ width: 24, height: 24 }}
-                        onClick={() => void deleteMessage(message.id)}
-                        title="Delete"
-                      >
-                        ✕
-                      </button>
+                      {/* Anyone can report anyone else. Reporting your own
+                          message would do nothing, so it is not offered. */}
+                      {!isAuthor && (
+                        <button
+                          className="icon-btn"
+                          style={{ width: 24, height: 24 }}
+                          onClick={() =>
+                            setReporting({
+                              subject: authorProfile?.username ?? name,
+                              messageId: message.id,
+                              quoted: message.content,
+                            })
+                          }
+                          title="Report to ChitChak staff"
+                        >
+                          ⚑
+                        </button>
+                      )}
+                      {(isAuthor || mayManageMessages) && (
+                        <button
+                          className="icon-btn icon-btn--danger"
+                          style={{ width: 24, height: 24 }}
+                          onClick={() => void deleteMessage(message.id)}
+                          title="Delete"
+                        >
+                          ✕
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

@@ -94,6 +94,21 @@ export class GatewayClient {
         this.attempts = 0;
         this.setStatus('ready');
       }
+      /*
+        A suspension ends the session here, before the close arrives.
+
+        The socket is what finds out first: staff act, and the connection is
+        dropped immediately, while the next HTTP request might be minutes away.
+        The close that follows is an authentication failure like any other, and
+        the handler below answers those by refreshing and reconnecting - which
+        for a suspended account is a loop that reconnects for ever and never
+        tells anybody anything. Ending the session here is what breaks it, and
+        carries the reason to the sign-in screen.
+      */
+      if (message.op === 'error' && message.d.code === 'suspended') {
+        this.deliberatelyClosed = true;
+        api.endSessionAsSuspended(message.d.message);
+      }
 
       for (const listener of this.listeners) listener(message);
     });

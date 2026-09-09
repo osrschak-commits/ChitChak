@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { users } from '../db/schema.js';
+import { currentSuspension, explain } from '../services/suspensions.js';
 import type { AccessTokenClaims } from './tokens.js';
 
 /**
@@ -24,18 +25,72 @@ import type { AccessTokenClaims } from './tokens.js';
  * Redis entry - Redis is already in the stack - but a query is the honest
  * starting point and correctness comes first.
  */
-export async function sessionIsStillValid(claims: AccessTokenClaims): Promise<boolean> {
+
+/**
+ * Why a session was refused, where saying so is useful.
+ *
+ * A boolean was enough while the only answers were "deleted" and "revoked",
+ * both of which mean the same thing to a client: sign in again. Suspension does
+ * not - "sign in again" sends somebody round a loop that cannot succeed and
+ * tells them nothing. So the verdict carries the message the person should
+ * actually be shown.
+ */
+export type SessionVerdict =
+  | { ok: true }
+  | { ok: false; reason: 'gone'; message: string }
+  | { ok: false; reason: 'suspended'; message: string };
+
+const GONE: SessionVerdict = {
+  ok: false,
+  reason: 'gone',
+  message: 'Session is no longer valid, please sign in again',
+};
+
+export async function checkSession(claims: AccessTokenClaims): Promise<SessionVerdict> {
   const user = await db.query.users.findFirst({
-    columns: { tokensValidFrom: true, deletedAt: true },
+    columns: {
+      tokensValidFrom: true,
+      deletedAt: true,
+      suspendedAt: true,
+      suspendedUntil: true,
+      suspendedReason: true,
+    },
     where: eq(users.id, claims.userId),
   });
 
-  if (!user || user.deletedAt) return false;
+  if (!user || user.deletedAt) return GONE;
+
+  /*
+    Asked before the token cutoff, and that order is the whole point.
+
+    Suspending also bumps `tokensValidFrom`, so a suspended person fails both
+    checks and whichever runs first decides what they are told. Behind the
+    cutoff the answer was a coin toss on the clock: `iat` is whole seconds and
+    gets the benefit of the boundary, so a token minted in the same second as
+    the suspension came back "suspended" and one minted a second earlier came
+    back "sign in again" - the same account, the same moment, two different
+    answers depending on when they last refreshed.
+
+    Suspension is also the more specific statement of the two. "Your account is
+    suspended until Tuesday" is what somebody needs; "sign in again" is what
+    they get told when we do not know.
+  */
+  const suspension = currentSuspension(user);
+  if (suspension) {
+    return { ok: false, reason: 'suspended', message: explain(suspension) };
+  }
 
   // `iat` is whole seconds, and tokensValidFrom is a millisecond timestamp. A
   // token issued in the same second as the cutoff would otherwise be rejected
   // by rounding alone, so the comparison is done in seconds and the token gets
   // the benefit of the boundary.
   const validFrom = Math.floor(user.tokensValidFrom.getTime() / 1000);
-  return claims.issuedAt >= validFrom;
+  if (claims.issuedAt < validFrom) return GONE;
+
+  return { ok: true };
+}
+
+/** The old boolean shape, for call sites that only need to know yes or no. */
+export async function sessionIsStillValid(claims: AccessTokenClaims): Promise<boolean> {
+  return (await checkSession(claims)).ok;
 }

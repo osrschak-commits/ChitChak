@@ -180,6 +180,22 @@ export class GatewayRegistry extends EventEmitter {
   }
 
   /** Disconnect every socket, used on graceful shutdown. */
+  /**
+   * Drops every socket this process holds for one person.
+   *
+   * What makes a suspension take effect on somebody who is currently connected.
+   * The HTTP side needs nothing like this - every request re-checks - but a
+   * gateway socket is opened once and can sit there for hours, so being locked
+   * out of the API while still talking in a voice channel is exactly the
+   * failure this prevents.
+   *
+   * Local to this process. Sessions elsewhere are caught by the periodic
+   * re-check in Session.revalidate, which is why both exist.
+   */
+  closeUser(userId: string, code: number, reason: string): void {
+    for (const session of this.localSessionsFor(userId)) session.close(code, reason);
+  }
+
   closeAll(code: number, reason: string): void {
     for (const sessions of this.sessionsByUser.values()) {
       for (const session of sessions) session.close(code, reason);

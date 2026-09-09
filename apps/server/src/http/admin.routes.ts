@@ -1,7 +1,9 @@
 import type { FastifyInstance } from 'fastify';
 import { errors } from '../lib/errors.js';
 import { issueBlackCard, issuedCards, revokeBlackCard } from '../services/blackcard.js';
+import * as reports from '../services/reports.js';
 import { isPlatformStaff, requirePlatformStaff } from '../services/staff.js';
+import * as suspensions from '../services/suspensions.js';
 import { authenticate, requireUser } from './authenticate.js';
 
 /**
@@ -72,4 +74,99 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     requirePlatformStaff(userId);
     return { cards: await issuedCards() };
   });
+
+  // --- Suspensions ---------------------------------------------------------
+
+  app.post<{ Body: { username?: string; reason?: string; days?: number | null } }>(
+    '/api/admin/suspend',
+    {
+      config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+      handler: async (request) => {
+        const { userId } = requireUser(request);
+        requirePlatformStaff(userId);
+
+        const username = request.body?.username;
+        if (typeof username !== 'string' || username.trim().length === 0) {
+          throw errors.invalid('Who is it about?');
+        }
+        const reason = request.body?.reason;
+        if (typeof reason !== 'string') throw errors.invalid('Say why - the person is shown this');
+
+        const result = await suspensions.suspend({
+          actorId: userId,
+          username,
+          reason,
+          days: request.body?.days ?? null,
+        });
+        request.log.warn(
+          { actor: userId, subject: result.username, until: result.until },
+          '[staff] account suspended',
+        );
+        return result;
+      },
+    },
+  );
+
+  app.delete<{ Body: { username?: string } }>('/api/admin/suspend', {
+    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+    handler: async (request) => {
+      const { userId } = requireUser(request);
+      requirePlatformStaff(userId);
+
+      const username = request.body?.username;
+      if (typeof username !== 'string' || username.trim().length === 0) {
+        throw errors.invalid('Whose suspension is it?');
+      }
+
+      const result = await suspensions.lift({ actorId: userId, username });
+      request.log.warn({ actor: userId, subject: result.username }, '[staff] suspension lifted');
+      return result;
+    },
+  });
+
+  app.get('/api/admin/suspended', async (request) => {
+    const { userId } = requireUser(request);
+    requirePlatformStaff(userId);
+    return { accounts: await suspensions.suspended() };
+  });
+
+  // --- Reports -------------------------------------------------------------
+
+  app.get<{ Querystring: { status?: string } }>('/api/admin/reports', async (request) => {
+    const { userId } = requireUser(request);
+    requirePlatformStaff(userId);
+
+    const status = request.query?.status;
+    const filter =
+      status === 'open' || status === 'actioned' || status === 'dismissed' ? status : undefined;
+    return { reports: await reports.queue(filter), open: await reports.openCount() };
+  });
+
+  app.post<{ Params: { reportId: string }; Body: { status?: string; outcome?: string } }>(
+    '/api/admin/reports/:reportId',
+    {
+      config: { rateLimit: { max: 60, timeWindow: '1 minute' } },
+      handler: async (request) => {
+        const { userId } = requireUser(request);
+        requirePlatformStaff(userId);
+
+        const status = request.body?.status;
+        if (status !== 'actioned' && status !== 'dismissed') {
+          throw errors.invalid('A report is either actioned or dismissed');
+        }
+
+        const report = await reports.resolve({
+          actorId: userId,
+          reportId: request.params.reportId,
+          status,
+          outcome: request.body?.outcome ?? null,
+        });
+        request.log.info(
+          { actor: userId, report: report.id, status },
+          '[staff] report resolved',
+        );
+        return report;
+      },
+    },
+  );
 }
