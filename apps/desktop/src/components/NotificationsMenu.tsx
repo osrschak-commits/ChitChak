@@ -161,12 +161,21 @@ function NotificationRow({
   const guilds = useApp((s) => s.guilds);
   const channels = useApp((s) => s.channels);
 
-  const member = notification.guildId
-    ? members.get(`${notification.guildId}:${notification.authorId}`)
-    : undefined;
+  // A guild mention has the author in that guild's member list; a DM's author
+  // is in `people` - unless a server is shared, in which case they are only in
+  // `members`, under some other guild's key. Fall back to a scan so the name is
+  // never "Someone" for a person the client plainly knows.
+  const member =
+    (notification.guildId
+      ? members.get(`${notification.guildId}:${notification.authorId}`)
+      : undefined) ??
+    [...members.values()].find((m) => m.userId === notification.authorId);
   const person = people.get(notification.authorId);
   const authorProfile = member?.user ?? person;
-  const authorName = member?.nickname ?? authorProfile?.displayName ?? 'Someone';
+  const authorName =
+    (notification.guildId ? member?.nickname : undefined) ??
+    authorProfile?.displayName ??
+    'Someone';
 
   const where = notification.guildId
     ? `${guilds.find((g) => g.id === notification.guildId)?.name ?? 'a server'} · #${
