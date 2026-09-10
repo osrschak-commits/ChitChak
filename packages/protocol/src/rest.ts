@@ -201,6 +201,24 @@ export const editMessageSchema = z.object({
   content: z.string().min(1, 'A message cannot be empty').max(4000),
 });
 
+// --- Notifications ---------------------------------------------------------
+
+/**
+ * Marking notifications read.
+ *
+ * One of `all`, a set of `ids`, or every entry for a `channelId` - the three
+ * ways the client actually needs: the "mark all" button, a click on one row,
+ * and opening a conversation. Giving none of them is a no-op rather than an
+ * error, so a redundant call on channel open costs nothing.
+ */
+export const markNotificationsReadSchema = z
+  .object({
+    all: z.literal(true).optional(),
+    ids: z.array(z.string().min(1)).max(200).optional(),
+    channelId: z.string().min(1).optional(),
+  })
+  .strict();
+
 // --- Invites ----------------------------------------------------------------
 
 export const createInviteSchema = z
@@ -234,6 +252,7 @@ export type SetOverwriteBody = z.infer<typeof setOverwriteSchema>;
 export type BanMemberBody = z.infer<typeof banMemberSchema>;
 export type VoiceModerationBody = z.infer<typeof voiceModerationSchema>;
 export type EditMessageBody = z.infer<typeof editMessageSchema>;
+export type MarkNotificationsReadBody = z.infer<typeof markNotificationsReadSchema>;
 export type CreateInviteBody = z.infer<typeof createInviteSchema>;
 
 export interface AuthResponse {

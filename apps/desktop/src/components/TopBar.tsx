@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import voiceSettingsIcon from '../assets/voice-settings.svg';
 import { mediaUrl } from '../lib/api.js';
 import { useApp } from '../store/app.js';
+import { NotificationsMenu } from './NotificationsMenu.js';
 import { Avatar } from './primitives.js';
 import { UpdateBanner } from './UpdateBanner.js';
 
@@ -199,6 +200,8 @@ export function TopBar({
 
       {/* The top right is "you": your account, and the settings that follow you
           between servers. Anything server-specific lives in the sidebar. */}
+      <NotificationsMenu />
+
       <button
         className="icon-btn"
         onClick={onOpenVoiceSettings}

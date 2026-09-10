@@ -22,6 +22,7 @@ import { imageRoutes } from './http/images.routes.js';
 import { moderationRoutes } from './http/moderation.routes.js';
 import { rankRoutes } from './http/ranks.routes.js';
 import { friendRoutes } from './http/friends.routes.js';
+import { notificationRoutes } from './http/notifications.routes.js';
 import { userRoutes } from './http/users.routes.js';
 import { isAppError } from './lib/errors.js';
 
@@ -132,6 +133,7 @@ await app.register(emojiServeRoutes);
 await app.register(emojiManageRoutes);
 await app.register(userRoutes);
 await app.register(friendRoutes);
+await app.register(notificationRoutes);
 await app.register(guildRoutes);
 await app.register(rankRoutes);
 await app.register(moderationRoutes);

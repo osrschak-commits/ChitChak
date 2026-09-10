@@ -36,6 +36,26 @@ const MAX_ATTACHMENTS = 10;
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 100;
 
+/**
+ * A mention token: `<@` then a snowflake then `>`, the shape the composer
+ * inserts when someone picks a name.
+ *
+ * Kept out of `content` cleaning on purpose - the token stays in the stored
+ * text so the client can resolve it to the person's current name at draw time,
+ * exactly like `:emoji:`.
+ */
+const MENTION_TOKEN = /<@(\d{1,20})>/g;
+
+/** Every distinct id a message's text mentions, in the order they first appear. */
+export function mentionedIds(content: string): string[] {
+  const seen = new Set<string>();
+  for (const match of content.matchAll(MENTION_TOKEN)) {
+    const id = match[1];
+    if (id) seen.add(id);
+  }
+  return [...seen];
+}
+
 function toMessage(
   row: typeof messages.$inferSelect,
   files: SerializedAttachment[] = [],
@@ -48,6 +68,7 @@ function toMessage(
     createdAt: row.createdAt.toISOString(),
     editedAt: row.editedAt ? row.editedAt.toISOString() : null,
     attachments: files,
+    mentions: mentionedIds(row.content),
   };
 }
 
@@ -276,6 +297,7 @@ export async function searchMessages(input: {
     createdAt: new Date(row.created_at).toISOString(),
     editedAt: row.edited_at ? new Date(row.edited_at).toISOString() : null,
     attachments: grouped.get(row.id) ?? [],
+    mentions: mentionedIds(row.content),
   }));
 }
 

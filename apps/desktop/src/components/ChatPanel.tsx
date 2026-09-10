@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { Permission } from '@chitchak/protocol';
 import { usePermissions } from '../hooks/usePermissions.js';
 import { usePersonPopover } from '../hooks/usePersonPopover.js';
@@ -98,6 +98,21 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
 
   const [draft, setDraft] = useState('');
   const [emojiOpen, setEmojiOpen] = useState(false);
+  /**
+   * The `@…` being typed, if any: the query text and where the `@` sits.
+   *
+   * Only in guild channels - a DM has two people who already both know when a
+   * message arrives, so an autocomplete there earns nothing.
+   */
+  const [mention, setMention] = useState<{ query: string; at: number } | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  /**
+   * The names picked from the autocomplete this draft, `@Label` -> user id.
+   *
+   * The composer shows `@Label` because `<@id>` in a text field is unreadable;
+   * this is what turns it back into the id on send. Cleared when the draft is.
+   */
+  const mentionMap = useRef<Map<string, string>>(new Map());
   /** The message being reported, if any. Held here so the dialog outlives the hover. */
   const [reporting, setReporting] = useState<{
     subject: string;
@@ -204,6 +219,92 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
     : undefined;
   const title = isDm ? (dmPartner?.displayName ?? 'Conversation') : (channel?.name ?? '');
 
+  /**
+   * Everyone in this guild who could be `@`-mentioned, with the label the
+   * composer shows for each. Nicknamed members are matched on both names.
+   */
+  const mentionPool = useMemo(() => {
+    if (isDm || !selectedGuildId) return [];
+    return [...members.values()]
+      .filter((m) => m.guildId === selectedGuildId)
+      .map((m) => ({
+        id: m.userId,
+        label: m.nickname ?? m.user.displayName,
+        handle: m.user.username,
+        haystack: `${m.nickname ?? ''} ${m.user.displayName} ${m.user.username}`.toLowerCase(),
+      }));
+  }, [isDm, selectedGuildId, members]);
+
+  const mentionCandidates = useMemo(() => {
+    if (!mention) return [];
+    const q = mention.query.toLowerCase();
+    return mentionPool
+      .filter((m) => q === '' || m.haystack.includes(q))
+      .sort((a, b) => {
+        // Names that start with what was typed come first; then alphabetical.
+        const aStarts = a.label.toLowerCase().startsWith(q) || a.handle.startsWith(q);
+        const bStarts = b.label.toLowerCase().startsWith(q) || b.handle.startsWith(q);
+        return aStarts === bStarts ? a.label.localeCompare(b.label) : aStarts ? -1 : 1;
+      })
+      .slice(0, 8);
+  }, [mention, mentionPool]);
+
+  /**
+   * Read the `@…` the caret is sitting in, if any.
+   *
+   * Anchored to the start of the text or a space, so an email address does not
+   * turn into a mention hunt, and capped so a long word is not one either.
+   */
+  function syncMention(value: string, caret: number | null): void {
+    if (isDm || caret === null) {
+      setMention(null);
+      return;
+    }
+    const before = value.slice(0, caret);
+    const match = /(?:^|\s)@([^\s@]{0,32})$/.exec(before);
+    if (!match) {
+      setMention(null);
+      return;
+    }
+    setMention({ query: match[1] ?? '', at: caret - (match[1] ?? '').length - 1 });
+    setMentionIndex(0);
+  }
+
+  /** Swap the `@…` fragment for the picked name, and remember it for send. */
+  function applyMention(candidate: { id: string; label: string }): void {
+    if (!mention) return;
+    const field = composerRef.current;
+    const caret = field?.selectionStart ?? draft.length;
+    const label = `@${candidate.label}`;
+    const next = `${draft.slice(0, mention.at)}${label} ${draft.slice(caret)}`;
+    if (next.length > 4000) return;
+
+    mentionMap.current.set(label, candidate.id);
+    setDraft(next);
+    setMention(null);
+
+    const pos = mention.at + label.length + 1;
+    requestAnimationFrame(() => {
+      field?.focus();
+      field?.setSelectionRange(pos, pos);
+    });
+  }
+
+  /**
+   * Turn the `@Label`s the composer shows back into `<@id>` for the wire.
+   *
+   * Longest label first, so `@Alex` is resolved before `@Al` can eat its start;
+   * a plain `split`/`join` is enough once the order is right.
+   */
+  function resolveMentions(text: string): string {
+    let out = text;
+    const entries = [...mentionMap.current.entries()].sort((a, b) => b[0].length - a[0].length);
+    for (const [label, id] of entries) {
+      if (out.includes(label)) out = out.split(label).join(`<@${id}>`);
+    }
+    return out;
+  }
+
   const [searching, setSearching] = useState(false);
 
   // Ctrl+F is what people press. Closing again is Escape, handled in the panel.
@@ -261,13 +362,15 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
 
     sendMessage(
       selectedTextChannelId,
-      draft,
+      resolveMentions(draft),
       ready.map((item) => item.attachment!.id),
     );
 
     for (const item of pending) if (item.preview) URL.revokeObjectURL(item.preview);
     setPending([]);
     setDraft('');
+    setMention(null);
+    mentionMap.current.clear();
   }
 
   return (
@@ -570,6 +673,31 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
             )}
 
             <div className="composer__field">
+            {mention && mentionCandidates.length > 0 && (
+              <ul className="mention-menu" role="listbox" aria-label="People to mention">
+                {mentionCandidates.map((candidate, index) => (
+                  <li key={candidate.id}>
+                    <button
+                      type="button"
+                      role="option"
+                      aria-selected={index === mentionIndex}
+                      className={`mention-menu__item ${
+                        index === mentionIndex ? 'mention-menu__item--on' : ''
+                      }`}
+                      // Pointer down, not click: click lands after the input has
+                      // blurred and the menu has already closed.
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        applyMention(candidate);
+                      }}
+                    >
+                      <span className="mention-menu__name">{candidate.label}</span>
+                      <span className="mention-menu__handle mono">@{candidate.handle}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
             <input
               ref={composerRef}
               value={draft}
@@ -582,8 +710,40 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
                   : 'Your rank cannot send messages in this channel'
               }
               maxLength={4000}
-              onChange={(e) => setDraft(e.target.value)}
+              onChange={(e) => {
+                setDraft(e.target.value);
+                syncMention(e.target.value, e.target.selectionStart);
+              }}
+              onKeyUp={(e) => syncMention(e.currentTarget.value, e.currentTarget.selectionStart)}
+              onClick={(e) => syncMention(e.currentTarget.value, e.currentTarget.selectionStart)}
+              onBlur={() => setMention(null)}
               onKeyDown={(e) => {
+                const menuOpen = mention !== null && mentionCandidates.length > 0;
+                if (menuOpen) {
+                  if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    setMentionIndex((i) => (i + 1) % mentionCandidates.length);
+                    return;
+                  }
+                  if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    setMentionIndex(
+                      (i) => (i - 1 + mentionCandidates.length) % mentionCandidates.length,
+                    );
+                    return;
+                  }
+                  if (e.key === 'Enter' || e.key === 'Tab') {
+                    e.preventDefault();
+                    const picked = mentionCandidates[mentionIndex];
+                    if (picked) applyMention(picked);
+                    return;
+                  }
+                  if (e.key === 'Escape') {
+                    e.preventDefault();
+                    setMention(null);
+                    return;
+                  }
+                }
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   submit();

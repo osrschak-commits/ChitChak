@@ -21,6 +21,7 @@ import { scoreMessage } from '../services/progress.js';
 import { verifyAccessToken, type AccessTokenClaims } from '../lib/tokens.js';
 import { buildReadySnapshot, guildIdsForUser } from '../services/snapshot.js';
 import { createMessage } from '../services/messages.js';
+import { notifyForMessage } from '../services/notifications.js';
 import {
   clearVoiceStateOnDisconnect,
   joinVoiceChannel,
@@ -264,6 +265,24 @@ export class Session {
           { op: 'message:create', d: { ...created.message, nonce: undefined } },
           this.userId,
         );
+
+        // The inbox entries this message earns - a DM for the other person, a
+        // mention for anyone it named who can see the channel. Behind its own
+        // catch for the same reason scoreMessage is: a rejected floating promise
+        // takes the process down.
+        void notifyForMessage({
+          message: created.message,
+          audience: created.audience,
+          guildId: created.audience.kind === 'guild' ? created.audience.guildId : null,
+        })
+          .then((entries) => {
+            for (const { userId, notification } of entries) {
+              registry.publishToUsers([userId], { op: 'notification:create', d: notification });
+            }
+          })
+          .catch((error: unknown) => {
+            this.log.error({ err: error }, 'notifyForMessage failed');
+          });
 
         // Scored after the message is delivered, never before, and behind
         // scoreMessage's own catch: a floating promise that rejects would take
