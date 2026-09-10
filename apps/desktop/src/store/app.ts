@@ -5,6 +5,7 @@ import type {
   Guild,
   GuildMember,
   Message,
+  Notification,
   PresenceStatus,
   Progress,
   PublicUser,
@@ -82,6 +83,13 @@ interface AppState {
   dmChannels: Map<string, string>;
   /** The open conversation, when `scope` is 'friends'. */
   selectedDmChannelId: string | null;
+
+  /**
+   * The notifications inbox - a DM that arrived, or a message that mentioned
+   * you. Newest first. The server's snapshot seeds it and `notification:create`
+   * prepends; `readAt` is set in place when something is opened or dismissed.
+   */
+  notifications: Notification[];
 
   /** Your level and how far into it you are. Nobody else's - see TODO.md. */
   progress: Progress;
@@ -173,6 +181,13 @@ interface AppState {
    */
   showGuild(): void;
   selectDmChannel(channelId: string): void;
+  /**
+   * Mark notifications read, locally and on the server, which echoes it to your
+   * other devices. `all`, a set of ids, or every entry for one channel.
+   */
+  markNotificationsRead(scope: { all: true } | { ids: string[] } | { channelId: string }): void;
+  /** Jump to whatever a notification points at, and clear it on the way. */
+  openNotification(notification: Notification): void;
   sendFriendRequest(username: string): Promise<void>;
   acceptFriendRequest(userId: string): Promise<void>;
   /** Declines an incoming request or cancels one you sent - the same call. */
@@ -394,6 +409,7 @@ function signedOutState() {
     people: new Map<string, PublicUser>(),
     dmChannels: new Map<string, string>(),
     selectedDmChannelId: null,
+    notifications: [] as Notification[],
     progress: {
       xp: 0,
       level: 1,
@@ -444,6 +460,7 @@ export const useApp = create<AppState>((set, get) => ({
   people: new Map(),
   dmChannels: new Map(),
   selectedDmChannelId: null,
+  notifications: [],
   progress: { xp: 0, level: 1, intoLevel: 0, needed: 155, streak: 0, completedTaskIds: [] },
   celebrations: [],
   channels: new Map(),
@@ -528,6 +545,48 @@ export const useApp = create<AppState>((set, get) => ({
   selectDmChannel(channelId) {
     set({ scope: 'friends', selectedDmChannelId: channelId, mainView: 'chat' });
     void get().loadMessages(channelId);
+    get().markNotificationsRead({ channelId });
+  },
+
+  markNotificationsRead(scope) {
+    const has = (n: Notification) =>
+      'all' in scope
+        ? true
+        : 'ids' in scope
+          ? scope.ids.includes(n.id)
+          : n.channelId === scope.channelId;
+
+    // Nothing unread in scope: skip the request rather than round-trip on every
+    // channel open.
+    if (!get().notifications.some((n) => n.readAt === null && has(n))) return;
+
+    const now = new Date().toISOString();
+    set((s) => ({
+      notifications: s.notifications.map((n) =>
+        n.readAt === null && has(n) ? { ...n, readAt: now } : n,
+      ),
+    }));
+    // The server echoes `notification:read` to our other devices; the local
+    // update above is what keeps this one instant.
+    void api.markNotificationsRead(scope).catch(() => {
+      // Non-fatal: the next snapshot corrects it.
+    });
+  },
+
+  openNotification(notification) {
+    if (notification.guildId) {
+      set({
+        scope: 'guild',
+        selectedGuildId: notification.guildId,
+        selectedTextChannelId: notification.channelId,
+        mainView: 'chat',
+      });
+      void get().loadMessages(notification.channelId);
+      get().markNotificationsRead({ channelId: notification.channelId });
+    } else {
+      // A DM: selectDmChannel already marks the conversation read.
+      get().selectDmChannel(notification.channelId);
+    }
   },
 
   async sendFriendRequest(username) {
@@ -605,13 +664,17 @@ export const useApp = create<AppState>((set, get) => ({
       selectedTextChannelId: firstText?.id ?? null,
       scope: 'guild',
     });
-    if (firstText) void get().loadMessages(firstText.id);
+    if (firstText) {
+      void get().loadMessages(firstText.id);
+      get().markNotificationsRead({ channelId: firstText.id });
+    }
   },
 
   selectTextChannel(channelId) {
     // Opening a text channel leaves the call view but not the call itself.
     set({ selectedTextChannelId: channelId, mainView: 'chat' });
     void get().loadMessages(channelId);
+    get().markNotificationsRead({ channelId });
   },
 
   setMainView(view) {
@@ -912,6 +975,7 @@ function applyServerMessage(
         users: people,
         dmChannels,
         progress: standing,
+        notifications,
       } = message.d;
       const channelMap = new Map(channels.map((c) => [c.id, c]));
 
@@ -978,6 +1042,9 @@ function applyServerMessage(
         people: new Map(people.map((person) => [person.id, person])),
         dmChannels: new Map(dmChannels.map((dm) => [dm.channelId, dm.userId])),
         progress: standing,
+        // `?? []` so a client that reconnects to a server from before the inbox
+        // existed still boots.
+        notifications: notifications ?? [],
         selectedGuildId: guildId,
         selectedTextChannelId: textStillValid ?? firstText?.id ?? null,
         pendingGuildId: null,
@@ -1108,6 +1175,37 @@ function applyServerMessage(
           { key: `task-${task.id}`, kind: 'task' as const, title: task.name, detail: `+${task.xp} XP` },
           ...s.celebrations,
         ].slice(0, 4),
+      }));
+      return;
+    }
+
+    case 'notification:create': {
+      const incoming = message.d;
+      set((s) => {
+        if (s.notifications.some((n) => n.id === incoming.id)) return { notifications: s.notifications };
+        // Newest first, and capped: the panel pages older ones over HTTP, so the
+        // store only needs to hold a working set.
+        return { notifications: [incoming, ...s.notifications].slice(0, 200) };
+      });
+      // Arrived in the conversation already open in front of them: clear it at
+      // once rather than lighting the bell for something they are reading.
+      {
+        const state = get();
+        const isDm = state.dmChannels.has(incoming.channelId);
+        if (isWatching(state, incoming.channelId, isDm)) {
+          state.markNotificationsRead({ ids: [incoming.id] });
+        }
+      }
+      return;
+    }
+
+    case 'notification:read': {
+      const ids = new Set(message.d.ids);
+      const now = new Date().toISOString();
+      set((s) => ({
+        notifications: s.notifications.map((n) =>
+          ids.has(n.id) && n.readAt === null ? { ...n, readAt: now } : n,
+        ),
       }));
       return;
     }
@@ -1313,12 +1411,18 @@ function applyServerMessage(
       set((s) => {
         const messages = new Map(s.messages);
         const existing = messages.get(message.d.channelId);
-        if (!existing) return { messages: s.messages };
+        // The notification pointing at this message is gone server-side by
+        // cascade; drop it here too rather than leaving a row that opens an
+        // empty channel.
+        const notifications = s.notifications.some((n) => n.messageId === message.d.messageId)
+          ? s.notifications.filter((n) => n.messageId !== message.d.messageId)
+          : s.notifications;
+        if (!existing) return { messages: s.messages, notifications };
         messages.set(
           message.d.channelId,
           existing.filter((m) => m.id !== message.d.messageId),
         );
-        return { messages };
+        return { messages, notifications };
       });
       return;
     }

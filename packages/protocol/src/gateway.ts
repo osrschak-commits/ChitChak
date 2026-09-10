@@ -5,6 +5,7 @@ import type {
   Guild,
   GuildMember,
   Message,
+  Notification,
   PresenceStatus,
   PublicUser,
   Rank,
@@ -102,6 +103,11 @@ export interface ReadyPayload {
   dmChannels: Array<{ channelId: Snowflake; userId: Snowflake }>;
   /** Your own level, and how far into it you are. */
   progress: Progress;
+  /**
+   * The notifications inbox: every unread entry, plus enough recent read ones
+   * to fill the panel without a fetch. Newest first.
+   */
+  notifications: Notification[];
 }
 
 /** Somebody's standing. `intoLevel` of `needed` fills the bar. */
@@ -234,7 +240,16 @@ export type ServerMessage =
      its own copy of the maths to know how far along the next bar starts. */
   | { op: 'level:up'; d: { level: number; progress: Progress } }
   /** You finished a task. Sent only to you. */
-  | { op: 'task:complete'; d: { id: string; name: string; xp: number; progress: Progress } };
+  | { op: 'task:complete'; d: { id: string; name: string; xp: number; progress: Progress } }
+  /** A DM arrived, or a message mentioned you. Sent only to the recipient. */
+  | { op: 'notification:create'; d: Notification }
+  /**
+   * Some notifications were marked read - here, or on another of your devices.
+   *
+   * Carries the ids rather than a channel so the receiver never has to work out
+   * which entries a channel covers; the sender already knows.
+   */
+  | { op: 'notification:read'; d: { ids: Snowflake[] } };
 
 export type GatewayErrorCode =
   | 'invalid_token'

@@ -12,6 +12,7 @@ import type {
   GuildMember,
   Invite,
   Message,
+  Notification,
   PublicUser,
   Rank,
   SelfUser,
@@ -682,6 +683,27 @@ class ApiClient {
   listMessages(channelId: string, before?: string): Promise<Message[]> {
     const query = before ? `?before=${encodeURIComponent(before)}` : '';
     return this.request<Message[]>(`/api/channels/${channelId}/messages${query}`);
+  }
+
+  // --- Notifications ----------------------------------------------------
+
+  listNotifications(before?: string): Promise<Notification[]> {
+    const query = before ? `?before=${encodeURIComponent(before)}` : '';
+    return this.request<Notification[]>(`/api/notifications${query}`);
+  }
+
+  /**
+   * Mark notifications read. One of `all`, a list of ids, or every entry for a
+   * channel - the server echoes a `notification:read` back over the gateway so
+   * other devices clear the same badge.
+   */
+  markNotificationsRead(
+    scope: { all: true } | { ids: string[] } | { channelId: string },
+  ): Promise<{ ids: string[] }> {
+    return this.request('/api/notifications/read', {
+      method: 'POST',
+      body: JSON.stringify(scope),
+    });
   }
 
   createInvite(

@@ -415,6 +415,61 @@ export const messages = pgTable(
 );
 
 /**
+ * The notifications inbox: one row per DM that arrived and per message that
+ * mentioned someone.
+ *
+ * A row per event rather than a per-channel unread counter, because the panel
+ * shows the individual things and "mark this one read" needs a target. The
+ * message it points at is kept by foreign key: if that message is deleted the
+ * notification goes with it, which is what stops the inbox pointing at things
+ * that are no longer there.
+ *
+ * `preview`, `authorId` and `guildId` are copied in rather than joined so the
+ * panel renders from this table alone - a mention in a channel the reader has
+ * since lost access to still shows who and where, the same way a report keeps
+ * its quoted copy.
+ */
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: id(),
+    /** Who this is for. */
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** 'dm' | 'mention'. Text so a third kind needs no migration. */
+    kind: text('kind').notNull(),
+    messageId: text('message_id')
+      .notNull()
+      .references(() => messages.id, { onDelete: 'cascade' }),
+    channelId: text('channel_id')
+      .notNull()
+      .references(() => channels.id, { onDelete: 'cascade' }),
+    /** Null for a DM. */
+    guildId: text('guild_id').references(() => guilds.id, { onDelete: 'cascade' }),
+    authorId: text('author_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    /** Short plain-text snippet, `<@id>` already resolved to a name. */
+    preview: text('preview').notNull().default(''),
+    createdAt: createdAt(),
+    /** Null until opened or dismissed. */
+    readAt: timestamp('read_at', { withTimezone: true }),
+  },
+  (table) => [
+    // The panel reads "mine, unread first, newest first"; the badge counts
+    // "mine where read_at is null". Both are this index.
+    index('notifications_user_idx').on(table.userId, table.readAt, table.createdAt),
+    // Opening a conversation marks every entry for that channel read.
+    index('notifications_user_channel_idx').on(table.userId, table.channelId),
+    // One notification per person per message: a message edited to add and
+    // remove a mention must not pile up rows, and re-delivery on a retry is a
+    // no-op rather than a duplicate.
+    uniqueIndex('notifications_user_message_idx').on(table.userId, table.messageId, table.kind),
+  ],
+);
+
+/**
  * Ranks: named permission bundles, ordered by `position`.
  *
  * Higher position outranks lower. A member's position is that of their highest

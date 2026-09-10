@@ -160,10 +160,48 @@ export interface Message {
   id: Snowflake;
   channelId: Snowflake;
   authorId: Snowflake;
+  /**
+   * The words as typed, except that a picked `@name` is stored as `<@id>`.
+   *
+   * The client resolves `<@id>` to the person's current name at draw time, the
+   * same way `:emoji:` is resolved - so a mention keeps working when someone
+   * changes their display name, and degrades to `@unknown` rather than a broken
+   * token when the account is gone.
+   */
   content: string;
   createdAt: string;
   editedAt: string | null;
   attachments: Attachment[];
+  /**
+   * Ids of everyone this message mentions, de-duplicated. Derived on the server
+   * from the `<@id>` tokens in `content`, filtered to people who can actually
+   * see the channel - so the client can trust it without re-checking.
+   */
+  mentions: Snowflake[];
+}
+
+/**
+ * One entry in the notifications inbox: a DM that arrived, or a message that
+ * mentioned you.
+ *
+ * A row per event rather than a per-channel counter, because the inbox shows
+ * the individual things - who, where, a snippet - and "mark this one read"
+ * needs something to point at. `readAt` is null until it is opened or dismissed.
+ */
+export interface Notification {
+  id: Snowflake;
+  kind: 'dm' | 'mention';
+  /** The message that caused it. Gone from the inbox if that message is deleted. */
+  messageId: Snowflake;
+  channelId: Snowflake;
+  /** Null for a DM, set for a mention in a guild channel - the context to show. */
+  guildId: Snowflake | null;
+  /** Who sent the message. */
+  authorId: Snowflake;
+  /** A short plain-text preview of the message, mentions already resolved. */
+  preview: string;
+  createdAt: string;
+  readAt: string | null;
 }
 
 /**

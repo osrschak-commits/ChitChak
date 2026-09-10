@@ -20,6 +20,7 @@ import {
 import { errors } from '../lib/errors.js';
 import { forGuilds } from './emoji.js';
 import { dmChannelsFor } from './dms.js';
+import { notificationsFor } from './notifications.js';
 import { progressFor } from './progress.js';
 import { blockedIdsFor, relationshipsFor } from './friends.js';
 import { memberContext, visibleChannelIds } from './permissions.js';
@@ -131,6 +132,7 @@ export async function buildReadySnapshot(userId: string): Promise<ReadyPayload> 
       overwrites: [],
       voiceStates: [],
       presences: [],
+      notifications: await notificationsFor(userId),
       ...relationships,
     };
   }
@@ -211,6 +213,7 @@ export async function buildReadySnapshot(userId: string): Promise<ReadyPayload> 
 
   return {
     progress: await progressFor(userId),
+    notifications: await notificationsFor(userId),
     user: self,
     guilds: guildRows.map(toGuild),
     // DM channels are appended rather than sorted in: compareChannels orders by
