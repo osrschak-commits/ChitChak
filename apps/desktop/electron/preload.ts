@@ -27,6 +27,16 @@ const api = {
     return ipcRenderer.invoke('ptt:get-key');
   },
 
+  /** Whether the app is set to start when you sign in to the computer. */
+  getOpenAtLogin(): Promise<boolean> {
+    return ipcRenderer.invoke('startup:get');
+  },
+
+  /** @returns the setting as it stands afterwards, in case the OS refused it. */
+  setOpenAtLogin(enabled: boolean): Promise<boolean> {
+    return ipcRenderer.invoke('startup:set', enabled);
+  },
+
   /** Screens and windows that can be shared, with preview thumbnails. */
   listScreenSources(): Promise<
     Array<{ id: string; name: string; kind: 'screen' | 'window'; thumbnail: string | null }>

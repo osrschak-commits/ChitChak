@@ -47,6 +47,16 @@ let mainWindow: BrowserWindow | null = null;
 let tray: TrayHandle | null = null;
 
 /**
+ * Whether this launch should come up straight into the tray with no window.
+ *
+ * True when the OS started us at login: nobody asked for a window, they turned
+ * their computer on. `--hidden` is the argument we register for the Windows Run
+ * key; `wasOpenedAtLogin` is how macOS says the same thing. A normal launch -
+ * double-clicking the icon - has neither, and shows the window as usual.
+ */
+let startHidden = process.argv.includes('--hidden');
+
+/**
  * Whether the app is on its way out, as opposed to the window being closed.
  *
  * The close handler cannot tell the difference on its own - a quit closes the
@@ -130,7 +140,10 @@ function createWindow(splash: Splash | null): void {
     // still up when the app appears floats over it for a frame, and over
     // anything the person alt-tabs to if the show ever fails.
     splash?.window.setAlwaysOnTop(false);
-    mainWindow?.show();
+    // A login launch stays in the tray. The window is fully built and a click
+    // on the tray icon brings it up instantly - it simply does not announce
+    // itself by appearing over whatever the person is doing right after boot.
+    if (!startHidden) mainWindow?.show();
     splash?.close();
   });
 
@@ -379,21 +392,27 @@ app.whenReady().then(() => {
   // OS draws match the window it is drawing around.
   nativeTheme.themeSource = 'dark';
 
+  // macOS reports a login launch here; on Windows it is the --hidden argument,
+  // already read at module scope.
+  startHidden = startHidden || app.getLoginItemSettings().wasOpenedAtLogin;
+
   /**
    * Something on screen first, then the slow part.
    *
    * The splash is created before anything that can block, because the whole
    * point of it is the seconds before the app can be shown - a splash that
-   * appears after the wait has been spent is decoration.
+   * appears after the wait has been spent is decoration. A login launch shows
+   * no splash: there is no window coming, so a panel that flashes and vanishes
+   * would just be a startup blip nobody asked to see.
    */
-  const splash = createSplash();
+  const splash = startHidden ? null : createSplash();
 
-  void bootUpdate((phase, percent) => splash.set(phase, percent))
+  void bootUpdate((phase, percent) => splash?.set(phase, percent))
     .catch(() => ({ kind: 'proceed' as const }))
     .then((outcome) => {
       const start = () => {
         if (mainWindow) return;
-        splash.set('loading');
+        splash?.set('loading');
         createWindow(splash);
         // All three read `mainWindow`, so none can run before it exists.
         installPermissionHandlers();
@@ -405,7 +424,7 @@ app.whenReady().then(() => {
         // The app is about to be replaced and relaunched. Leave the splash up
         // saying so - closing it here would leave a few seconds of nothing at
         // all, which reads as a crash.
-        splash.set('installing', 100);
+        splash?.set('installing', 100);
         setImmediate(installAndRestart);
         // If the installer does not take, open the app anyway. Whatever went
         // wrong with the update, being unable to start is a far worse outcome
@@ -488,6 +507,25 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('ptt:get-key', () => pushToTalkAccelerator);
+
+  /**
+   * Launch at login.
+   *
+   * The OS owns this setting - a registry Run entry on Windows, a login item on
+   * macOS - so there is nothing to persist here; `getLoginItemSettings` reads
+   * back whatever was written last, even across reinstalls.
+   *
+   * `--hidden` is registered alongside it so a login launch comes up in the
+   * tray rather than throwing a window at someone the moment they reach the
+   * desktop. `openAsHidden` is the macOS equivalent, ignored elsewhere.
+   */
+  ipcMain.handle('startup:get', () => app.getLoginItemSettings().openAtLogin);
+
+  ipcMain.handle('startup:set', (_event, enabled: unknown) => {
+    const openAtLogin = Boolean(enabled);
+    app.setLoginItemSettings({ openAtLogin, openAsHidden: true, args: ['--hidden'] });
+    return app.getLoginItemSettings().openAtLogin;
+  });
 
   app.on('activate', () => {
     // No splash: this is a dock click on a running app, not a cold start, so

@@ -64,9 +64,14 @@ export function VoiceSettingsDialog({ onClose }: { onClose(): void }) {
   const [capturing, setCapturing] = useState(false);
   const [keyError, setKeyError] = useState<string | null>(null);
 
+  // Desktop only: a browser tab cannot register itself to open at login.
+  const isDesktop = Boolean(window.chitchak);
+  const [openAtLogin, setOpenAtLogin] = useState(false);
+
   useEffect(() => {
     void listMediaDevices().then(setDevices);
     void window.chitchak?.getPushToTalkKey().then(setPttKey);
+    void window.chitchak?.getOpenAtLogin().then(setOpenAtLogin);
 
     // Headsets get plugged in mid-session; the list should not be a snapshot
     // from whenever this dialog happened to open.
@@ -116,6 +121,33 @@ export function VoiceSettingsDialog({ onClose }: { onClose(): void }) {
         </div>
 
         <div className="modal__body">
+          {isDesktop && (
+            <div className="section">
+              <h3 className="section__title">General</h3>
+
+              <div className="row">
+                <div>
+                  <div className="row__label">Launch at startup</div>
+                  <div className="row__hint">
+                    Opens ChitChak when you sign in to this computer, straight to the tray - no
+                    window until you click the icon, so a call can reconnect without getting in
+                    your way.
+                  </div>
+                </div>
+                <Switch
+                  label="Launch at startup"
+                  checked={openAtLogin}
+                  onChange={(v) => {
+                    // Reflect the OS's answer, not the click: it can decline, and
+                    // a managed machine may not let this be set at all.
+                    setOpenAtLogin(v);
+                    void window.chitchak?.setOpenAtLogin(v).then(setOpenAtLogin);
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
           <div className="section">
             <h3 className="section__title">Devices</h3>
 
