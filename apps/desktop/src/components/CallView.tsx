@@ -5,6 +5,7 @@ import { usePermissions } from '../hooks/usePermissions.js';
 import { usePersonPopover } from '../hooks/usePersonPopover.js';
 import { useApp } from '../store/app.js';
 import { Avatar, MemberName, Meter } from './primitives.js';
+import { CallBar } from './Sidebar.js';
 
 /**
  * The call: everyone in this voice room, and nothing else.
@@ -227,6 +228,11 @@ export function CallView() {
           )}
         </div>
       </div>
+
+      {/* Hidden by CSS above the mobile breakpoint - the desktop rail already
+          carries this. Below it there is no rail, and this is the only place
+          left to reach mute, camera or leave without going back to the list. */}
+      <CallBar />
 
       {person.popovers}
     </main>

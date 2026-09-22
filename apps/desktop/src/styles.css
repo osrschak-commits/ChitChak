@@ -1067,6 +1067,13 @@ textarea::placeholder {
   color: var(--alert-400);
 }
 
+/* CallView's own copy, for the phone layout - hidden here, shown at the
+   mobile breakpoint. See styles.css's @media block, and the comment on
+   CallBar's export in Sidebar.tsx for why there are two of these at all. */
+.pane > .callbar {
+  display: none;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
@@ -5137,5 +5144,13 @@ textarea::placeholder {
 
   .composer {
     padding-bottom: calc(18px + env(safe-area-inset-bottom));
+  }
+
+  /* The call screen has no rail beside it to carry the live-call controls,
+     so CallView renders its own copy of CallBar - hidden above this
+     breakpoint, where the rail is doing that job instead. */
+  .pane > .callbar {
+    display: block;
+    padding-bottom: calc(11px + env(safe-area-inset-bottom));
   }
 }

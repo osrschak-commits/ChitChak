@@ -346,8 +346,15 @@ function VoiceRow({
   );
 }
 
-/** The live-call controls. Only rendered while actually in a channel. */
-function CallBar() {
+/**
+ * The live-call controls. Only rendered while actually in a channel.
+ *
+ * Exported as well as used here: the desktop rail carries it permanently
+ * alongside the channel list, but the phone layout has no rail - CallView
+ * renders a second copy of this same component at the foot of the call
+ * screen itself, shown only below the mobile breakpoint. See styles.css.
+ */
+export function CallBar() {
   const voiceChannelId = useApp((s) => s.voiceChannelId);
   const voiceConnection = useApp((s) => s.voiceConnection);
   const channels = useApp((s) => s.channels);
