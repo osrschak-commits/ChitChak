@@ -41,11 +41,19 @@ const app = Fastify({
 
 app.decorate('isShuttingDown', false);
 
+/**
+ * Capacitor's iOS webview serves the app from this custom scheme rather than
+ * a real origin - it is the same for every install, not per-deployment like
+ * CLIENT_ORIGIN, so it is a constant here rather than an env var.
+ */
+const CAPACITOR_ORIGIN = 'capacitor://localhost';
+
 await app.register(cors, {
   // Electron renderers load from file:// or the dev server, so the origin is
   // either the Vite URL or absent entirely. An allowlist rather than `*`,
   // because credentials are involved.
-  origin: (origin, cb) => cb(null, !origin || origin === config.CLIENT_ORIGIN),
+  origin: (origin, cb) =>
+    cb(null, !origin || origin === config.CLIENT_ORIGIN || origin === CAPACITOR_ORIGIN),
   credentials: true,
 });
 
