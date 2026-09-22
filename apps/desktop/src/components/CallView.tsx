@@ -229,9 +229,10 @@ export function CallView() {
         </div>
       </div>
 
-      {/* Hidden by CSS above the mobile breakpoint - the desktop rail already
-          carries this. Below it there is no rail, and this is the only place
-          left to reach mute, camera or leave without going back to the list. */}
+      {/* The rail carries its own copy too, on desktop where there is a rail -
+          this is so mute, camera or leave never need looking away from the
+          people you are talking to, and it is the only way to reach them at
+          all on the phone layout, where there is no rail. */}
       <CallBar />
 
       {person.popovers}

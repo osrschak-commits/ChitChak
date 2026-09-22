@@ -1067,10 +1067,23 @@ textarea::placeholder {
   color: var(--alert-400);
 }
 
-/* CallView's own copy, for the phone layout - hidden here, shown at the
-   mobile breakpoint. See styles.css's @media block, and the comment on
-   CallBar's export in Sidebar.tsx for why there are two of these at all. */
+/*
+ * CallView's own copy of CallBar - see the comment on its export in
+ * Sidebar.tsx for why there are two of these. Shown at every width now: it
+ * started as a mobile-only stand-in for the rail, but reaching mute or
+ * leave without looking away from the people you are talking to turned out
+ * to be worth having on desktop too, alongside the rail's copy rather than
+ * instead of it.
+ *
+ * The channel name and connection state repeat what the pane header above
+ * already says, so only the button row itself shows here.
+ */
 .pane > .callbar {
+  display: block;
+}
+
+.pane > .callbar .callbar__head,
+.pane > .callbar .callbar__where {
   display: none;
 }
 
@@ -5146,20 +5159,10 @@ textarea::placeholder {
     padding-bottom: calc(18px + env(safe-area-inset-bottom));
   }
 
-  /* The call screen has no rail beside it to carry the live-call controls,
-     so CallView renders its own copy of CallBar - hidden above this
-     breakpoint, where the rail is doing that job instead. The channel name
-     and connection state repeat what the pane header above already says, so
-     only the buttons themselves make the trip - the rest was most of what
-     made this take up half the screen. */
+  /* CallView's own CallBar shows at every width (see its base rule above) -
+     only the home-indicator clearance is specific to being here. */
   .pane > .callbar {
-    display: block;
     padding-bottom: calc(11px + env(safe-area-inset-bottom));
-  }
-
-  .pane > .callbar .callbar__head,
-  .pane > .callbar .callbar__where {
-    display: none;
   }
 
   /* A landscape webcam cropped to a narrow phone-width tile under `cover`
