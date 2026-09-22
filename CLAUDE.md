@@ -71,7 +71,21 @@ in plain words, without marketing tone.
   with a wait rather than reporting the 429 as a failure.
 - **Windows loopback audio is the whole output mix**, so a screen share with sound
   carries the call itself back to everyone in it. Electron 33 offers no way to exclude
-  our own audio. The setting in voice settings is the only cure.
+  our own audio. The setting in voice settings is the only cure. (A fix is built on
+  the `electron-44` branch, pending a two-person test before merge — see TODO.md.)
+- **A single-pane mobile layout lives below `@media (max-width: 860px)`** at the
+  bottom of `styles.css`, built for an iOS app (Capacitor, not yet added - see
+  TODO.md) rather than for being found in a phone browser. Three screens - the
+  list (Sidebar/FriendsSidebar), main (ChatPanel/CallView/FriendsPanel) and members
+  (MemberRail) - share one `data-mobile-pane` attribute on `.shell__body` and
+  `.topbar`, driven by `mobileList`/`mobileMembers` in the store; every navigation
+  action sets them, so a new one that changes where the app is looking (a new
+  `selectX`-style action) needs to set them too or the phone layout silently
+  strands someone on the wrong screen. Desktop is unaffected - nothing outside that
+  media query changed except `min-width: 0` fixes that were already-latent grid
+  bugs (a flex/grid item's own `min-width` defaults to its content's size, not 0,
+  which only bit once the sidebar/rail sat in a flexible `1fr` column instead of a
+  fixed-pixel one).
 
 ## Testing
 

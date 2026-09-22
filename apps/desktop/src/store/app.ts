@@ -151,6 +151,18 @@ interface AppState {
   screenShares: ScreenShare[];
   /** Whether the member rail is showing. Remembered between sessions. */
   membersVisible: boolean;
+  /**
+   * Single-pane navigation for a narrow window - the list of channels/people,
+   * or whatever it leads to, never both at once.
+   *
+   * Unlike `membersVisible`, neither of these is a preference: they are reset
+   * by every act of navigation, so returning to the list and drilling in again
+   * always lands somewhere sane. Harmless at desktop width, where the CSS that
+   * reads them never applies and every pane is simply on screen at once.
+   */
+  mobileList: boolean;
+  /** The member rail as its own mobile screen, independent of `membersVisible`. */
+  mobileMembers: boolean;
   selfMuted: boolean;
   selfDeafened: boolean;
   cameraOn: boolean;
@@ -221,6 +233,10 @@ interface AppState {
   watchScreen(trackSid: string): void;
   stopWatchingScreen(trackSid: string): void;
   toggleMembers(): void;
+  /** The mobile back button: whatever screen is showing, return to the list. */
+  goToMobileList(): void;
+  /** The mobile member-count pill: its own screen, not the desktop rail. */
+  toggleMobileMembers(): void;
   setTransmitMode(mode: TransmitMode): void;
   setPushToTalkActive(active: boolean): void;
   setAudioSettings(settings: Partial<AudioSettings>): Promise<void>;
@@ -432,6 +448,8 @@ function signedOutState() {
     pendingGuildId: null,
     mainView: 'chat' as const,
     gatewayStatus: 'closed' as GatewayStatus,
+    mobileList: true,
+    mobileMembers: false,
   };
 }
 
@@ -488,6 +506,8 @@ export const useApp = create<AppState>((set, get) => ({
   videoFeeds: [],
   screenShares: [],
   membersVisible: readMembersVisible(),
+  mobileList: true,
+  mobileMembers: false,
   selfMuted: false,
   selfDeafened: false,
   cameraOn: false,
@@ -534,16 +554,22 @@ export const useApp = create<AppState>((set, get) => ({
       Going to Friends means the list of people, which is what both controls
       say on them. The conversation is one click away in the sidebar.
     */
-    set({ scope: 'friends', mainView: 'chat', selectedDmChannelId: null });
+    set({ scope: 'friends', mainView: 'chat', selectedDmChannelId: null, mobileList: true, mobileMembers: false });
   },
 
   showGuild() {
     if (!get().selectedGuildId) return;
-    set({ scope: 'guild' });
+    set({ scope: 'guild', mobileList: true, mobileMembers: false });
   },
 
   selectDmChannel(channelId) {
-    set({ scope: 'friends', selectedDmChannelId: channelId, mainView: 'chat' });
+    set({
+      scope: 'friends',
+      selectedDmChannelId: channelId,
+      mainView: 'chat',
+      mobileList: false,
+      mobileMembers: false,
+    });
     void get().loadMessages(channelId);
     get().markNotificationsRead({ channelId });
   },
@@ -580,6 +606,8 @@ export const useApp = create<AppState>((set, get) => ({
         selectedGuildId: notification.guildId,
         selectedTextChannelId: notification.channelId,
         mainView: 'chat',
+        mobileList: false,
+        mobileMembers: false,
       });
       void get().loadMessages(notification.channelId);
       get().markNotificationsRead({ channelId: notification.channelId });
@@ -651,6 +679,8 @@ export const useApp = create<AppState>((set, get) => ({
       scope: 'friends',
       selectedDmChannelId: channel.id,
       mainView: 'chat',
+      mobileList: false,
+      mobileMembers: false,
     }));
     void get().loadMessages(channel.id);
   },
@@ -663,6 +693,10 @@ export const useApp = create<AppState>((set, get) => ({
       selectedGuildId: guildId,
       selectedTextChannelId: firstText?.id ?? null,
       scope: 'guild',
+      // Switching servers lands on that server's channel list, not straight
+      // into a channel - the list is what a server switch is asking to see.
+      mobileList: true,
+      mobileMembers: false,
     });
     if (firstText) {
       void get().loadMessages(firstText.id);
@@ -672,7 +706,12 @@ export const useApp = create<AppState>((set, get) => ({
 
   selectTextChannel(channelId) {
     // Opening a text channel leaves the call view but not the call itself.
-    set({ selectedTextChannelId: channelId, mainView: 'chat' });
+    set({
+      selectedTextChannelId: channelId,
+      mainView: 'chat',
+      mobileList: false,
+      mobileMembers: false,
+    });
     void get().loadMessages(channelId);
     get().markNotificationsRead({ channelId });
   },
@@ -752,11 +791,11 @@ export const useApp = create<AppState>((set, get) => ({
     // tears down a working call and rebuilds it. Switch to the call view
     // instead, which is what a second click is actually asking for.
     if (get().voiceChannelId === channelId && get().voiceConnection !== 'disconnected') {
-      set({ mainView: 'call' });
+      set({ mainView: 'call', mobileList: false, mobileMembers: false });
       return;
     }
 
-    set({ voiceError: null, mainView: 'call' });
+    set({ voiceError: null, mainView: 'call', mobileList: false, mobileMembers: false });
     // The server replies with `voice:credentials`, which is where the SFU
     // connection is actually established - see applyServerMessage.
     gateway.send({ op: 'voice:join', d: { channelId } });
@@ -841,6 +880,14 @@ export const useApp = create<AppState>((set, get) => ({
       // Private browsing, or storage disabled. The rail still toggles; it just
       // forgets, which is a far smaller problem than refusing to toggle.
     }
+  },
+
+  goToMobileList() {
+    set({ mobileList: true, mobileMembers: false });
+  },
+
+  toggleMobileMembers() {
+    set((s) => ({ mobileMembers: !s.mobileMembers }));
   },
 
   watchScreen(trackSid) {

@@ -2,7 +2,17 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!--
+      viewport-fit=cover, so an iOS app (the notch, the home-indicator strip)
+      exposes env(safe-area-inset-*) for the mobile layout to pad around
+      instead of drawing the top bar and composer underneath them. It does
+      nothing anywhere else - Electron and a desktop browser both simply
+      ignore it.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
     <!--
       The renderer never loads remote code. The hosts it may reach are injected
       at build time from VITE_CONNECT_SRC / VITE_IMG_SRC, because a packaged

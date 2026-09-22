@@ -47,6 +47,8 @@ export function App() {
   const membersVisible = useApp((s) => s.membersVisible);
   const selectedDmChannelId = useApp((s) => s.selectedDmChannelId);
   const voiceChannelId = useApp((s) => s.voiceChannelId);
+  const mobileList = useApp((s) => s.mobileList);
+  const mobileMembers = useApp((s) => s.mobileMembers);
 
   useEffect(() => {
     if (authenticated) void boot();
@@ -119,6 +121,14 @@ export function App() {
     );
   }
 
+  /*
+    Which of the three regions a narrow window shows, full screen, instead of
+    all three side by side. Irrelevant at desktop width - the CSS that reads
+    `data-mobile-pane` only exists inside the narrow-window media query, so
+    this costs nothing there beyond an attribute nobody looks at.
+  */
+  const mobilePane = mobileList ? 'list' : mobileMembers ? 'members' : 'main';
+
   return (
     <div className="shell">
       <TopBar
@@ -128,42 +138,51 @@ export function App() {
         onOpenVoiceSettings={() => setOverlay('voice-settings')}
       />
 
-      <div className="shell__body">
+      <div className="shell__body" data-mobile-pane={mobilePane}>
         {/* Boundaries per region: a bug in the channel list should not take the
             call down with it, and vice versa. */}
-        <ErrorBoundary scope="channel list">
-          {scope === 'friends' ? (
-            <FriendsSidebar />
-          ) : (
-            <Sidebar
-              onOpenServerSettings={(tab) => {
-                setSettingsTab(tab);
-                setOverlay('server-settings');
-              }}
-            />
-          )}
-        </ErrorBoundary>
+        <div className="mobile-screen" data-screen="list">
+          <ErrorBoundary scope="channel list">
+            {scope === 'friends' ? (
+              <FriendsSidebar />
+            ) : (
+              <Sidebar
+                onOpenServerSettings={(tab) => {
+                  setSettingsTab(tab);
+                  setOverlay('server-settings');
+                }}
+              />
+            )}
+          </ErrorBoundary>
+        </div>
 
         {/* A call and a text channel are separate places, not a call stacked on
             top of a channel. Switching between them is what the sidebar does. */}
-        <ErrorBoundary scope={mainView === 'call' ? 'call view' : 'chat'}>
-          {mainView === 'call' && voiceChannelId ? (
-            <CallView />
-          ) : scope === 'friends' && selectedDmChannelId === null ? (
-            // A conversation renders through the ordinary chat panel: a DM is an
-            // ordinary channel, and deserves the same reading experience.
-            <FriendsPanel />
-          ) : (
-            <ChatPanel onEditProfile={() => setOverlay('profile')} />
-          )}
-        </ErrorBoundary>
+        <div className="mobile-screen" data-screen="main">
+          <ErrorBoundary scope={mainView === 'call' ? 'call view' : 'chat'}>
+            {mainView === 'call' && voiceChannelId ? (
+              <CallView />
+            ) : scope === 'friends' && selectedDmChannelId === null ? (
+              // A conversation renders through the ordinary chat panel: a DM is an
+              // ordinary channel, and deserves the same reading experience.
+              <FriendsPanel />
+            ) : (
+              <ChatPanel onEditProfile={() => setOverlay('profile')} />
+            )}
+          </ErrorBoundary>
+        </div>
 
         {/* Not in the friends scope: there is no server there to list, and the
-            conversation list on the left is already the roster. */}
-        {scope !== 'friends' && selectedGuildId && membersVisible && (
-          <ErrorBoundary scope="member list">
-            <MemberRail guildId={selectedGuildId} />
-          </ErrorBoundary>
+            conversation list on the left is already the roster. `mobileMembers`
+            is its own screen, independent of the desktop rail's remembered
+            preference - opening it on a phone must not depend on what that
+            preference happens to be, and must not change it either. */}
+        {scope !== 'friends' && selectedGuildId && (membersVisible || mobileMembers) && (
+          <div className="mobile-screen" data-screen="members">
+            <ErrorBoundary scope="member list">
+              <MemberRail guildId={selectedGuildId} />
+            </ErrorBoundary>
+          </div>
         )}
       </div>
 

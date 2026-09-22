@@ -210,6 +210,20 @@ textarea::placeholder {
 .shell {
   display: grid;
   grid-template-rows: var(--topbar-h) 1fr;
+  /*
+    Without this, the single implicit column `.shell__body` sits in sizes
+    itself to fit its content instead of filling the window - a plain block
+    child fills its parent by default, but a grid item does not unless told
+    to. `minmax(0, 1fr)` is what "told to" looks like: 1fr to actually fill
+    it, and the 0 minimum so a wide unbreakable line inside (a channel name
+    with nowrap for its own ellipsis, say) cannot push the column - and with
+    it the window - wider than the screen to make room for itself.
+
+    Desktop never surfaced this: `.shell__body`'s own columns underneath are
+    fixed pixel widths, small enough that the gap never showed. The single
+    column below the breakpoint has nothing to fall back on the same way.
+  */
+  grid-template-columns: minmax(0, 1fr);
   height: 100%;
   background: var(--graphite-850);
 }
@@ -4921,4 +4935,202 @@ textarea::placeholder {
 .notif__clear:hover {
   background: var(--graphite-750);
   color: var(--text-bright);
+}
+
+/* ======================================================================
+   Single pane, narrow window
+   ======================================================================
+
+   Below this width there is no room for three columns, so only one of
+   list/main/members is ever on screen - `data-mobile-pane` on `.shell__body`
+   (App.tsx) and on `.topbar` (TopBar.tsx) says which. Keep this number equal
+   to `MOBILE_MEDIA_QUERY` in TopBar.tsx; nothing enforces that but a comment
+   on each end pointing at the other.
+
+   This is written for the app's own webview, not for being found in a phone
+   browser - chitchak.com sends a phone to the app instead (see apps/site) -
+   but the two engines are close enough that this is also exactly what makes
+   the layout checkable from an ordinary desktop browser's device toolbar.
+   ====================================================================== */
+
+@media (max-width: 860px) {
+  :root {
+    /* Grows the bar's own grid row to fit the safe-area padding added to
+       `.topbar` below - a padding the row track does not know about on its
+       own, since `--topbar-h` is what actually sizes it (see `.shell`). */
+    --topbar-h: calc(46px + env(safe-area-inset-top));
+  }
+
+  .shell__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /*
+    Hidden by default and shown exactly one at a time, selected by the
+    `data-mobile-pane` attribute rather than by unmounting the other two -
+    unmounting would drop a screen share's video element and a scroll
+    position every time someone glances at the member list and comes back.
+  */
+  .mobile-screen {
+    display: none;
+    min-width: 0;
+    min-height: 0;
+  }
+
+  .shell__body[data-mobile-pane='list'] .mobile-screen[data-screen='list'],
+  .shell__body[data-mobile-pane='main'] .mobile-screen[data-screen='main'],
+  .shell__body[data-mobile-pane='members'] .mobile-screen[data-screen='members'] {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  /* Sidebar, the call/chat pane and FriendsPanel already have no width of
+     their own - they fill whatever grid column holds them on desktop, and
+     now fill the full-width screen wrapper the same way, by ordinary flex
+     stretch. Only the member rail sets an explicit desktop width, so only it
+     needs overriding here. */
+  .rail {
+    width: 100%;
+    border-left: none;
+  }
+
+  /*
+    A flex item's `min-width` defaults to `auto` - its content's own minimum
+    size - not 0. On desktop that default never shows up, because the sidebar
+    and rail sit in a *fixed*-width grid column that hands them a size
+    outright; `.mobile-screen` making them flex items besides only starts
+    mattering here, where the column is `1fr` and has none to hand them. Left
+    at `auto`, an unwrapped channel name (`.chan__name`, `white-space:nowrap`
+    for its own ellipsis) was enough to hold the whole sidebar - and with it
+    the grid track, and with that the window - open to its width rather than
+    the screen's. This is the fix, not a mobile nicety: without it the
+    single-pane layout does not fit a phone at all.
+  */
+  .mobile-screen > * {
+    min-width: 0;
+  }
+
+  /* A back arrow only exists in the DOM away from the list screen (see
+     TopBar.tsx), so it needs no visibility rule - only its appearance. */
+  .topbar__back {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    font-size: 22px;
+    line-height: 1;
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    margin-left: -4px;
+  }
+
+  .topbar__back:hover {
+    background: var(--graphite-750);
+    color: var(--text-bright);
+  }
+
+  /* The server/Friends switcher is how you choose *which* list - it belongs
+     on the list screen and nowhere else, or the bar has nothing to say about
+     where you are once you have gone somewhere. The member-count pill is the
+     same control the desktop rail uses (see TopBar.tsx); it only makes sense
+     once a channel is open, alongside the chat it counts. */
+  .topbar[data-mobile-pane='main'] .scope-tabs,
+  .topbar[data-mobile-pane='members'] .scope-tabs,
+  .topbar[data-mobile-pane='list'] .topbar__members {
+    display: none;
+  }
+
+  /*
+    The bar's own children, next: `.scope-tab`'s 280px cap and `.me`'s 200px
+    are desktop-tuned - room enough there that the cap, not the screen, was
+    always what stopped a name running on forever. Both are wider than an
+    entire phone screen, so at this width they are what overflows the bar
+    instead. `.scope-tab__name` already truncates with an ellipsis (see its
+    own rule above); what it was missing is a flex item willing to shrink
+    below its content's width in the first place; `min-width: auto` is the
+    default which fights exactly that, same as `.mobile-screen > *` above.
+  */
+  .scope-tabs,
+  .scope-tab {
+    min-width: 0;
+  }
+
+  .scope-tab {
+    max-width: none;
+    padding: 0 12px;
+  }
+
+  /* Only the server tab actually needs the room - "Friends" never runs long
+     enough to ask for it, and letting it grow anyway only takes width away
+     from the name that does. */
+  .scope-tabs > .scope-tab:first-child {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .scope-tabs > .scope-tab:last-child {
+    flex: 0 0 auto;
+  }
+
+  /* One icon too many for a phone-width bar to hold next to the switcher.
+     Still there on the other two screens - including the call itself, where
+     it is the one place changing it on the move actually matters. */
+  .topbar[data-mobile-pane='list'] .topbar__voice-settings {
+    display: none;
+  }
+
+  /* Your name spelled out next to your face was never load-bearing - the
+     avatar alone is who this button is, and giving that name's width back is
+     worth more here than the name itself. */
+  .me {
+    max-width: none;
+  }
+
+  .me__name {
+    display: none;
+  }
+
+  /* The update pill's whole sentence does not fit next to everything else on
+     a phone-width bar, and it is not urgent enough to make room for by
+     hiding something that is - it says the same thing again next time this
+     opens. */
+  .update {
+    display: none;
+  }
+
+  /* Anything narrower than the desktop's 480/720px dialogs should not also
+     keep the desktop's generous margin around them - that margin is what
+     stopped a dialog crowding the edges of a wide window, and on a phone it
+     is most of the screen. */
+  .scrim {
+    padding: 12px;
+  }
+
+  .modal,
+  .modal--wide {
+    max-width: 100%;
+  }
+
+  /* iOS zooms the page in to fit any focused input smaller than 16px - a
+     phone-only annoyance nobody asked for, since every input here is already
+     legible at the desktop size. Scoped to the breakpoint rather than raised
+     everywhere, so the desktop app's inputs keep their designed size. */
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+
+  /* The notch and the home-indicator strip, on the one native surface that
+     actually has them. `viewport-fit=cover` in index.html is what turns
+     these on; everywhere else they resolve to zero and cost nothing. */
+  .topbar {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .composer {
+    padding-bottom: calc(18px + env(safe-area-inset-bottom));
+  }
 }

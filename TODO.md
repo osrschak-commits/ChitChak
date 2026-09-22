@@ -97,12 +97,6 @@ belong to someone else. Nothing breaks, because friendships key on ids, but the
 longer it stays true the stranger "add by username" gets. A cooldown, or a
 history of past names, would settle it.
 
-## Mobile
-
-The web client runs in a phone browser but is laid out for a keyboard and a wide
-window. Either a responsive pass over the existing client, or a real mobile app.
-The site currently says "coming", which is a promise with a clock on it.
-
 ## Paddle live approval
 
 Sandbox works end to end. Going live needs Paddle to review the account, which
@@ -159,3 +153,51 @@ off and RED on. All of that was reasoned from the symptoms — quiet audio, a
 stream that vanished, a long wait before it played — and none of it has been
 watched by a second person on a second machine, which is the only test that
 counts. Worth doing before anyone is invited who would be annoyed by it.
+
+(`restrictOwnAudio`, the Electron 33 → 44 fix for the same symptom on the call's
+own audio, is built on the separate `electron-44` branch and unmerged pending
+that same two-person test — not part of this branch's work.)
+
+## Mobile: the layout is done, the app is not
+
+2026-09-18. Decided: an iOS app wrapping the existing web client with
+Capacitor, not a responsive site for phone browsers (chitchak.com will gate
+phones to "download the app" once that page exists - it does not yet).
+
+Done: the single-pane layout below `@media (max-width: 860px)` in
+`styles.css` - see CLAUDE.md's "Things that will bite you" for how it is
+wired. Verified in a desktop browser's device toolbar at 375×812: sign-in,
+every server/DM/channel/members navigation and the back button, a profile
+dialog, and a real voice call, with no horizontal overflow anywhere in that
+flow. Not yet touched: ServerSettingsDialog, GuildDialog, the emoji/screen
+pickers, and search - anything opened less often than the main flow above.
+
+Not done, in the order it likely needs doing:
+
+- **Add Capacitor** (`@capacitor/core`, `@capacitor/cli`, `@capacitor/ios`,
+  a `capacitor.config.ts` pointing `webDir` at `apps/desktop/dist-web`).
+  `npx cap add ios`, the Xcode project it generates, and everything after
+  need a Mac - `cap add ios` refuses to run anywhere else. Buildable from
+  Windows up to that point.
+- **Safe-area padding beyond the top bar.** `env(safe-area-inset-top)` is on
+  `.topbar`; the composer has `env(safe-area-inset-bottom)` but nothing else
+  does yet - worth a pass once the app is actually running on a notched
+  device and it is obvious what else sits under the home-indicator strip.
+- **Background voice.** A backgrounded or locked-screen webview stops
+  running JS and can drop the mic - untouched so far. Needs a native
+  Capacitor plugin (CallKit + a VoIP push, on iOS) before a call reliably
+  survives someone locking their phone. The one thing in this whole effort
+  that is a real unknown rather than a known amount of work.
+- **Push notifications.** The bell only updates while the gateway socket is
+  open; closed or backgrounded, nothing arrives. Needs server-side APNs
+  integration (a device-token table, sending on the same events that already
+  create a row in `notifications`) plus the Capacitor push plugin.
+- **App Store in-app purchase.** Keys/chests are sold through Paddle today.
+  The moment this is a listed iOS app, Apple requires its own IAP for
+  digital goods and takes its cut - a business decision as much as a
+  technical one, and it sits next to the loot-box note above, not instead of
+  it.
+- **The mobile web gate.** A phone hitting chitchak.com should be told to
+  get the app rather than shown the desktop-shaped marketing site - Discord's
+  own behaviour, and the reason there is no responsive-web workstream here at
+  all. Cheap once the app exists to point at; pointless before then.

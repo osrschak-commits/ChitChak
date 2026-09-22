@@ -15,6 +15,17 @@ import { UpdateBanner } from './UpdateBanner.js';
  * servers a labelled menu reads better than a stack of monograms, and dropping
  * the rail gives the channel list and the call the full width.
  */
+
+/**
+ * The single-pane breakpoint, as a media query string rather than a CSS
+ * variable - `matchMedia` cannot read `var(--mobile-bp)`, so this is checked
+ * at the moment of a click rather than tracked as reactive state, which is
+ * all one button actually needs it for. Keep this number equal to the one in
+ * `styles.css`'s `@media (max-width: …)` block; nothing enforces that but a
+ * comment on each end pointing at the other.
+ */
+const MOBILE_MEDIA_QUERY = '(max-width: 860px)';
+
 export function TopBar({
   onCreateServer,
   onJoinServer,
@@ -35,6 +46,10 @@ export function TopBar({
   const requestCount = useApp((s) => s.incomingRequests.size);
   const members = useApp((s) => s.members);
   const user = useApp((s) => s.user);
+  const mobileList = useApp((s) => s.mobileList);
+  const mobileMembers = useApp((s) => s.mobileMembers);
+  const goToMobileList = useApp((s) => s.goToMobileList);
+  const toggleMobileMembers = useApp((s) => s.toggleMobileMembers);
 
   /** Whether the server menu is down. */
   const [open, setOpen] = useState(false);
@@ -66,8 +81,27 @@ export function TopBar({
     ? [...members.values()].filter((m) => m.guildId === guild.id).length
     : 0;
 
+  /*
+    Which screen a narrow window is showing - see App.tsx. Read here too,
+    rather than passed down, because the bar needs it for two different
+    things: which controls make sense to show, and where "back" goes.
+  */
+  const mobilePane = mobileList ? 'list' : mobileMembers ? 'members' : 'main';
+
   return (
-    <header className="topbar" ref={barRef}>
+    <header className="topbar" ref={barRef} data-mobile-pane={mobilePane}>
+      {/*
+        Only ever in the DOM away from the list screen, so it costs nothing at
+        desktop width - `mobileList` never leaves true there. The rest of what
+        a narrow window hides is CSS's job, gated on `data-mobile-pane`; this
+        one needs a click handler, so it has to be a real element.
+      */}
+      {!mobileList && (
+        <button className="topbar__back" onClick={goToMobileList} aria-label="Back to the list">
+          <span aria-hidden="true">‹</span>
+        </button>
+      )}
+
       {/*
         No wordmark. The app's name is on the window, in the taskbar and on the
         installer; repeating it in the corner of every screen spends the most
@@ -186,9 +220,23 @@ export function TopBar({
         <button
           type="button"
           className="legend mono topbar__members"
-          onClick={toggleMembers}
-          aria-pressed={membersVisible}
-          title={membersVisible ? 'Hide the member list' : 'Show the member list'}
+          onClick={() => {
+            /*
+              Two different toggles, because they mean different things: the
+              desktop rail is a remembered preference that survives switching
+              channels, and the mobile member screen is a place you visit and
+              leave every time. One control can drive both - it just has to
+              ask which one applies right now rather than flip both at once,
+              or leaving a channel on a phone would silently change what the
+              desktop rail does the next time this account opens on a laptop.
+            */
+            if (window.matchMedia(MOBILE_MEDIA_QUERY).matches) toggleMobileMembers();
+            else toggleMembers();
+          }}
+          aria-pressed={membersVisible || mobileMembers}
+          title={
+            membersVisible || mobileMembers ? 'Hide the member list' : 'Show the member list'
+          }
         >
           {memberCount} {memberCount === 1 ? 'member' : 'members'}
         </button>
@@ -203,7 +251,7 @@ export function TopBar({
       <NotificationsMenu />
 
       <button
-        className="icon-btn"
+        className="icon-btn topbar__voice-settings"
         onClick={onOpenVoiceSettings}
         title="Voice and video settings"
         aria-label="Voice and video settings"
