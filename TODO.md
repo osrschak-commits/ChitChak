@@ -188,21 +188,42 @@ baked in.
 Also done: `npx cap add ios` ran on a Mac and the generated Xcode project
 is committed at `apps/desktop/ios/` (SPM, not CocoaPods - no `Pods/` to
 gitignore beyond what Capacitor's own `.gitignore` there already covers).
-It builds and runs in the iOS Simulator - the whole mobile layout above,
-in an actual iOS webview rather than a browser's device toolbar. Not yet
-run on a physical device, and no development team/signing is set up
-beyond what the simulator needs.
+It builds, runs on a real signed device with a paid Apple Developer
+account, and a real account can sign in - the server's CORS allowlist
+needed `capacitor://localhost` added (`apps/server/src/index.ts`), since
+that origin is neither empty (Electron) nor the website's (`CLIENT_ORIGIN`).
+
+Also done, found from that first real-device run: `Info.plist` had no
+`NSMicrophoneUsageDescription`/`NSCameraUsageDescription`, so iOS was not
+denying mic/camera access, it was killing the app outright for touching
+privacy-gated hardware undeclared - both added. `.scrim`'s mobile padding
+did not know about `env(safe-area-inset-top)`, so a dialog's close button
+sat almost under the notch - now padded by the safe area on both edges.
+The live-call controls (mute/camera/share/leave) lived only in the desktop
+rail's `CallBar`, invisible on the phone layout's call screen since there
+is no rail there - `CallView` now renders its own copy, shown only below
+the breakpoint. A landscape webcam cropped hard under `cover` in a narrow
+phone-width tile - letterboxed instead on mobile, same reasoning as a
+shared screen. And the screen-share button is disabled with an explanatory
+title when `navigator.mediaDevices.getDisplayMedia` does not exist, which
+is unconditionally true in an iOS WKWebView - see the unstarted item below
+for what actually fixes that rather than just explaining it.
 
 Not done, in the order it likely needs doing:
 
-- **A real device, then TestFlight.** Signing with an actual Apple
-  Developer account (paid, $99/year) is the gate for both - the free
-  account used for the simulator run does not carry to hardware you don't
-  own or to distribution.
-- **Safe-area padding beyond the top bar.** `env(safe-area-inset-top)` is on
-  `.topbar`; the composer has `env(safe-area-inset-bottom)` but nothing else
-  does yet - worth a pass once the app is actually running on a notched
-  device and it is obvious what else sits under the home-indicator strip.
+- **TestFlight.** The paid Developer account that got a real device signed
+  is also what TestFlight needs - distributing further than "phones this
+  Mac has plugged in" from here is a distribution setting, not new work.
+- **Sharing a phone's own screen.** iOS's WKWebView has no
+  `getDisplayMedia` at all - not a permission to request, a capability the
+  platform does not hand to a webview. The real fix is a native Capacitor
+  plugin wrapping ReplayKit's broadcast upload extension, which is its own
+  scoped project, not a quick follow-up. Watching someone *else's* shared
+  screen from a phone is unaffected - that is just an incoming video track.
+- **Safe-area padding elsewhere.** The top bar, the composer, dialogs and
+  the mobile call bar all know about the safe area now; whatever is still
+  missing will be obvious once more of the app has actually been used on a
+  notched device rather than guessed at.
 - **Background voice.** A backgrounded or locked-screen webview stops
   running JS and can drop the mic - untouched so far. Needs a native
   Capacitor plugin (CallKit + a VoIP push, on iOS) before a call reliably

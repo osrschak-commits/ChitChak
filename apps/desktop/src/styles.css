@@ -5148,9 +5148,26 @@ textarea::placeholder {
 
   /* The call screen has no rail beside it to carry the live-call controls,
      so CallView renders its own copy of CallBar - hidden above this
-     breakpoint, where the rail is doing that job instead. */
+     breakpoint, where the rail is doing that job instead. The channel name
+     and connection state repeat what the pane header above already says, so
+     only the buttons themselves make the trip - the rest was most of what
+     made this take up half the screen. */
   .pane > .callbar {
     display: block;
     padding-bottom: calc(11px + env(safe-area-inset-bottom));
+  }
+
+  .pane > .callbar .callbar__head,
+  .pane > .callbar .callbar__where {
+    display: none;
+  }
+
+  /* A landscape webcam cropped to a narrow phone-width tile under `cover`
+     loses most of the person to the sides - the same reasoning that already
+     keeps a shared screen letterboxed, applied to a camera tile too. Left
+     alone at desktop width, where tiles are wide enough that cover rarely
+     crops anything worth keeping. */
+  .tile .surface__video {
+    object-fit: contain;
   }
 }

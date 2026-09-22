@@ -379,6 +379,13 @@ export function CallBar() {
   // the same thing - so a disabled button here is a hint, not the boundary.
   const mayUseCamera = canInChannel(voiceChannelId, Permission.VIDEO);
   const mayShareScreen = canInChannel(voiceChannelId, Permission.SCREEN_SHARE);
+  // iOS's WKWebView has no getDisplayMedia at all - not a permission the user
+  // can grant, a capability the platform does not offer the page. Sharing a
+  // phone's own screen would need a native ReplayKit broadcast extension,
+  // which is real, separate work - see TODO.md. A capability check rather
+  // than a platform-name check: it is the actual thing that is missing, and
+  // it stays correct if some other browser ever lacks the same API.
+  const canShareScreen = typeof navigator.mediaDevices?.getDisplayMedia === 'function';
 
   const channel = channels.get(voiceChannelId);
   const connecting = voiceConnection === 'connecting' || voiceConnection === 'reconnecting';
@@ -446,13 +453,15 @@ export function CallBar() {
             setPicking(true);
           }}
           aria-pressed={screenShareOn}
-          disabled={!mayShareScreen}
+          disabled={!mayShareScreen || !canShareScreen}
           title={
-            mayShareScreen
-              ? screenShareOn
-                ? 'Stop sharing'
-                : 'Share your screen'
-              : 'Your rank cannot share a screen here'
+            !canShareScreen
+              ? 'Screen sharing needs a browser or the desktop app - not available here yet.'
+              : mayShareScreen
+                ? screenShareOn
+                  ? 'Stop sharing'
+                  : 'Share your screen'
+                : 'Your rank cannot share a screen here'
           }
         >
           <ScreenIcon />
