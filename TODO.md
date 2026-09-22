@@ -185,11 +185,20 @@ localhost. Verified: builds clean, `assertAssetsResolved` passes, and the
 built `index.html` has root-relative asset paths and the production CSP
 baked in.
 
+Also done: `npx cap add ios` ran on a Mac and the generated Xcode project
+is committed at `apps/desktop/ios/` (SPM, not CocoaPods - no `Pods/` to
+gitignore beyond what Capacitor's own `.gitignore` there already covers).
+It builds and runs in the iOS Simulator - the whole mobile layout above,
+in an actual iOS webview rather than a browser's device toolbar. Not yet
+run on a physical device, and no development team/signing is set up
+beyond what the simulator needs.
+
 Not done, in the order it likely needs doing:
 
-- **`npx cap add ios`, and everything after it.** Needs a Mac - the command
-  refuses to run anywhere else. Generates the Xcode project; from there it's
-  building, signing, a simulator run, then a real device.
+- **A real device, then TestFlight.** Signing with an actual Apple
+  Developer account (paid, $99/year) is the gate for both - the free
+  account used for the simulator run does not carry to hardware you don't
+  own or to distribution.
 - **Safe-area padding beyond the top bar.** `env(safe-area-inset-top)` is on
   `.topbar`; the composer has `env(safe-area-inset-bottom)` but nothing else
   does yet - worth a pass once the app is actually running on a notched
