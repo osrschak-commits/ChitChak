@@ -5104,8 +5104,13 @@ textarea::placeholder {
      keep the desktop's generous margin around them - that margin is what
      stopped a dialog crowding the edges of a wide window, and on a phone it
      is most of the screen. */
+  /* Plain 12px put a dialog's close button under the notch on a real device -
+     nothing here knew the top of the screen was not the top of the safe area.
+     calc rather than max(): env() alone can be 0 (no notch) or the inset
+     itself, and either way this is that plus the same breathing room the
+     12px was already giving everywhere else. */
   .scrim {
-    padding: 12px;
+    padding: calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
   }
 
   .modal,

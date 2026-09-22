@@ -66,5 +66,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>ChitChak needs your microphone to let you talk in a voice channel.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>ChitChak needs your camera to let you turn on video in a call.</string>
 </dict>
 </plist>
