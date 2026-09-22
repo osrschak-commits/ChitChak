@@ -236,6 +236,32 @@ textarea::placeholder {
   min-height: 0;
 }
 
+/*
+ * Every screen sits inside one of these now, on every width, not only below
+ * the single-pane breakpoint - see App.tsx. Before this wrapper existed,
+ * .sidebar/.pane/the rail were themselves the grid items handed a stretched
+ * height directly by .shell__body's grid; wrapping them in a plain <div>
+ * put a block-level box between the grid and its actual content, and a
+ * block box's height is auto - content-sized - unless something says
+ * otherwise. This is that something, at every width: flex-stretch is what
+ * used to be implicit. Skipping it left the sidebar exactly as tall as its
+ * channel list and nothing below that, rather than the full column.
+ */
+.mobile-screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Flex's cross axis (width, here) stretches its children by default - its
+   main axis (height) does not, and sits at content size until told to grow.
+   The grid used to hand that height straight to .sidebar/.pane/the rail;
+   now it has to be said again, one level further in. */
+.mobile-screen > * {
+  flex: 1;
+  min-height: 0;
+}
+
 /* --- Top bar -------------------------------------------------------------- */
 
 .topbar {
@@ -1080,6 +1106,13 @@ textarea::placeholder {
  */
 .pane > .callbar {
   display: block;
+  /* The rail's tint and border-top read as a rail fragment when it is
+     actually sitting under a full-width video grid instead - .composer
+     (ChatPanel's equivalent bottom bar) has neither, and this now matches
+     it: nothing but padding, so it reads as part of the call screen rather
+     than a strip cut from somewhere else. */
+  background: none;
+  border-top: none;
 }
 
 .pane > .callbar .callbar__head,
@@ -5000,16 +5033,15 @@ textarea::placeholder {
   .shell__body[data-mobile-pane='list'] .mobile-screen[data-screen='list'],
   .shell__body[data-mobile-pane='main'] .mobile-screen[data-screen='main'],
   .shell__body[data-mobile-pane='members'] .mobile-screen[data-screen='members'] {
+    /* flex-direction and min-height carry over from .mobile-screen's base
+       rule above - only display needs restating, to undo `none`. */
     display: flex;
-    flex-direction: column;
-    min-height: 0;
   }
 
   /* Sidebar, the call/chat pane and FriendsPanel already have no width of
-     their own - they fill whatever grid column holds them on desktop, and
-     now fill the full-width screen wrapper the same way, by ordinary flex
-     stretch. Only the member rail sets an explicit desktop width, so only it
-     needs overriding here. */
+     their own - they fill whatever grid column holds them, at every width.
+     Only the member rail sets an explicit desktop width, so only it needs
+     overriding here. */
   .rail {
     width: 100%;
     border-left: none;
