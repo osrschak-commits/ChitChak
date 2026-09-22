@@ -10,6 +10,7 @@
     "dev": "node scripts/dev.mjs",
     "build": "node scripts/build.mjs",
     "build:web": "vite build --config vite.web.config.ts",
+    "build:capacitor": "vite build --config vite.capacitor.config.ts",
     "icon": "node scripts/make-icon.mjs",
     "//dist": "--publish never is load-bearing. electron-builder publishes on its own when it sees a CI tag build, and the `publish` block in electron-builder.yml is a generic provider - which it publishes to over HTTP PUT. The update host is a read-only directory of files, so the PUT fails and takes the build down with it. Uploading is scripts/release.mjs's job, over SSH.",
     "dist:win": "node scripts/icons-ready.mjs && node scripts/build.mjs && electron-builder --win --config electron-builder.yml --publish never",
@@ -20,6 +21,8 @@
   },
   "//": "livekit-client is pinned exactly, not with a caret. It negotiates an RTC protocol version with the SFU, and a client newer than the server in docker-compose.yml connects, silently falls back, and then reports 'reconnecting' forever while media actually flows. Upgrade this and the livekit-server image together.",
   "dependencies": {
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
     "@chitchak/protocol": "*",
     "@fontsource-variable/archivo": "^5.3.0",
     "@fontsource/ibm-plex-mono": "^5.3.0",
@@ -30,6 +33,7 @@
     "zustand": "^5.0.3"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.2",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",

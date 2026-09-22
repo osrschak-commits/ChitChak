@@ -172,13 +172,24 @@ dialog, and a real voice call, with no horizontal overflow anywhere in that
 flow. Not yet touched: ServerSettingsDialog, GuildDialog, the emoji/screen
 pickers, and search - anything opened less often than the main flow above.
 
+Also done, since the above: `@capacitor/core`, `@capacitor/cli` and
+`@capacitor/ios` are installed, and `capacitor.config.ts` points `webDir`
+at `dist-capacitor` - its own build (`npm run build:capacitor`, from a new
+`vite.capacitor.config.ts`), not `dist-web`. It has to be its own build
+because `base` differs: `dist-web` is mounted at `/app/` for apps/site,
+which breaks the moment a webview serves index.html from the bundle root
+instead, so `dist-capacitor` uses `base: '/'`. No `--mode` flag - a plain
+`vite build` already defaults to production and loads `.env.production`,
+so this build talks to the real API and SFU like the installer does, not
+localhost. Verified: builds clean, `assertAssetsResolved` passes, and the
+built `index.html` has root-relative asset paths and the production CSP
+baked in.
+
 Not done, in the order it likely needs doing:
 
-- **Add Capacitor** (`@capacitor/core`, `@capacitor/cli`, `@capacitor/ios`,
-  a `capacitor.config.ts` pointing `webDir` at `apps/desktop/dist-web`).
-  `npx cap add ios`, the Xcode project it generates, and everything after
-  need a Mac - `cap add ios` refuses to run anywhere else. Buildable from
-  Windows up to that point.
+- **`npx cap add ios`, and everything after it.** Needs a Mac - the command
+  refuses to run anywhere else. Generates the Xcode project; from there it's
+  building, signing, a simulator run, then a real device.
 - **Safe-area padding beyond the top bar.** `env(safe-area-inset-top)` is on
   `.topbar`; the composer has `env(safe-area-inset-bottom)` but nothing else
   does yet - worth a pass once the app is actually running on a notched
