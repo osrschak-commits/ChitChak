@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, apiBase, uploadEmoji } from '../lib/api.js';
+import { shrinkImageToFit } from '../lib/image.js';
 import { useApp } from '../store/app.js';
 
 /**
@@ -43,6 +44,7 @@ export function EmojiTab({ guildId }: { guildId: string }) {
   const [name, setName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
 
   const mine = [...emoji.values()]
     .filter((one) => one.guildId === guildId)
@@ -53,11 +55,25 @@ export function EmojiTab({ guildId }: { guildId: string }) {
   async function add(file: File): Promise<void> {
     setBusy(true);
     setError(null);
+    setNote(null);
     try {
       // The filename is the obvious default - somebody who saved a picture as
       // "shrug.png" has already named it.
       const wanted = name.trim() || file.name.replace(/\.[a-z0-9]+$/i, '');
-      await uploadEmoji(guildId, wanted, file);
+
+      // Over the limit gets one automatic pass at fitting under it rather
+      // than an outright refusal - see shrinkImageToFit for why only a PNG
+      // or JPEG qualifies. Already-small files upload exactly as chosen, no
+      // re-encoding, so nothing about a file that already fits ever changes.
+      let upload: File | Blob = file;
+      if (file.size > MAX_KB * 1024) {
+        upload = await shrinkImageToFit(file, MAX_KB * 1024);
+        setNote(
+          `Shrunk from ${Math.ceil(file.size / 1024)}KB to ${Math.ceil(upload.size / 1024)}KB to fit.`,
+        );
+      }
+
+      await uploadEmoji(guildId, wanted, upload);
       // Nothing to set here: the gateway event that follows adds it to the
       // store for everyone in the server, this window included.
       setName('');
@@ -94,8 +110,10 @@ export function EmojiTab({ guildId }: { guildId: string }) {
         ) : (
           <>
             <p className="row__hint" style={{ marginBottom: 12 }}>
-              A square PNG, JPEG, GIF or WebP under {MAX_KB}KB. Named with letters, numbers and
-              underscores — that name is what people type between colons.
+              A PNG, JPEG, GIF or WebP under {MAX_KB}KB. Named with letters, numbers and
+              underscores — that name is what people type between colons. A PNG or JPEG over the
+              limit is shrunk to fit automatically; a GIF or WebP needs to already fit, since
+              either could be animated.
             </p>
 
             <div className="emojitab__add">
@@ -135,6 +153,7 @@ export function EmojiTab({ guildId }: { guildId: string }) {
               </div>
             )}
             {error && <div className="field__error">{error}</div>}
+            {note && <div className="field__hint">{note}</div>}
           </>
         )}
       </div>

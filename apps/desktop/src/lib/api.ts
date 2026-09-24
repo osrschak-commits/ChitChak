@@ -1011,7 +1011,7 @@ export function uploadFile(
  * The same raw-body shape as an attachment upload - one picture per request, so
  * a multipart envelope would carry nothing the query string does not.
  */
-export async function uploadEmoji(guildId: string, name: string, file: File): Promise<Emoji> {
+export async function uploadEmoji(guildId: string, name: string, file: File | Blob): Promise<Emoji> {
   const token = api.accessToken;
   if (!token) throw new Error('Not signed in');
 
