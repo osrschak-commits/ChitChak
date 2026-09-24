@@ -215,7 +215,7 @@ function ShopItem({
   const art = item.slot === 'badge' ? artworkFor(item.id) : null;
 
   return (
-    <div className={`shopitem ${item.equipped ? 'shopitem--worn' : ''}`}>
+    <div data-cosmetic-id={item.id} className={`shopitem ${item.equipped ? 'shopitem--worn' : ''}`}>
       {/* The item shows itself rather than describing itself: a plate is its
           finish and a badge is its glyph, so the swatch is the product. */}
       <span

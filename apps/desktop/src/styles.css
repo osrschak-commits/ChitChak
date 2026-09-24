@@ -1,68 +1,62 @@
 /*
- * ChitChak — visual system.
- *
- * The reference is studio and broadcast hardware, not chat apps: warm graphite
- * panels, brass for the thing you have selected, and one cool signal colour
- * reserved exclusively for live audio. Two accents, each with exactly one job,
- * so colour always carries meaning instead of decoration.
+ * ChitChak — after-hours clubhouse.
+ * Ink surfaces keep conversations calm; apricot marks actions and selection,
+ * mint identifies live voice, and metallic finishes belong to collectibles.
+ * Legacy token names stay compatible with component-level inline styles.
  */
 
 :root {
-  /* Surfaces. Warm near-black with a violet-brown cast, deliberately not the
-     blue-black that every gaming chat app uses. */
-  --graphite-900: #131215;
-  --graphite-850: #17161a;
-  --graphite-800: #1c1a1f;
-  --graphite-750: #232128;
-  --graphite-700: #2b2932;
-  --graphite-600: #383540;
+  /* Layered ink surfaces, from the shell to raised controls. */
+  --graphite-900: #14151d;
+  --graphite-850: #191b25;
+  --graphite-800: #20232f;
+  --graphite-750: #282c3a;
+  --graphite-700: #323748;
+  --graphite-600: #454c61;
 
-  /* Brass: selection, focus, "this is you". Warm, metallic, restrained. */
-  --brass-500: #c9954a;
-  --brass-400: #d9a45b;
-  --brass-300: #e6bd83;
-  --brass-glow: rgba(217, 164, 91, 0.14);
+  /* Apricot: actions, focus and selection. */
+  --brass-500: #f49b73;
+  --brass-400: #ffb38a;
+  --brass-300: #ffd1b7;
+  --brass-glow: rgba(255, 179, 138, 0.14);
 
-  /* Signal: live audio only. Nothing else in the app may use this colour. */
-  --signal-500: #35bfae;
-  --signal-400: #4fd6c4;
-  --signal-glow: rgba(79, 214, 196, 0.16);
+  /* Mint: voice activity and presence. */
+  --signal-500: #45c9ad;
+  --signal-400: #64dfc0;
+  --signal-glow: rgba(100, 223, 192, 0.16);
 
-  --alert-400: #e0605f;
-  --alert-glow: rgba(224, 96, 95, 0.14);
+  --alert-400: #ff858d;
+  --alert-glow: rgba(255, 133, 141, 0.14);
 
-  --text-bright: #f2f0f4;
-  --text-primary: #ddd9e2;
-  --text-secondary: #9d98a8;
-  --text-muted: #6b6675;
-  --text-faint: #4c4855;
+  --text-bright: #f4f1eb;
+  --text-primary: #e0e1e8;
+  --text-secondary: #b1b6c8;
+  --text-muted: #a6adc1;
+  --text-faint: #a0a9bf;
 
-  --line: #2a2830;
-  --line-strong: #363340;
+  --line: #2d3242;
+  --line-strong: #41485d;
 
-  --radius-lg: 10px;
-  --radius: 7px;
-  --radius-sm: 5px;
+  --radius-lg: 16px;
+  --radius: 12px;
+  --radius-sm: 8px;
 
   --sidebar-w: 244px;
   --rail-w: 208px;
-  --topbar-h: 46px;
+  --topbar-h: 56px;
 
-  /*
-   * The emoji families are on the end of both stacks on purpose.
-   *
-   * Archivo and IBM Plex Mono have no emoji glyphs, so without a named fallback
-   * the renderer picks whatever it likes for those codepoints - which on a
-   * machine with an old monochrome emoji font means flat outlines, and on one
-   * with none means tofu boxes. Naming them keeps emoji in colour and identical
-   * between the desktop app and the browser client on the same OS.
-   */
-  --font-ui: 'Archivo Variable', 'Archivo', system-ui, -apple-system, sans-serif,
+  /* Native UI faces keep text comfortable at small sizes; explicit emoji
+     fallbacks preserve colour glyphs on each platform. */
+  --font-ui: 'Segoe UI Variable Text', 'Segoe UI', -apple-system, BlinkMacSystemFont, system-ui, sans-serif,
     'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
   --font-mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace,
     'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
 
   --ease: cubic-bezier(0.2, 0, 0, 1);
+  --text-tertiary: var(--text-muted);
+  --gold: #edc878;
+  --lilac: #c1b0f6;
+  color-scheme: dark;
 }
 
 * {
@@ -78,8 +72,8 @@ body,
 
 body {
   font-family: var(--font-ui);
-  font-size: 13.5px;
-  line-height: 1.45;
+  font-size: 14px;
+  line-height: 1.5;
   color: var(--text-primary);
   background: var(--graphite-850);
   overflow: hidden;
@@ -190,11 +184,11 @@ textarea::placeholder {
 
 /* Small caps labels: the panel-legend voice used throughout. */
 .legend {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--text-muted);
 }
 
@@ -227,9 +221,9 @@ textarea::placeholder {
 .topbar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 0 12px 0 14px;
-  background: var(--graphite-900);
+  gap: 12px;
+  padding: 0 16px;
+  background: #161820;
   border-bottom: 1px solid var(--line);
   /* Electron frameless-style drag region; harmless in a normal window. */
   -webkit-app-region: drag;
@@ -240,21 +234,15 @@ textarea::placeholder {
 }
 
 /* Server switcher replaces the icon rail entirely. */
-/*
- * The two places you can be: a server, or your friends.
- *
- * Full height and marked underneath rather than drawn as pills, so the
- * selected one is indicated on the bar's own bottom edge - which is what makes
- * these read as tabs onto the view below rather than as two buttons that
- * happen to be lit.
- */
+/* The existing scope tabs keep their positions; a soft fill marks selection. */
 .scope-tabs {
   display: flex;
   align-self: stretch;
   /* A hair between them, so two lit tabs never read as one block. */
-  gap: 2px;
+  gap: 6px;
   /* The bar's own left padding plus the tab's own is the inset. */
-  margin-left: -6px;
+  margin-left: 0;
+  padding: 7px 0;
 }
 
 .scope-tab {
@@ -269,10 +257,11 @@ textarea::placeholder {
    * once rather than one - at 12px the name sat almost on the fill, and the
    * count badge on the right harder still.
    */
-  padding: 0 18px;
+  padding: 0 14px;
   max-width: 280px;
   color: var(--text-secondary);
   transition: background 120ms var(--ease), color 120ms var(--ease);
+  border-radius: 10px;
 }
 
 .scope-tab:hover {
@@ -289,16 +278,16 @@ textarea::placeholder {
   position: absolute;
   /* Inset to sit under the label rather than the whole tab, and tracking the
      padding above so the two stay in proportion. */
-  left: 14px;
-  right: 14px;
-  bottom: -1px;
+  left: 18px;
+  right: 18px;
+  bottom: -7px;
   height: 2px;
   border-radius: 2px 2px 0 0;
   background: var(--brass-400);
 }
 
 .scope-tab--on {
-  background: var(--graphite-850);
+  background: var(--brass-glow);
 }
 
 .scope-tab--on .scope-tab__name {
@@ -365,7 +354,7 @@ textarea::placeholder {
   background: var(--graphite-800);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 16px 48px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.035);
   z-index: 60;
   max-height: 420px;
   overflow-y: auto;
@@ -412,7 +401,7 @@ textarea::placeholder {
   height: 26px;
   padding: 0 11px;
   border-radius: 999px;
-  border: 1px solid rgba(217, 164, 91, 0.32);
+  border: 1px solid rgba(255, 179, 138, 0.32);
   background: var(--brass-glow);
   color: var(--brass-300);
   font-size: 11.5px;
@@ -423,7 +412,7 @@ textarea::placeholder {
 }
 
 .update:hover:not(:disabled) {
-  background: rgba(217, 164, 91, 0.22);
+  background: rgba(255, 179, 138, 0.22);
   border-color: var(--brass-400);
 }
 
@@ -489,7 +478,7 @@ textarea::placeholder {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 14px 10px 8px;
+  padding: 20px 12px 12px;
 }
 
 /*
@@ -508,7 +497,7 @@ textarea::placeholder {
   align-items: center;
   gap: 10px;
   width: 100%;
-  padding: 7px 10px;
+  padding: 9px 10px;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 13px;
@@ -551,13 +540,14 @@ textarea::placeholder {
   align-items: center;
   gap: 9px;
   width: 100%;
-  padding: 6px 10px;
+  padding: 8px 10px;
   border-radius: var(--radius-sm);
-  color: var(--text-muted);
+  color: var(--text-secondary);
   text-align: left;
   position: relative;
   font-size: 13px;
   transition: background 110ms var(--ease), color 110ms var(--ease);
+  margin-bottom: 3px;
 }
 
 .chan:hover:not(:disabled) {
@@ -571,11 +561,11 @@ textarea::placeholder {
 }
 
 .chan--active {
-  color: var(--text-bright);
-  background: var(--graphite-800);
+  color: var(--brass-300);
+  background: var(--brass-glow);
 }
 
-/* A short brass tick, not a full-height bar - it marks the row without
+/* A short apricot tick, not a full-height bar - it marks the row without
    pretending to be a tab. */
 .chan__tick {
   width: 3px;
@@ -608,10 +598,11 @@ textarea::placeholder {
 }
 
 .chan__count {
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   font-size: 10.5px;
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }
 
 /*
@@ -626,10 +617,10 @@ textarea::placeholder {
   position: relative;
   width: 100%;
   text-align: left;
-  padding: 9px 11px 9px 14px;
-  margin-bottom: 5px;
+  padding: 12px 12px 12px 15px;
+  margin-bottom: 8px;
   border-radius: var(--radius);
-  background: var(--graphite-850);
+  background: linear-gradient(135deg, var(--graphite-800), var(--graphite-850));
   border: 1px solid var(--line);
   color: var(--text-secondary);
   overflow: hidden;
@@ -669,8 +660,8 @@ textarea::placeholder {
 
 /* The room you are actually in. */
 .room--joined {
-  background: var(--graphite-800);
-  border-color: rgba(79, 214, 196, 0.28);
+  background: linear-gradient(135deg, rgba(100, 223, 192, .09), var(--graphite-800));
+  border-color: rgba(100, 223, 192, 0.28);
   color: var(--text-primary);
 }
 
@@ -691,7 +682,7 @@ textarea::placeholder {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-primary);
 }
 
@@ -700,9 +691,9 @@ textarea::placeholder {
 }
 
 .room__count {
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   font-size: 10px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0;
   color: var(--text-faint);
   font-variant-numeric: tabular-nums;
   flex-shrink: 0;
@@ -730,10 +721,11 @@ textarea::placeholder {
 }
 
 .room__more {
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   font-size: 10px;
   color: var(--text-faint);
   margin-left: 8px;
+  letter-spacing: 0;
 }
 
 /* Full roster, shown for the room you are in. */
@@ -755,10 +747,10 @@ textarea::placeholder {
 
 .roster--attached {
   position: relative;
-  margin: 0 0 5px;
-  padding: 8px 11px 9px 14px;
+  margin: 0 0 8px;
+  padding: 10px 12px 12px 15px;
   background: var(--graphite-800);
-  border: 1px solid rgba(79, 214, 196, 0.28);
+  border: 1px solid rgba(100, 223, 192, 0.28);
   border-top: 1px solid var(--line);
   border-radius: 0 0 var(--radius) var(--radius);
 }
@@ -857,7 +849,7 @@ textarea::placeholder {
 /* --- Avatars -------------------------------------------------------------- */
 
 .avatar {
-  border-radius: 50%;
+  border-radius: 38%;
   flex-shrink: 0;
   display: grid;
   place-items: center;
@@ -866,6 +858,7 @@ textarea::placeholder {
   overflow: hidden;
   position: relative;
   background: var(--graphite-600);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.12);
 }
 
 .avatar img {
@@ -878,7 +871,7 @@ textarea::placeholder {
 /* Speaking ring drawn as a shadow so it never shifts layout when it toggles
    many times a second during conversation. */
 .avatar--speaking {
-  box-shadow: 0 0 0 2px var(--graphite-900), 0 0 0 3.5px var(--signal-400);
+  box-shadow: 0 0 0 2px var(--graphite-900), 0 0 0 4px var(--signal-400);
 }
 
 .avatar__status {
@@ -911,8 +904,8 @@ textarea::placeholder {
 /* Live call bar, at the foot of the channel column. */
 .callbar {
   border-top: 1px solid var(--line);
-  padding: 10px 12px 11px;
-  background: linear-gradient(180deg, rgba(79, 214, 196, 0.05), transparent);
+  padding: 14px 12px;
+  background: linear-gradient(145deg, rgba(100,223,192,.07), var(--graphite-900));
   flex-shrink: 0;
 }
 
@@ -924,11 +917,11 @@ textarea::placeholder {
 }
 
 .callbar__state {
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-ui);
+  font-size: 11px;
   font-weight: 600;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--signal-400);
 }
 
@@ -1024,8 +1017,8 @@ textarea::placeholder {
 /* Call controls are wider and equal-weight: they are the primary actions. */
 .ctl {
   flex: 1;
-  height: 32px;
-  border-radius: var(--radius-sm);
+  height: 36px;
+  border-radius: 10px;
   display: grid;
   place-items: center;
   background: var(--graphite-750);
@@ -1058,17 +1051,18 @@ textarea::placeholder {
   align-items: center;
   justify-content: center;
   gap: 7px;
-  padding: 9px 15px;
+  padding: 10px 16px;
   border-radius: var(--radius-sm);
   font-weight: 600;
   font-size: 13px;
   width: auto;
-  transition: background 120ms var(--ease), color 120ms var(--ease);
+  transition: background 140ms var(--ease), color 140ms var(--ease), box-shadow 140ms var(--ease);
 }
 
 .btn--primary {
   background: var(--brass-400);
-  color: #241a08;
+  color: #302019;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 3px 10px rgba(0,0,0,.12);
 }
 
 .btn--primary:hover:not(:disabled) {
@@ -1092,7 +1086,7 @@ textarea::placeholder {
 .btn--danger {
   background: transparent;
   color: var(--alert-400);
-  border: 1px solid rgba(224, 96, 95, 0.35);
+  border: 1px solid rgba(255, 133, 141, 0.35);
 }
 
 .btn--danger:hover {
@@ -1104,7 +1098,7 @@ textarea::placeholder {
 }
 
 .btn--sm {
-  padding: 6px 11px;
+  padding: 7px 12px;
   font-size: 12px;
 }
 
@@ -1133,9 +1127,9 @@ textarea::placeholder {
 }
 
 .pane__header {
-  height: 46px;
+  height: 58px;
   flex-shrink: 0;
-  padding: 0 18px;
+  padding: 0 24px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -1144,8 +1138,9 @@ textarea::placeholder {
 
 .pane__title {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 16px;
   color: var(--text-bright);
+  letter-spacing: -0.02em;
 }
 
 /*
@@ -1160,7 +1155,7 @@ textarea::placeholder {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 18px;
+  padding: 24px;
 }
 
 /* The line under the title that says what the surface is for. */
@@ -1168,7 +1163,7 @@ textarea::placeholder {
   margin: 0 0 20px;
   max-width: 62ch;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 14px;
 }
 
 .pane__topic {
@@ -1207,6 +1202,7 @@ textarea::placeholder {
   gap: 10px;
   padding: 14px;
   overflow: hidden;
+  background: radial-gradient(ellipse at 50% 0, rgba(193,176,246,.055), transparent 65%), var(--graphite-850);
 }
 
 /*
@@ -1407,9 +1403,9 @@ textarea::placeholder {
 .tile {
   position: relative;
   min-height: 0;
-  border-radius: var(--radius);
+  border-radius: 16px;
   overflow: hidden;
-  background: var(--graphite-800);
+  background: radial-gradient(ellipse at 50% 35%, #303648, var(--graphite-800) 75%);
   border: 1px solid var(--line);
   display: grid;
   place-items: center;
@@ -1448,7 +1444,7 @@ textarea::placeholder {
   left: 0;
   right: 0;
   bottom: 0;
-  padding: 18px 10px 8px;
+  padding: 26px 14px 12px;
   display: flex;
   align-items: center;
   gap: 7px;
@@ -1456,8 +1452,8 @@ textarea::placeholder {
 }
 
 .tile__name {
-  font-size: 12px;
-  font-weight: 500;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--text-bright);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1493,7 +1489,7 @@ textarea::placeholder {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px 18px 8px;
+  padding: 20px 24px 12px;
   display: flex;
   flex-direction: column;
   user-select: text;
@@ -1502,7 +1498,9 @@ textarea::placeholder {
 .msg {
   display: flex;
   gap: 11px;
-  padding: 3px 0;
+  padding: 5px 8px;
+  margin: 0 -8px;
+  border-radius: 8px;
 }
 
 .msg--grouped {
@@ -1517,11 +1515,12 @@ textarea::placeholder {
 }
 
 .msg__stamp {
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   font-size: 9.5px;
   color: transparent;
   padding-top: 4px;
   font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }
 
 /* Timestamp only appears on hover for grouped messages: present when wanted,
@@ -1539,31 +1538,33 @@ textarea::placeholder {
   display: flex;
   align-items: baseline;
   gap: 9px;
-  margin-bottom: 1px;
+  margin-bottom: 3px;
 }
 
 .msg__author {
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 14px;
   color: var(--text-bright);
 }
 
 .msg__time {
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-ui);
+  font-size: 11px;
   color: var(--text-faint);
+  letter-spacing: 0;
 }
 
 .msg__text {
   overflow-wrap: anywhere;
   white-space: pre-wrap;
   color: var(--text-primary);
-  font-size: 13.5px;
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .composer {
   position: relative;
-  padding: 8px 18px 18px;
+  padding: 10px 24px 20px;
   flex-shrink: 0;
 }
 
@@ -1574,13 +1575,14 @@ textarea::placeholder {
   position: relative;
 }
 
-.composer input {
+.composer__field > input {
   background: var(--graphite-800);
   border-color: var(--line-strong);
   /* Room on the left for the two buttons, so a long draft does not run under
      them. */
-  padding: 11px 14px 11px 78px;
-  border-radius: var(--radius);
+  padding: 14px 16px 14px 88px;
+  border-radius: 14px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.10);
 }
 
 .composer__emoji,
@@ -1593,23 +1595,26 @@ textarea::placeholder {
     so they belong at the start of the line rather than past the end of what
     you have typed.
   */
-  left: 40px;
-  top: 0;
-  bottom: 0;
-  width: 32px;
+  left: 46px;
+  top: 50%;
+  bottom: auto;
+  width: 34px;
   display: grid;
   place-items: center;
   font-size: 16px;
   line-height: 1;
   border-radius: var(--radius-sm);
-  opacity: 0.5;
+  opacity: 1;
   transition: opacity 110ms var(--ease), background 110ms var(--ease);
+  height: 34px;
+  transform: translateY(-50%);
+  color: var(--text-secondary);
 }
 
 /* First of the two, so the order matches the order of the thought: a file, then
    something to say about it. */
 .composer__attach {
-  left: 6px;
+  left: 10px;
 }
 
 .composer__emoji:hover:not(:disabled),
@@ -1802,6 +1807,10 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: 20px;
+  padding: 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(193,176,246,.06), var(--graphite-800));
 }
 
 .chest__box {
@@ -1811,10 +1820,10 @@ textarea::placeholder {
   flex: none;
   display: grid;
   place-items: center;
-  border-radius: 8px;
-  background: linear-gradient(160deg, #6b5327, #3a2c14);
-  border: 1px solid #8a6a33;
-  box-shadow: inset 0 -8px 16px rgba(0, 0, 0, 0.45);
+  border-radius: 14px;
+  background: linear-gradient(145deg, #b88447, #674b31);
+  border: 2px solid #edc878;
+  box-shadow: inset 0 -8px 16px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.2);
   overflow: hidden;
 }
 
@@ -1824,8 +1833,8 @@ textarea::placeholder {
   position: absolute;
   inset: 0 0 auto 0;
   height: 30px;
-  background: linear-gradient(180deg, #9a7638, #6b5327);
-  border-bottom: 1px solid #22190b;
+  background: linear-gradient(135deg, #f3d698, #c39658);
+  border-bottom: 2px solid #674b31;
   transform-origin: top center;
   transition: transform 420ms cubic-bezier(0.3, 0, 0.2, 1);
 }
@@ -1833,7 +1842,10 @@ textarea::placeholder {
 .chest__mark {
   position: relative;
   font-size: 18px;
-  filter: saturate(0.4);
+  filter: none;
+  color: #fff0c7;
+  display: grid;
+  place-items: center;
 }
 
 /* What comes out of the gap, once the lid moves. */
@@ -1980,7 +1992,7 @@ textarea::placeholder {
 /*
  * One colour per tier, used for the odds and for the rarity on a win.
  *
- * Kept away from the app's brass and signal colours, which already mean
+ * Kept away from the app's action and signal colours, which already mean
  * "subscription" and "live audio" - a rarity that borrowed either would be
  * saying something it does not mean.
  */
@@ -1988,7 +2000,7 @@ textarea::placeholder {
 .chest__odd--uncommon .chest__odd-name, .chest__prize--uncommon .chest__rarity { color: #6fb26f; }
 .chest__odd--rare .chest__odd-name, .chest__prize--rare .chest__rarity { color: #5c9ad4; }
 .chest__odd--epic .chest__odd-name, .chest__prize--epic .chest__rarity { color: #a882d8; }
-.chest__odd--legendary .chest__odd-name, .chest__prize--legendary .chest__rarity { color: #d9a45b; }
+.chest__odd--legendary .chest__odd-name, .chest__prize--legendary .chest__rarity { color: var(--gold); }
 
 .chest__actions {
   display: flex;
@@ -2276,7 +2288,7 @@ textarea::placeholder {
   background: var(--graphite-800);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 16px 48px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.035);
   z-index: 60;
   overflow: hidden;
 }
@@ -2318,14 +2330,16 @@ textarea::placeholder {
 }
 
 .emoji__label {
-  font-size: 10px;
-  letter-spacing: 0.13em;
+  font-size: 11px;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-faint);
   padding: 6px 2px 4px;
   position: sticky;
   top: 0;
   background: var(--graphite-800);
+  font-family: var(--font-ui);
+  font-weight: 600;
 }
 
 .emoji__grid {
@@ -2385,8 +2399,8 @@ textarea::placeholder {
 }
 
 .composer__hint {
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-ui);
+  font-size: 11px;
   color: var(--text-faint);
   height: 14px;
   padding: 3px 2px 0;
@@ -2407,16 +2421,18 @@ textarea::placeholder {
 }
 
 .empty__title {
-  font-size: 15px;
+  font-size: 20px;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0 0 6px;
+  letter-spacing: -0.025em;
 }
 
 .empty__body {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 14px;
   margin: 0;
+  line-height: 1.65;
 }
 
 .notice {
@@ -2424,7 +2440,7 @@ textarea::placeholder {
   padding: 10px 13px;
   border-radius: var(--radius-sm);
   background: var(--alert-glow);
-  border: 1px solid rgba(224, 96, 95, 0.28);
+  border: 1px solid rgba(255, 133, 141, 0.28);
   color: #f0a9ab;
   display: flex;
   align-items: center;
@@ -2449,25 +2465,31 @@ textarea::placeholder {
 .auth {
   height: 100%;
   display: grid;
-  place-items: center;
-  background: var(--graphite-900);
+  place-items: safe center;
+  background: radial-gradient(ellipse at 15% 20%, rgba(255,179,138,.13), transparent 45%), radial-gradient(ellipse at 85% 80%, rgba(193,176,246,.13), transparent 50%), var(--graphite-900);
+  padding: 32px 20px;
+  overflow-y: auto;
 }
 
 .auth__card {
-  width: 392px;
-  padding: 34px;
+  width: min(440px, 100%);
+  padding: 36px;
+  background: linear-gradient(145deg, rgba(40,44,58,.96), rgba(25,27,37,.98));
+  border: 1px solid var(--line-strong);
+  border-radius: 24px;
+  box-shadow: 0 24px 80px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.04);
 }
 
 .auth__mark {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-family: var(--font-mono);
-  font-size: 12px;
+  font-family: var(--font-ui);
+  font-size: 15px;
   font-weight: 600;
-  letter-spacing: 0.28em;
+  letter-spacing: 0.08em;
   color: var(--brass-400);
-  margin-bottom: 22px;
+  margin-bottom: 32px;
 }
 
 /*
@@ -2487,32 +2509,32 @@ textarea::placeholder {
 }
 
 .auth__title {
-  font-size: 23px;
-  font-weight: 700;
-  letter-spacing: -0.015em;
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
   color: var(--text-bright);
   margin: 0 0 5px;
 }
 
 .auth__sub {
-  color: var(--text-muted);
-  font-size: 13px;
+  color: var(--text-secondary);
+  font-size: 14px;
   margin: 0 0 26px;
 }
 
 .field {
-  margin-bottom: 15px;
+  margin-bottom: 18px;
 }
 
 .field__label {
   display: block;
   margin-bottom: 6px;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  color: var(--text-muted);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-secondary);
 }
 
 .field__error {
@@ -2541,8 +2563,8 @@ textarea::placeholder {
 .scrim {
   position: fixed;
   inset: 0;
-  background: rgba(9, 8, 11, 0.66);
-  backdrop-filter: blur(3px);
+  background: rgba(10,12,19,.74);
+  backdrop-filter: blur(8px);
   display: grid;
   place-items: center;
   z-index: 100;
@@ -2565,10 +2587,10 @@ textarea::placeholder {
   max-height: 100%;
   display: flex;
   flex-direction: column;
-  background: var(--graphite-800);
+  background: var(--graphite-850);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 28px 90px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.04);
   overflow: hidden;
 }
 
@@ -2577,9 +2599,10 @@ textarea::placeholder {
 }
 
 .modal__head {
-  padding: 18px 22px 15px;
+  padding: 22px 24px 18px;
   border-bottom: 1px solid var(--line);
   flex-shrink: 0;
+  background: linear-gradient(120deg, rgba(255,179,138,.045), transparent 70%);
 }
 
 /* For dialogs that can only be left deliberately, so the way out has to be
@@ -2609,9 +2632,9 @@ textarea::placeholder {
 }
 
 .modal__title {
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
   color: var(--text-bright);
   margin: 0;
 }
@@ -2623,14 +2646,14 @@ textarea::placeholder {
 }
 
 .modal__body {
-  padding: 20px 22px;
+  padding: 24px;
   overflow-y: auto;
   flex: 1;
   min-height: 0;
 }
 
 .modal__foot {
-  padding: 14px 22px;
+  padding: 16px 24px;
   border-top: 1px solid var(--line);
   display: flex;
   gap: 9px;
@@ -2649,8 +2672,8 @@ textarea::placeholder {
 
 .settings__rail {
   border-right: 1px solid var(--line);
-  padding: 14px 10px;
-  background: var(--graphite-850);
+  padding: 16px 10px;
+  background: var(--graphite-900);
   overflow-y: auto;
 }
 
@@ -2658,11 +2681,11 @@ textarea::placeholder {
   display: block;
   width: 100%;
   text-align: left;
-  padding: 8px 11px;
+  padding: 10px 12px;
   border-radius: var(--radius-sm);
   color: var(--text-secondary);
   font-size: 13px;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
   position: relative;
 }
 
@@ -2672,19 +2695,20 @@ textarea::placeholder {
 }
 
 .settings__tab--active {
-  background: var(--graphite-750);
-  color: var(--text-bright);
+  background: var(--brass-glow);
+  color: var(--brass-300);
   font-weight: 600;
 }
 
 .settings__panel {
-  padding: 20px 22px;
+  padding: 24px;
   overflow-y: auto;
   min-height: 0;
+  min-width: 0;
 }
 
 .section {
-  margin-bottom: 26px;
+  margin-bottom: 30px;
 }
 
 .section:last-child {
@@ -2692,14 +2716,14 @@ textarea::placeholder {
 }
 
 .section__title {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin: 0 0 12px;
-  padding-bottom: 8px;
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--text-bright);
+  margin: 0 0 14px;
+  padding-bottom: 12px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -2717,16 +2741,16 @@ textarea::placeholder {
 }
 
 .row__label {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text-primary);
 }
 
 .row__hint {
-  font-size: 11.5px;
+  font-size: 12px;
   color: var(--text-muted);
   margin-top: 3px;
   max-width: 330px;
-  line-height: 1.45;
+  line-height: 1.6;
 }
 
 .row__control {
@@ -2745,7 +2769,7 @@ textarea::placeholder {
 
 .segmented button {
   padding: 5px 12px;
-  border-radius: 3px;
+  border-radius: 6px;
   font-size: 12px;
   color: var(--text-secondary);
   white-space: nowrap;
@@ -2815,8 +2839,8 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 9px 11px;
-  border-radius: var(--radius-sm);
+  padding: 12px;
+  border-radius: 10px;
   background: var(--graphite-850);
   border: 1px solid var(--line);
 }
@@ -2839,10 +2863,11 @@ textarea::placeholder {
 }
 
 .list__meta {
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   font-size: 10.5px;
   color: var(--text-faint);
   margin-top: 2px;
+  letter-spacing: 0;
 }
 
 .list__actions {
@@ -3089,7 +3114,7 @@ textarea::placeholder {
   background: var(--graphite-750);
 }
 
-/* Whether this account is one of the people in the pill - brass rather than
+/* Whether this account is one of the people in the pill - apricot rather than
    signal-teal, since teal is already spoken for by "live audio" everywhere
    else in the app, and a reaction is not that. */
 .reaction--mine {
@@ -3164,7 +3189,7 @@ textarea::placeholder {
   color: var(--text-faint);
 }
 
-/* --- Profile: a spec plate, not a social card ----------------------------- */
+/* --- Profile card ----------------------------- */
 
 .plate {
   position: fixed;
@@ -3175,7 +3200,7 @@ textarea::placeholder {
   background: var(--graphite-800);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
-  box-shadow: 0 18px 46px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 20px 65px rgba(0,0,0,.45);
   animation: plate-in 130ms var(--ease);
   /* Room for the rail, which runs the full height down the left edge. */
   padding-left: 3px;
@@ -3219,7 +3244,7 @@ textarea::placeholder {
   width: 62px;
   height: 62px;
   flex-shrink: 0;
-  border-radius: var(--radius-sm);
+  border-radius: 38%;
   border: 1px solid var(--line-strong);
   overflow: hidden;
   display: grid;
@@ -3248,8 +3273,8 @@ textarea::placeholder {
 }
 
 .plate__name {
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 19px;
+  font-weight: 600;
   letter-spacing: -0.015em;
   color: var(--text-bright);
   line-height: 1.15;
@@ -3354,7 +3379,7 @@ textarea::placeholder {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--alert-400);
-  border: 1px solid rgba(224, 96, 95, 0.4);
+  border: 1px solid rgba(255, 133, 141, 0.4);
   border-radius: 3px;
   padding: 1px 5px;
 }
@@ -3405,7 +3430,7 @@ textarea::placeholder {
   background: var(--graphite-800);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 16px 48px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.035);
 }
 
 .menu__item {
@@ -3447,6 +3472,10 @@ textarea::placeholder {
 
 .menu__label {
   padding: 6px 9px 4px;
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
 }
 
 /* A control rather than a command, so it is not styled as a menu item - no
@@ -3513,7 +3542,7 @@ textarea::placeholder {
   padding: 6px 9px;
   border-radius: var(--radius-sm);
   background: var(--alert-glow);
-  border: 1px solid rgba(224, 96, 95, 0.28);
+  border: 1px solid rgba(255, 133, 141, 0.28);
   color: #f0a9ab;
   font-size: 11.5px;
 }
@@ -3582,9 +3611,9 @@ textarea::placeholder {
 }
 
 .friends__home--active {
-  background: var(--graphite-750);
+  background: var(--brass-glow);
   border-color: var(--line-strong);
-  color: var(--text-bright);
+  color: var(--brass-300);
 }
 
 .friends__badge,
@@ -3599,9 +3628,9 @@ textarea::placeholder {
   align-items: center;
   gap: 9px;
   width: 100%;
-  padding: 6px 8px;
+  padding: 10px;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: 10px;
   background: transparent;
   color: var(--text-secondary);
   font: inherit;
@@ -3610,7 +3639,7 @@ textarea::placeholder {
 }
 
 .friends__row:hover { background: var(--graphite-750); color: var(--text-primary); }
-.friends__row--active { background: var(--graphite-700); color: var(--text-bright); }
+.friends__row--active { background: var(--brass-glow); color: var(--brass-300); }
 
 .friends__name {
   overflow: hidden;
@@ -3675,11 +3704,13 @@ textarea::placeholder {
 }
 
 .level__number {
-  font-size: 26px;
+  font-size: 34px;
   font-weight: 600;
   line-height: 1;
   color: var(--brass-300);
   min-width: 34px;
+  font-family: var(--font-ui);
+  letter-spacing: -0.05em;
 }
 
 .level__bar {
@@ -3719,11 +3750,13 @@ textarea::placeholder {
 }
 
 .tasks__group-name {
-  font-size: 10px;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--text-faint);
   margin-bottom: 6px;
+  font-family: var(--font-ui);
+  font-weight: 600;
 }
 
 .task {
@@ -3732,8 +3765,8 @@ textarea::placeholder {
   grid-template-columns: 16px 1fr auto;
   align-items: baseline;
   gap: 10px;
-  padding: 7px 10px 8px;
-  border-radius: var(--radius-sm);
+  padding: 12px 10px;
+  border-radius: 10px;
   overflow: hidden;
 }
 
@@ -3828,10 +3861,10 @@ textarea::placeholder {
   text-align: left;
   font: inherit;
   color: var(--text-primary);
-  background: var(--graphite-800);
+  background: linear-gradient(125deg, #303044, var(--graphite-800));
   border: 1px solid var(--line-strong);
   border-left: 2px solid var(--brass-500);
-  border-radius: var(--radius);
+  border-radius: 14px;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
   cursor: pointer;
   animation: celebration-in 320ms var(--ease) both;
@@ -4010,11 +4043,13 @@ textarea::placeholder {
 }
 
 .daybreak__label {
-  font-size: 10px;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--text-muted);
   white-space: nowrap;
+  font-family: var(--font-ui);
+  font-weight: 600;
 }
 
 /* ==========================================================================
@@ -4027,9 +4062,9 @@ textarea::placeholder {
 .rail {
   width: var(--rail-w);
   border-left: 1px solid var(--line);
-  background: var(--graphite-850);
+  background: var(--graphite-900);
   overflow-y: auto;
-  padding: 14px 8px 18px;
+  padding: 20px 12px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -4041,12 +4076,14 @@ textarea::placeholder {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 10px;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--text-muted);
   padding: 0 8px;
   margin-bottom: 6px;
+  font-family: var(--font-ui);
+  font-weight: 600;
 }
 
 .rail__count {
@@ -4057,8 +4094,8 @@ textarea::placeholder {
   display: flex;
   align-items: center;
   gap: 9px;
-  padding: 5px 8px;
-  border-radius: var(--radius-sm);
+  padding: 8px;
+  border-radius: 10px;
   cursor: pointer;
   min-width: 0;
 }
@@ -4110,12 +4147,13 @@ textarea::placeholder {
 }
 
 .rail__where {
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   font-size: 10px;
   color: var(--signal-500);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  letter-spacing: 0;
 }
 
 /* The member count doubles as the switch, so it has to read as one. */
@@ -4126,8 +4164,9 @@ textarea::placeholder {
   border-radius: var(--radius-sm);
   cursor: pointer;
   font: inherit;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
+  font-family: var(--font-ui);
 }
 
 .topbar__members:hover {
@@ -4153,10 +4192,10 @@ textarea::placeholder {
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   padding: 4px 10px;
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
   font-size: 10px;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--text-muted);
   cursor: pointer;
 }
@@ -4321,6 +4360,10 @@ textarea::placeholder {
   align-items: center;
   gap: 18px;
   flex-wrap: wrap;
+  padding: 20px;
+  border: 1px solid rgba(237,200,120,.24);
+  border-radius: 14px;
+  background: radial-gradient(ellipse at 0 0, rgba(237,200,120,.13), transparent 80%), var(--graphite-800);
 }
 
 .brass__keys {
@@ -4330,10 +4373,12 @@ textarea::placeholder {
 }
 
 .brass__count {
-  font-size: 26px;
+  font-size: 36px;
   font-weight: 600;
   line-height: 1;
-  color: var(--brass-300);
+  color: var(--gold);
+  font-family: var(--font-ui);
+  letter-spacing: -0.04em;
 }
 
 .brass__unit {
@@ -4351,12 +4396,13 @@ textarea::placeholder {
 .brass__badge {
   align-self: flex-start;
   font-size: 10px;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--brass-400);
   border: 1px solid var(--line-strong);
   border-radius: 999px;
   padding: 2px 9px;
+  font-family: var(--font-ui);
 }
 
 .brass__badge--off {
@@ -4366,15 +4412,17 @@ textarea::placeholder {
 .shop {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 8px;
 }
 
 .shopitem {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 8px 10px;
-  border-radius: var(--radius-sm);
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--graphite-800);
+  border: 1px solid var(--line);
 }
 
 .shopitem:hover {
@@ -4382,31 +4430,27 @@ textarea::placeholder {
 }
 
 .shopitem--worn {
-  background: var(--graphite-800);
-  box-shadow: inset 2px 0 0 var(--brass-500);
+  background: linear-gradient(110deg, var(--brass-glow), var(--graphite-800));
+  box-shadow: none;
+  border-color: rgba(255,179,138,.4);
 }
 
 /* The swatch is the product: a plate is its finish, a badge is its glyph. */
 .shopitem__swatch {
   flex: none;
-  width: 34px;
-  height: 34px;
-  border-radius: var(--radius-sm);
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
   border: 1px solid var(--line-strong);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* Wider than the plate swatch, and wider than a square.
-
-   Badge artwork is drawn about twice as wide as it is tall, so a 34px square
-   squeezes it to half the height the row has room for. Every badge swatch is
-   the same rectangle - including the glyph ones - so the names beside them
-   still line up down the column. */
+/* Consistent swatches keep artwork and labels aligned across the collection. */
 .shopitem__swatch--badge {
-  width: 48px;
-  background: var(--graphite-750);
+  width: 56px;
+  background: var(--graphite-900);
   color: var(--brass-300);
   font-size: 12px;
   letter-spacing: 1px;
@@ -4415,8 +4459,8 @@ textarea::placeholder {
 /* Bounded on both axes so any shape of artwork fits, and `contain` so none of
    it is ever stretched to do so. */
 .shopitem__art {
-  height: 22px;
-  max-width: 44px;
+  height: 36px;
+  max-width: 48px;
   object-fit: contain;
 }
 
@@ -4429,13 +4473,14 @@ textarea::placeholder {
 }
 
 .shopitem__name {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--text-primary);
+  font-weight: 600;
 }
 
 .shopitem__blurb {
-  font-size: 11px;
-  color: var(--text-faint);
+  font-size: 12px;
+  color: var(--text-secondary);
   line-height: 1.4;
 }
 
@@ -4444,8 +4489,8 @@ textarea::placeholder {
 .plate__finish {
   position: absolute;
   inset: 0 0 auto 0;
-  height: 54px;
-  opacity: 0.18;
+  height: 110px;
+  opacity: .35;
   pointer-events: none;
   border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   -webkit-mask-image: linear-gradient(to bottom, #000, transparent);
@@ -4463,18 +4508,12 @@ textarea::placeholder {
   outline: none;
 }
 
-/*
- * 18px tall, and as wide as the artwork needs.
- *
- * Taller than the glyph it replaces, because a drawn badge is a picture rather
- * than a letter - at 11px a winged mark is a smudge, and at 18 the shape reads
- * while still sitting inside a line of text. Width is left alone so a badge
- * keeps its own proportions instead of being squeezed into a square.
- */
+/* Compact enamel pins retain their silhouettes beside a name. */
 .badge__art {
-  height: 18px;
+  height: 20px;
   width: auto;
   display: block;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.25));
 }
 
 /* The fallback, for a badge nobody has drawn yet. */
@@ -4543,10 +4582,11 @@ textarea::placeholder {
 
 .shopitem__locked {
   font-size: 10px;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--text-faint);
   padding: 0 6px;
+  font-family: var(--font-ui);
 }
 
 /* ==========================================================================
@@ -4559,20 +4599,23 @@ textarea::placeholder {
   padding: 0 22px;
   border-bottom: 1px solid var(--line);
   flex: none;
+  overflow-x: auto;
 }
 
 .tabs__tab {
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  padding: 10px 12px 9px;
+  padding: 12px 10px;
   cursor: pointer;
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  font-family: var(--font-ui);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
   color: var(--text-muted);
   margin-bottom: -1px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .tabs__tab:hover {
@@ -4779,7 +4822,7 @@ textarea::placeholder {
   background: var(--graphite-800);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 16px 48px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.035);
   z-index: 60;
   max-height: 260px;
   overflow-y: auto;
@@ -4842,7 +4885,7 @@ textarea::placeholder {
   background: var(--graphite-800);
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-lg);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 16px 48px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.035);
   z-index: 60;
   overflow: hidden;
 }
@@ -4992,4 +5035,38 @@ textarea::placeholder {
 .notif__clear:hover {
   background: var(--graphite-750);
   color: var(--text-bright);
+}
+
+/* Small feedback stays consistent across the client without moving hit targets. */
+.msg:hover { background: rgba(255,255,255,.025); }
+button:disabled { cursor: not-allowed; }
+.badge:focus-visible { outline: 2px solid var(--brass-400); outline-offset: 3px; }
+.chest__badge-art { width: 48px; height: 48px; object-fit: contain; }
+.tile--self.tile--speaking { border-color: var(--signal-400); }
+.ctl svg, .icon-btn svg, .serverbar__item svg { flex-shrink: 0; }
+.composer__emoji, .composer__attach { color: var(--text-secondary); opacity: 1; }
+::selection { background: rgba(255,179,138,.28); color: var(--text-bright); }
+
+@media (max-width: 1000px) {
+  :root { --sidebar-w: 220px; --rail-w: 184px; --text-faint: #a0a9bf; }
+  .pane__header { padding: 0 16px; }
+  .messages { padding-right: 16px; padding-left: 16px; }
+  .composer { padding-right: 16px; padding-left: 16px; }
+}
+@media (max-width: 600px) {
+  .scrim { padding: 12px; }
+  .modal__head, .modal__body, .settings__panel { padding: 16px; }
+  .settings { grid-template-columns: 132px minmax(0, 1fr); }
+  .tabs { padding: 0 12px; overflow-x: auto; }
+  .tabs__tab { white-space: nowrap; }
+  .chest { flex-wrap: wrap; padding: 14px; }
+  .auth__card { padding: 28px 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

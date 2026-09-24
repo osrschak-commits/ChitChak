@@ -1,3 +1,4 @@
+import { DecorativeIcon } from './DecorativeIcon.js';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { Emoji as CustomEmoji, Message } from '@chitchak/protocol';
@@ -595,7 +596,7 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
                         }}
                         title="Add a reaction"
                       >
-                        🙂
+                        <DecorativeIcon name="smile" />
                       </button>
                       {reactingTo?.messageId === message.id && (
                         <ReactionPicker
@@ -824,7 +825,7 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
               aria-label="Attach a file"
               onClick={() => fileRef.current?.click()}
             >
-              <PaperclipIcon />
+              <DecorativeIcon name="attachment" />
             </button>
             <button
               type="button"
@@ -835,7 +836,7 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
               aria-label="Emoji"
               onClick={() => setEmojiOpen((open) => !open)}
             >
-              🙂
+              <DecorativeIcon name="smile" />
             </button>
             </div>
 
@@ -977,23 +978,7 @@ function MessageReactions({
  * "attach" at any size and takes its colour from the button like every other
  * icon in the app.
  */
-function PaperclipIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.5}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12.5 7.2 7.7 12a2.9 2.9 0 0 1-4.1-4.1l5.2-5.2a1.9 1.9 0 0 1 2.7 2.7l-5.2 5.2a.9.9 0 0 1-1.3-1.3l4.6-4.6" />
-    </svg>
-  );
-}
+
 
 /** Inline editor. Enter saves, Escape cancels - the shortcuts people expect. */
 function MessageEditor({

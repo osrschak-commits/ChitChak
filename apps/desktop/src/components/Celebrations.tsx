@@ -1,3 +1,4 @@
+import { DecorativeIcon } from './DecorativeIcon.js';
 import { useEffect } from 'react';
 import { useApp } from '../store/app.js';
 
@@ -38,7 +39,7 @@ export function Celebrations() {
           title="Dismiss"
         >
           <span className="celebration__mark" aria-hidden="true">
-            {celebration.mark ?? (celebration.kind === 'level' ? '▲' : '◆')}
+            {celebration.mark ?? <DecorativeIcon name={celebration.kind === 'level' ? 'level' : 'sparkle'} size={24} />}
           </span>
           <span className="celebration__text">
             <span className="celebration__title">{celebration.title}</span>
