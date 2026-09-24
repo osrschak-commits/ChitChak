@@ -38,7 +38,7 @@ export function Celebrations() {
           title="Dismiss"
         >
           <span className="celebration__mark" aria-hidden="true">
-            {celebration.kind === 'level' ? '▲' : '◆'}
+            {celebration.mark ?? (celebration.kind === 'level' ? '▲' : '◆')}
           </span>
           <span className="celebration__text">
             <span className="celebration__title">{celebration.title}</span>

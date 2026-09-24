@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { errors } from '../lib/errors.js';
 import { issueBlackCard, issuedCards, revokeBlackCard } from '../services/blackcard.js';
+import { awardWreath, type WreathTier } from '../services/cosmetics.js';
 import * as reports from '../services/reports.js';
 import { isPlatformStaff, requirePlatformStaff } from '../services/staff.js';
 import * as suspensions from '../services/suspensions.js';
@@ -73,6 +74,32 @@ export async function adminRoutes(app: FastifyInstance): Promise<void> {
     const { userId } = requireUser(request);
     requirePlatformStaff(userId);
     return { cards: await issuedCards() };
+  });
+
+  // --- Wreaths ---------------------------------------------------------------
+
+  app.post<{ Body: { username?: string; tier?: string } }>('/api/admin/wreath', {
+    config: { rateLimit: { max: 20, timeWindow: '1 minute' } },
+    handler: async (request) => {
+      const { userId } = requireUser(request);
+      requirePlatformStaff(userId);
+
+      const username = request.body?.username;
+      if (typeof username !== 'string' || username.trim().length === 0) {
+        throw errors.invalid('Who is it for?');
+      }
+      const tier = request.body?.tier;
+      if (tier !== 'bronze' && tier !== 'silver' && tier !== 'gold') {
+        throw errors.invalid('Pick bronze, silver or gold');
+      }
+
+      const result = await awardWreath({ actorId: userId, username, tier: tier as WreathTier });
+      request.log.info(
+        { actor: userId, subject: result.username, tier: result.tier, granted: result.granted },
+        '[staff] wreath awarded',
+      );
+      return result;
+    },
   });
 
   // --- Suspensions ---------------------------------------------------------

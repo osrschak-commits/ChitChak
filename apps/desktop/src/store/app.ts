@@ -99,7 +99,15 @@ interface AppState {
    * Held in the store rather than in a component so a level-up that arrives
    * while the profile dialog is closed is still seen.
    */
-  celebrations: Array<{ key: string; kind: 'level' | 'task'; title: string; detail: string }>;
+  celebrations: Array<{
+    key: string;
+    kind: 'level' | 'task' | 'badge';
+    title: string;
+    detail: string;
+    /** The badge's own glyph, for a 'badge' celebration - absent otherwise,
+     *  where Celebrations.tsx already knows what mark a level or task gets. */
+    mark?: string;
+  }>;
   channels: Map<string, Channel>;
   members: Map<string, GuildMember>;
   ranks: Map<string, Rank>;
@@ -1171,7 +1179,21 @@ function applyServerMessage(
       const task = message.d;
       set((s) => ({
         progress: task.progress,
+        // The badge first, so it is the one still on screen a moment later -
+        // slice(0, 4) drops from the end, and the XP toast already said what
+        // the task was called.
         celebrations: [
+          ...(task.badge
+            ? [
+                {
+                  key: `badge-${task.badge.id}`,
+                  kind: 'badge' as const,
+                  title: task.badge.name,
+                  detail: task.badge.blurb,
+                  mark: task.badge.value,
+                },
+              ]
+            : []),
           { key: `task-${task.id}`, kind: 'task' as const, title: task.name, detail: `+${task.xp} XP` },
           ...s.celebrations,
         ].slice(0, 4),

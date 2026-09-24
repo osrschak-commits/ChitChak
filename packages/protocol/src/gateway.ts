@@ -239,8 +239,23 @@ export type ServerMessage =
      lives on the server, and a client that applied a delta would have to keep
      its own copy of the maths to know how far along the next bar starts. */
   | { op: 'level:up'; d: { level: number; progress: Progress } }
-  /** You finished a task. Sent only to you. */
-  | { op: 'task:complete'; d: { id: string; name: string; xp: number; progress: Progress } }
+  /**
+   * You finished a task. Sent only to you.
+   *
+   * `badge` is only present on the handful of tiers that also grant a
+   * cosmetic - most tasks complete with nothing here, which is why it is
+   * optional rather than a badge field on every task in the catalogue.
+   */
+  | {
+      op: 'task:complete';
+      d: {
+        id: string;
+        name: string;
+        xp: number;
+        progress: Progress;
+        badge?: { id: string; name: string; blurb: string; value: string };
+      };
+    }
   /** A DM arrived, or a message mentioned you. Sent only to the recipient. */
   | { op: 'notification:create'; d: Notification }
   /**

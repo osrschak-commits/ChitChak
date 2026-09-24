@@ -15,19 +15,23 @@ import type { WornBadge } from '../lib/api.js';
 /**
  * Every badge picture in the folder, found at build time.
  *
- * A glob rather than a hand-written map: adding a badge is then dropping a file
- * called `<cosmetic id>.svg` into src/assets/badges, with nothing to remember
- * to register. Eager, because these are a couple of kilobytes each and a lazy
- * import would make a badge fade in after the name it belongs to.
+ * A glob rather than a hand-written map: adding a badge is then dropping a
+ * file called `<cosmetic id>.svg` (or `.png`, for art that started as a
+ * raster and was never going to trace cleanly - the gold crown) into
+ * src/assets/badges, with nothing to remember to register. Eager, because
+ * these are a couple of kilobytes each and a lazy import would make a badge
+ * fade in after the name it belongs to.
  */
-const ARTWORK = import.meta.glob('../assets/badges/*.svg', {
+const ARTWORK = import.meta.glob('../assets/badges/*.{svg,png}', {
   eager: true,
   query: '?url',
   import: 'default',
 }) as Record<string, string>;
 
 export function artworkFor(id: string): string | null {
-  const match = Object.entries(ARTWORK).find(([path]) => path.endsWith(`/${id}.svg`));
+  const match = Object.entries(ARTWORK).find(
+    ([path]) => path.endsWith(`/${id}.svg`) || path.endsWith(`/${id}.png`),
+  );
   return match ? match[1] : null;
 }
 

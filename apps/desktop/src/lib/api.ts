@@ -428,6 +428,17 @@ class ApiClient {
     return this.request('/api/admin/black-cards');
   }
 
+  /** Bronze, silver or gold - for something a query could not have checked. */
+  awardWreath(
+    username: string,
+    tier: 'bronze' | 'silver' | 'gold',
+  ): Promise<{ username: string; tier: string; granted: boolean }> {
+    return this.request('/api/admin/wreath', {
+      method: 'POST',
+      body: JSON.stringify({ username, tier }),
+    });
+  }
+
   // --- Moderation -----------------------------------------------------------
 
   /**

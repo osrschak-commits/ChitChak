@@ -15,6 +15,11 @@ export function StaffPanel() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+
+  const [wreathUsername, setWreathUsername] = useState('');
+  const [wreathBusy, setWreathBusy] = useState<'bronze' | 'silver' | 'gold' | null>(null);
+  const [wreathError, setWreathError] = useState<string | null>(null);
+  const [wreathNote, setWreathNote] = useState<string | null>(null);
   const [cards, setCards] = useState<
     Array<{
       at: string;
@@ -82,6 +87,27 @@ export function StaffPanel() {
     }
   }
 
+  async function giveWreath(tier: 'bronze' | 'silver' | 'gold') {
+    const name = wreathUsername.trim();
+    if (!name) return;
+    setWreathBusy(tier);
+    setWreathError(null);
+    setWreathNote(null);
+    try {
+      const result = await api.awardWreath(name, tier);
+      setWreathNote(
+        result.granted
+          ? `${result.username} now has the ${tier} wreath.`
+          : `${result.username} already had the ${tier} wreath.`,
+      );
+      setWreathUsername('');
+    } catch (problem) {
+      setWreathError(problem instanceof Error ? problem.message : 'That did not work');
+    } finally {
+      setWreathBusy(null);
+    }
+  }
+
   return (
     <>
       {/* Reports first: a card is something you give when you feel like it, a
@@ -111,6 +137,48 @@ export function StaffPanel() {
 
         {error && <div className="notice" style={{ marginTop: 12 }}>{error}</div>}
         {note && <p className="row__hint" style={{ marginTop: 12 }}>{note}</p>}
+      </div>
+
+      <div className="section">
+        <h3 className="section__title">Wreath</h3>
+        <p className="row__hint" style={{ marginBottom: 12, maxWidth: 420 }}>
+          For something worth marking that no task could have checked for. Cannot be taken back -
+          it was true when it was given, and stays true.
+        </p>
+
+        <div className="staff__give">
+          <input
+            className="staff__input"
+            value={wreathUsername}
+            placeholder="username"
+            onChange={(event) => setWreathUsername(event.target.value)}
+            aria-label="Username to give a wreath to"
+          />
+          <button
+            className="btn btn--sm"
+            disabled={wreathBusy !== null || !wreathUsername.trim()}
+            onClick={() => void giveWreath('bronze')}
+          >
+            {wreathBusy === 'bronze' ? 'Giving…' : 'Bronze'}
+          </button>
+          <button
+            className="btn btn--sm"
+            disabled={wreathBusy !== null || !wreathUsername.trim()}
+            onClick={() => void giveWreath('silver')}
+          >
+            {wreathBusy === 'silver' ? 'Giving…' : 'Silver'}
+          </button>
+          <button
+            className="btn btn--sm"
+            disabled={wreathBusy !== null || !wreathUsername.trim()}
+            onClick={() => void giveWreath('gold')}
+          >
+            {wreathBusy === 'gold' ? 'Giving…' : 'Gold'}
+          </button>
+        </div>
+
+        {wreathError && <div className="notice" style={{ marginTop: 12 }}>{wreathError}</div>}
+        {wreathNote && <p className="row__hint" style={{ marginTop: 12 }}>{wreathNote}</p>}
       </div>
 
       <div className="section">

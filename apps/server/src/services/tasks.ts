@@ -424,6 +424,27 @@ export const TASKS: Task[] = [
 
 export const TASKS_BY_ID = new Map(TASKS.map((task) => [task.id, task]));
 
+/**
+ * The hardest tier of a handful of tracks also hands over a badge, not only
+ * XP - see the matching entries in cosmetics.ts (`badge.openmic` and so on).
+ * A map rather than a field on the task itself: which tasks carry a badge is
+ * a decision about the cosmetics catalogue as much as the task one, and
+ * keeping it here would mean this file importing that one for no other
+ * reason.
+ *
+ * Deliberately short. Every tier not listed here is not a lesser
+ * accomplishment - it is one that already has a task:complete toast of its
+ * own, and not everything needs a second reward on top of that.
+ */
+export const TASK_BADGES: Record<string, string> = {
+  'voice.hours.h100': 'badge.openmic',
+  'talk.messages.m10k': 'badge.wire',
+  'people.friends.f100': 'badge.rolodex',
+  'people.invited.i50': 'badge.host',
+  'belong.servers.g10': 'badge.frequent',
+  'habit.streak.s30': 'badge.unbroken',
+};
+
 /** Which of these has this person already finished. */
 export async function completedTaskIds(userId: string): Promise<Set<string>> {
   const rows = await db
