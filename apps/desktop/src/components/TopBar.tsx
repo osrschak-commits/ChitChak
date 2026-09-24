@@ -1,3 +1,4 @@
+import { DecorativeIcon } from './DecorativeIcon.js';
 import { useEffect, useRef, useState } from 'react';
 import voiceSettingsIcon from '../assets/voice-settings.svg';
 import { mediaUrl } from '../lib/api.js';
@@ -174,7 +175,7 @@ export function TopBar({
             openFriends();
           }}
         >
-          <FriendsBadge size={20} />
+          <DecorativeIcon name="friends" size={20} />
           <span className="scope-tab__name">Friends</span>
           {/* A request nobody can see until they go looking is a request nobody
               answers. */}
@@ -277,30 +278,3 @@ function monogram(name: string): string {
 }
 
 
-/**
- * The Friends entry's mark.
- *
- * Deliberately not a server icon: Friends is not a server, and giving it a
- * lookalike badge would suggest it behaves like one.
- */
-function FriendsBadge({ size }: { size: number }) {
-  return (
-    <span
-      aria-hidden="true"
-      style={{
-        width: size,
-        height: size,
-        display: 'grid',
-        placeItems: 'center',
-        borderRadius: 6,
-        background: 'var(--graphite-700)',
-        color: 'var(--brass-400)',
-        fontSize: Math.round(size * 0.62),
-        lineHeight: 1,
-        flexShrink: 0,
-      }}
-    >
-      ◈
-    </span>
-  );
-}

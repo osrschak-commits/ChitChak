@@ -1,3 +1,5 @@
+import { DecorativeIcon } from './DecorativeIcon.js';
+import { artworkFor } from './Badge.js';
 import { useEffect, useState } from 'react';
 import { api, type ChestResult, type ChestStatus, type Rarity } from '../lib/api.js';
 
@@ -75,7 +77,7 @@ export function BrassChest({
         <div className={`chest__box chest__box--${phase}`} aria-hidden="true">
           <span className="chest__lid" />
           <span className="chest__glow" />
-          <span className="chest__mark">{phase === 'revealed' ? '' : '🔒'}</span>
+          <span className="chest__mark">{phase === 'revealed' ? null : <DecorativeIcon name="lock" size={26} />}</span>
         </div>
 
         {phase === 'revealed' && result ? (
@@ -152,12 +154,13 @@ export function BrassChest({
 
 /** The item itself, drawn the way it will look when worn. */
 function Preview({ item }: { item: ChestResult['cosmetic'] }) {
+  const art = item.slot === 'badge' ? artworkFor(item.id) : null;
   if (item.slot === 'plate') {
     return <span className="chest__plate" style={{ background: item.value }} aria-hidden="true" />;
   }
   return (
     <span className="chest__badge" aria-hidden="true">
-      {item.value}
+      {art ? <img className="chest__badge-art" src={art} alt="" draggable={false} /> : item.value}
     </span>
   );
 }

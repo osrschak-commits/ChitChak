@@ -6,14 +6,14 @@ import { usePermissions, useRanks } from '../hooks/usePermissions.js';
 import { Switch } from './primitives.js';
 
 const RANK_COLORS = [
-  '#d9a45b',
-  '#4fd6c4',
-  '#8a7fd4',
-  '#d97b6c',
-  '#6ca9d9',
-  '#b0c05f',
-  '#d48fb8',
-  '#9aa3ad',
+  '#ffb38a',
+  '#64dfc0',
+  '#c1b0f6',
+  '#ff9697',
+  '#8dc7f2',
+  '#c6d98d',
+  '#e8a6ce',
+  '#b1b6c8',
 ];
 
 /**
