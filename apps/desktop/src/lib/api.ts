@@ -184,7 +184,7 @@ class ApiClient {
    * Without this, six parallel requests on a cold start would each burn a
    * refresh token, and rotation would revoke five of them as replays.
    */
-  private refreshing: Promise<boolean> | null = null;
+  private refreshing: Promise<'refreshed' | 'invalid' | 'transient'> | null = null;
   private sessionEndedHandlers = new Set<() => void>();
 
   /**
@@ -242,9 +242,12 @@ class ApiClient {
     const response = await fetch(`${API_BASE}${path}`, { ...init, headers, body: requestBody });
 
     if (response.status === 401 && retry && this.session) {
-      const refreshed = await this.refresh();
-      if (refreshed) return this.request<T>(path, init, false);
-      this.persist(null);
+      const outcome = await this.refresh();
+      if (outcome === 'refreshed') return this.request<T>(path, init, false);
+      // A transient failure leaves the session in place - the original 401
+      // falls through below and surfaces as an error for this one request,
+      // rather than signing the person out over a network hiccup.
+      if (outcome === 'invalid') this.persist(null);
     }
 
     if (response.status === 204) return undefined as T;
@@ -294,28 +297,43 @@ class ApiClient {
     if (this.session) this.persist(null);
   }
 
-  private async refresh(): Promise<boolean> {
+  /**
+   * `invalid` and `transient` are both "did not refresh", but they mean
+   * opposite things to the caller: `invalid` is the server actually rejecting
+   * the refresh token (expired, revoked, reused), which is a real sign-out.
+   * `transient` is everything else - offline, a DNS lookup still resolving
+   * after the machine woke from sleep, the API mid-restart during a deploy -
+   * where the refresh token was never actually refused and the session should
+   * survive to be retried, not be thrown away.
+   */
+  private async refresh(): Promise<'refreshed' | 'invalid' | 'transient'> {
     if (this.refreshing) return this.refreshing;
 
     this.refreshing = (async () => {
       const refreshToken = this.session?.refreshToken;
-      if (!refreshToken) return false;
+      if (!refreshToken) return 'invalid' as const;
       try {
         const response = await fetch(`${API_BASE}/api/auth/refresh`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ refreshToken }),
         });
-        if (!response.ok) return false;
+        // 401/403 is the server actually refusing this token. A 5xx is the
+        // server itself in trouble - mid-deploy, out of capacity - and says
+        // nothing about whether the token is good.
+        if (response.status >= 500) return 'transient' as const;
+        if (!response.ok) return 'invalid' as const;
         const auth = (await response.json()) as AuthResponse;
         this.persist({
           accessToken: auth.accessToken,
           refreshToken: auth.refreshToken,
           user: auth.user,
         });
-        return true;
+        return 'refreshed' as const;
       } catch {
-        return false;
+        // fetch() throwing means the request never reached the server at all
+        // - no connection, no verdict on the token.
+        return 'transient' as const;
       } finally {
         this.refreshing = null;
       }
