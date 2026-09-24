@@ -1,4 +1,4 @@
-import type { Message } from '@chitchak/protocol';
+import type { Message, Reaction } from '@chitchak/protocol';
 import { Permission, has } from '@chitchak/protocol';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { db } from '../db/client.js';
@@ -11,6 +11,7 @@ import {
   type SerializedAttachment,
 } from './attachments.js';
 import { requireChannelAccess, type ChannelAccess } from './permissions.js';
+import { forMessages as reactionsForMessages, reactionsFor } from './reactions.js';
 
 /**
  * Who a message event goes to.
@@ -59,6 +60,7 @@ export function mentionedIds(content: string): string[] {
 function toMessage(
   row: typeof messages.$inferSelect,
   files: SerializedAttachment[] = [],
+  reactions: Reaction[] = [],
 ): Message {
   return {
     id: row.id,
@@ -69,18 +71,19 @@ function toMessage(
     editedAt: row.editedAt ? row.editedAt.toISOString() : null,
     attachments: files,
     mentions: mentionedIds(row.content),
+    reactions,
   };
 }
 
 /**
- * Attaches the files to a page of messages in one query rather than per row.
- *
- * History is read fifty at a time, and asking per message is fifty round trips
- * to save writing this.
+ * Attaches the files and reactions to a page of messages in one query each,
+ * rather than per row. History is read fifty at a time, and asking per
+ * message is fifty round trips to save writing this.
  */
 async function withAttachments(rows: Array<typeof messages.$inferSelect>): Promise<Message[]> {
-  const grouped = await forMessages(rows.map((row) => row.id));
-  return rows.map((row) => toMessage(row, grouped.get(row.id) ?? []));
+  const ids = rows.map((row) => row.id);
+  const [files, reactions] = await Promise.all([forMessages(ids), reactionsForMessages(ids)]);
+  return rows.map((row) => toMessage(row, files.get(row.id) ?? [], reactions.get(row.id) ?? []));
 }
 
 export async function createMessage(input: {
@@ -286,9 +289,10 @@ export async function searchMessages(input: {
   `);
 
   // Search results are rendered by the same component as the channel, so they
-  // carry their files too - a result whose whole content was a screenshot
-  // would otherwise come back as a blank row.
-  const grouped = await forMessages(rows.map((row) => row.id));
+  // carry their files and reactions too - a result whose whole content was a
+  // screenshot would otherwise come back as a blank row.
+  const ids = rows.map((row) => row.id);
+  const [files, reactions] = await Promise.all([forMessages(ids), reactionsForMessages(ids)]);
   return rows.map((row) => ({
     id: row.id,
     channelId: row.channel_id,
@@ -296,8 +300,9 @@ export async function searchMessages(input: {
     content: row.content,
     createdAt: new Date(row.created_at).toISOString(),
     editedAt: row.edited_at ? new Date(row.edited_at).toISOString() : null,
-    attachments: grouped.get(row.id) ?? [],
+    attachments: files.get(row.id) ?? [],
     mentions: mentionedIds(row.content),
+    reactions: reactions.get(row.id) ?? [],
   }));
 }
 
@@ -332,10 +337,18 @@ export async function editMessage(input: {
     .returning();
   if (!row) throw errors.notFound('No such message');
 
-  // Editing changes the words, never the files - so they are re-read rather
-  // than dropped, which is what returning a bare toMessage(row) would do.
-  const files = (await forMessages([row.id])).get(row.id) ?? [];
-  return { message: toMessage(row, files), audience: audienceOf(access, input.userId) };
+  // Editing changes the words, never the files or the reactions - so both are
+  // re-read rather than dropped, which is what returning a bare toMessage(row)
+  // would do. Losing every reaction pill the moment somebody fixed a typo
+  // would be a strange cost for an edit to have.
+  const [files, reactions] = await Promise.all([
+    forMessages([row.id]).then((m) => m.get(row.id) ?? []),
+    reactionsFor(row.id),
+  ]);
+  return {
+    message: toMessage(row, files, reactions),
+    audience: audienceOf(access, input.userId),
+  };
 }
 
 /** Deleting your own needs nothing; deleting anyone else's needs MANAGE_MESSAGES. */

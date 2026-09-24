@@ -1,7 +1,7 @@
 import type { Emoji } from '@chitchak/protocol';
 import { and, eq, inArray } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { guildEmoji, type GuildEmojiRow } from '../db/schema.js';
+import { guildEmoji, messageReactions, type GuildEmojiRow } from '../db/schema.js';
 import { errors } from '../lib/errors.js';
 import { removeStored } from '../lib/storage.js';
 import { attachments } from '../db/schema.js';
@@ -115,6 +115,14 @@ export async function remove(guildId: string, emojiId: string): Promise<GuildEmo
     .where(and(eq(guildEmoji.guildId, guildId), eq(guildEmoji.id, emojiId)))
     .returning();
   if (!row) throw errors.notFound('No such emoji');
+
+  // No foreign key ties a reaction to the emoji it names - see the comment on
+  // messageReactions in schema.ts - so a deleted emoji's reactions are swept
+  // up by hand instead of by cascade. Whoever already had a message open
+  // keeps seeing the pill until they reload; nothing is watching for this to
+  // re-broadcast it away live, the same trade the shop makes when an owned
+  // cosmetic's catalogue entry disappears.
+  await db.delete(messageReactions).where(eq(messageReactions.emoji, `custom:${row.id}`));
 
   const [otherEmoji] = await db
     .select({ id: guildEmoji.id })

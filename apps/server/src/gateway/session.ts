@@ -22,6 +22,7 @@ import { verifyAccessToken, type AccessTokenClaims } from '../lib/tokens.js';
 import { buildReadySnapshot, guildIdsForUser } from '../services/snapshot.js';
 import { createMessage } from '../services/messages.js';
 import { notifyForMessage } from '../services/notifications.js';
+import { addReaction, removeReaction } from '../services/reactions.js';
 import {
   clearVoiceStateOnDisconnect,
   joinVoiceChannel,
@@ -293,6 +294,32 @@ export class Session {
         this.send({
           op: 'message:create',
           d: { ...created.message, nonce: message.d?.nonce },
+        });
+        return;
+      }
+
+      /**
+       * Reacting and un-reacting are the same broadcast shape: the message's
+       * whole reaction list, recomputed. No echo-with-nonce the way
+       * message:create gets one - there is no optimistic bubble to
+       * reconcile, so the sender hears about their own click the same way
+       * everyone else does, over the same publishToAudience call.
+       */
+      case 'reaction:add':
+      case 'reaction:remove': {
+        const messageId = message.d?.messageId;
+        if (typeof messageId !== 'string') {
+          this.sendError('invalid_payload', 'messageId is required');
+          return;
+        }
+        const change = await (message.op === 'reaction:add' ? addReaction : removeReaction)({
+          userId: this.userId,
+          messageId,
+          emoji: message.d?.emoji,
+        });
+        registry.publishToAudience(change.audience, {
+          op: 'message:reaction',
+          d: { channelId: change.channelId, messageId, reactions: change.reactions },
         });
         return;
       }

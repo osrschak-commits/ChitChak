@@ -2281,6 +2281,17 @@ textarea::placeholder {
   overflow: hidden;
 }
 
+/* For ReactionPicker's own fixed-position wrapper (ChatPanel.tsx), which has
+   already worked out where on screen this panel actually fits - the
+   composer-relative placement above would either fight that or, above the
+   top few messages in a scrolled conversation, run off the top of the
+   window entirely. */
+.emoji--anchored {
+  position: static;
+  bottom: auto;
+  right: auto;
+}
+
 .emoji__head {
   padding: 10px 10px 6px;
   flex-shrink: 0;
@@ -3046,6 +3057,59 @@ textarea::placeholder {
   font-size: 9.5px;
   color: var(--text-faint);
   margin-left: 6px;
+}
+
+/* --- Reactions -------------------------------------------------------------
+   Pills under a message, one per emoji rather than one per person - past a
+   handful of people on the same reaction, a name list stops being readable
+   and a count is the only version of this that still is. */
+
+.reactions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: var(--graphite-800);
+  border: 1px solid var(--line-strong);
+  color: var(--text-secondary);
+  font-size: 12px;
+  transition: background 110ms var(--ease), border-color 110ms var(--ease), color 110ms var(--ease);
+}
+
+.reaction:hover {
+  background: var(--graphite-750);
+}
+
+/* Whether this account is one of the people in the pill - brass rather than
+   signal-teal, since teal is already spoken for by "live audio" everywhere
+   else in the app, and a reaction is not that. */
+.reaction--mine {
+  background: var(--brass-glow);
+  border-color: var(--brass-500);
+  color: var(--brass-300);
+}
+
+.reaction__art {
+  width: 14px;
+  height: 14px;
+}
+
+.reaction__glyph {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.reaction__count {
+  font-size: 11px;
 }
 
 .msg__editor {

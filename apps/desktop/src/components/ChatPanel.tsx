@@ -1,9 +1,11 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import type { Emoji as CustomEmoji, Message } from '@chitchak/protocol';
 import { Permission } from '@chitchak/protocol';
 import { usePermissions } from '../hooks/usePermissions.js';
 import { usePersonPopover } from '../hooks/usePersonPopover.js';
-import { uploadFile } from '../lib/api.js';
-import { rememberEmoji } from '../lib/emoji.js';
+import { apiBase, uploadFile } from '../lib/api.js';
+import { rememberEmoji, type Emoji } from '../lib/emoji.js';
 import { MessageAttachments, PendingAttachments, type Pending } from './Attachments.js';
 import { RichText } from './RichText.js';
 import { EmojiPicker } from './EmojiPicker.js';
@@ -89,6 +91,7 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
   const sendMessage = useApp((s) => s.sendMessage);
   const editMessage = useApp((s) => s.editMessage);
   const deleteMessage = useApp((s) => s.deleteMessage);
+  const toggleReaction = useApp((s) => s.toggleReaction);
   const voiceError = useApp((s) => s.voiceError);
   const dismissVoiceError = useApp((s) => s.dismissVoiceError);
   const guilds = useApp((s) => s.guilds);
@@ -200,6 +203,14 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
     });
   }
   const [editingId, setEditingId] = useState<string | null>(null);
+  /**
+   * The message the reaction picker is open on, if any - one at a time - and
+   * where its button was when opened, which is what ReactionPicker positions
+   * itself from. The rect rather than a ref: which button this is changes
+   * with every message, and a rect captured at the click is simpler than a
+   * ref map keyed by message id for something this short-lived.
+   */
+  const [reactingTo, setReactingTo] = useState<{ messageId: string; rect: DOMRect } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const person = usePersonPopover(selectedGuildId, { onEditProfile });
 
@@ -554,12 +565,54 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
                           </div>
                         )}
                         <MessageAttachments files={message.attachments ?? []} />
+                        <MessageReactions
+                          message={message}
+                          selfId={selfId}
+                          onToggle={(emoji) => toggleReaction(message.id, emoji)}
+                        />
                       </>
                     )}
                   </div>
 
                   {editingId !== message.id && (
                     <div className="msg__actions">
+                      <button
+                        className="icon-btn"
+                        style={{ width: 24, height: 24 }}
+                        aria-expanded={reactingTo?.messageId === message.id}
+                        onClick={(e) => {
+                          // Read synchronously, into a plain value, rather
+                          // than from inside the updater below: React does
+                          // not guarantee `e.currentTarget` is still the
+                          // button by the time a functional setState update
+                          // actually runs, and it was not - the second click
+                          // (closing the picker back open on the same
+                          // button) crashed here with a null currentTarget.
+                          const rect = e.currentTarget.getBoundingClientRect();
+                          setReactingTo((open) =>
+                            open?.messageId === message.id ? null : { messageId: message.id, rect },
+                          );
+                        }}
+                        title="Add a reaction"
+                      >
+                        🙂
+                      </button>
+                      {reactingTo?.messageId === message.id && (
+                        <ReactionPicker
+                          anchorRect={reactingTo.rect}
+                          onClose={() => setReactingTo(null)}
+                          guildId={channel?.guildId ?? null}
+                          onPickCustom={(custom) => {
+                            toggleReaction(message.id, `custom:${custom.id}`);
+                            setReactingTo(null);
+                          }}
+                          onPick={(emoji) => {
+                            rememberEmoji(emoji.char);
+                            toggleReaction(message.id, emoji.char);
+                            setReactingTo(null);
+                          }}
+                        />
+                      )}
                       {isAuthor && (
                         <button
                           className="icon-btn"
@@ -795,6 +848,123 @@ export function ChatPanel({ onEditProfile }: { onEditProfile(): void }) {
 
       {person.popovers}
     </main>
+  );
+}
+
+/**
+ * The pills under a message: one per emoji, not one per person - Discord's
+ * own shape for this, and the only one that stays readable once a dozen
+ * people have piled onto the same reaction.
+ *
+ * Reads the custom-emoji store directly rather than taking it as a prop: a
+ * `custom:<id>` reaction needs the picture and the name looked up by id the
+ * same way the composer's own picker does, and every caller would otherwise
+ * have to thread that map through for a component that only exists once
+ * per message.
+ */
+/**
+ * EmojiPicker, placed by hand instead of by its own CSS.
+ *
+ * The composer can rely on `.emoji`'s `position: absolute` because the
+ * composer is always at the bottom of the pane - there is nowhere for the
+ * picker to go but up, and always room for it there. A message has no such
+ * guarantee: reacting to one of the first few lines in a long scrolled
+ * history left the picker opening upward into nothing, clipped by both the
+ * top of the window and the scrolling messages list's own overflow.
+ *
+ * Rendered through a portal into `document.body` rather than left as a
+ * child of the message it belongs to, so that `position: fixed` reliably
+ * means "relative to the window": a `transform`, `filter` or similar on any
+ * ancestor - `.messages` included, and CSS gains new properties that do this
+ * over time - turns that ancestor into the containing block instead, which
+ * would silently reintroduce the exact clipping this exists to avoid.
+ */
+function ReactionPicker({
+  anchorRect,
+  onClose,
+  guildId,
+  onPick,
+  onPickCustom,
+}: {
+  anchorRect: DOMRect;
+  onClose(): void;
+  guildId: string | null;
+  onPick(emoji: Emoji): void;
+  onPickCustom(emoji: CustomEmoji): void;
+}) {
+  const WIDTH = 340;
+  const HEIGHT = 360;
+  const MARGIN = 8;
+
+  // Opens upward where there is room for it, the same direction the composer
+  // always opens in - downward only for the handful of messages near the top
+  // of a scrolled conversation where upward would not fit.
+  const openUp = anchorRect.top - HEIGHT - MARGIN > 0;
+  const top = openUp
+    ? anchorRect.top - HEIGHT - MARGIN
+    : Math.min(anchorRect.bottom + MARGIN, window.innerHeight - HEIGHT - MARGIN);
+  const left = Math.min(
+    Math.max(MARGIN, anchorRect.right - WIDTH),
+    window.innerWidth - WIDTH - MARGIN,
+  );
+
+  return createPortal(
+    <div style={{ position: 'fixed', top, left, zIndex: 500 }}>
+      <EmojiPicker
+        className="emoji--anchored"
+        onClose={onClose}
+        guildId={guildId}
+        onPick={onPick}
+        onPickCustom={onPickCustom}
+      />
+    </div>,
+    document.body,
+  );
+}
+
+function MessageReactions({
+  message,
+  selfId,
+  onToggle,
+}: {
+  message: Message;
+  selfId: string | undefined;
+  onToggle(emoji: string): void;
+}) {
+  const customEmoji = useApp((s) => s.emoji);
+
+  if (message.reactions.length === 0) return null;
+
+  return (
+    <div className="reactions">
+      {message.reactions.map((reaction) => {
+        const mine = selfId !== undefined && reaction.userIds.includes(selfId);
+        const custom = reaction.emoji.startsWith('custom:')
+          ? customEmoji.get(reaction.emoji.slice('custom:'.length))
+          : undefined;
+        // A custom emoji somebody's server later deleted - the reaction row
+        // survives (see services/emoji.ts), so the alternative to skipping it
+        // here is a broken image where a picture used to be.
+        if (reaction.emoji.startsWith('custom:') && !custom) return null;
+
+        return (
+          <button
+            key={reaction.emoji}
+            type="button"
+            className={`reaction ${mine ? 'reaction--mine' : ''}`}
+            onClick={() => onToggle(reaction.emoji)}
+            title={custom ? `:${custom.name}:` : reaction.emoji}
+          >
+            {custom ? (
+              <img className="reaction__art" src={`${apiBase}${custom.url}`} alt="" draggable={false} />
+            ) : (
+              <span className="reaction__glyph">{reaction.emoji}</span>
+            )}
+            <span className="reaction__count mono">{reaction.userIds.length}</span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 

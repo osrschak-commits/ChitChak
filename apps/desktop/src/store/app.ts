@@ -214,6 +214,12 @@ interface AppState {
   sendMessage(channelId: string, content: string, attachmentIds?: string[]): void;
   editMessage(messageId: string, content: string): Promise<void>;
   deleteMessage(messageId: string): Promise<void>;
+  /**
+   * Adds the reaction, or removes it if this account already reacted with
+   * that exact emoji - one call for both, since a click always means "flip
+   * whatever it currently is" rather than the caller having to know which.
+   */
+  toggleReaction(messageId: string, emoji: string): void;
   joinVoice(channelId: string): void;
   setStreamPreset(preset: StreamPreset): void;
   setShareComputerSound(on: boolean): void;
@@ -725,6 +731,32 @@ export const useApp = create<AppState>((set, get) => ({
 
   async deleteMessage(messageId) {
     await api.deleteMessage(messageId);
+  },
+
+  toggleReaction(messageId, emoji) {
+    const selfId = get().user?.id;
+    if (!selfId) return;
+
+    // Which way this click goes: found by scanning every channel's history
+    // rather than tracked separately, because the message itself already
+    // knows who reacted - a second copy of that fact would just be one more
+    // place for it to drift out of sync with the first.
+    let reacted = false;
+    search: for (const list of get().messages.values()) {
+      for (const message of list) {
+        if (message.id !== messageId) continue;
+        reacted = message.reactions.some((r) => r.emoji === emoji && r.userIds.includes(selfId));
+        break search;
+      }
+    }
+
+    // Fire-and-forget, like sendMessage - the broadcast this earns back is
+    // what actually updates the pill, for the clicker the same as for
+    // everyone else watching.
+    gateway.send({
+      op: reacted ? 'reaction:remove' : 'reaction:add',
+      d: { messageId, emoji },
+    });
   },
 
   /**
@@ -1423,6 +1455,22 @@ function applyServerMessage(
         messages.set(
           message.d.channelId,
           existing.map((m) => (m.id === message.d.id ? message.d : m)),
+        );
+        return { messages };
+      });
+      return;
+    }
+
+    case 'message:reaction': {
+      set((s) => {
+        const messages = new Map(s.messages);
+        const existing = messages.get(message.d.channelId);
+        if (!existing) return { messages: s.messages };
+        messages.set(
+          message.d.channelId,
+          existing.map((m) =>
+            m.id === message.d.messageId ? { ...m, reactions: message.d.reactions } : m,
+          ),
         );
         return { messages };
       });
