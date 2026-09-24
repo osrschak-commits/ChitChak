@@ -156,6 +156,21 @@ export interface Attachment {
   url: string;
 }
 
+/**
+ * Everyone who reacted to one message with one emoji.
+ *
+ * `emoji` is either the unicode character itself, or `custom:<guild emoji
+ * id>` - one column's worth of shape carried straight from the database, see
+ * the comment on `messageReactions` in schema.ts. `userIds` rather than a
+ * bare count for the same reason `Message.mentions` is a list of ids and not
+ * a number: the client already needs to ask "did I do this", and a count
+ * alone would mean asking the server a second question to answer it.
+ */
+export interface Reaction {
+  emoji: string;
+  userIds: Snowflake[];
+}
+
 export interface Message {
   id: Snowflake;
   channelId: Snowflake;
@@ -178,6 +193,8 @@ export interface Message {
    * see the channel - so the client can trust it without re-checking.
    */
   mentions: Snowflake[];
+  /** Grouped by emoji. Empty rather than omitted when nobody has reacted. */
+  reactions: Reaction[];
 }
 
 /**

@@ -846,6 +846,42 @@ export const guildEmoji = pgTable(
 );
 
 /**
+ * One person's reaction to one message, with one emoji.
+ *
+ * The three columns are the primary key - reacting twice with the same emoji
+ * is not a second row, it is the row that already exists, which is what
+ * makes toggling on and off an ordinary insert-or-delete rather than
+ * something that has to check first.
+ *
+ * `emoji` holds one of two shapes: the unicode character itself, or
+ * `custom:<guild emoji id>` for one of this app's own. One column rather than
+ * a nullable pair, because a reaction is always exactly one or the other,
+ * never neither and never both - a nullable pair would let a row exist that
+ * says nothing. There is deliberately no foreign key into `guild_emoji`: a
+ * reaction naming a since-deleted emoji is cleaned up explicitly, in
+ * services/emoji.ts, rather than by a constraint that would also have to
+ * understand the text column's second shape.
+ */
+export const messageReactions = pgTable(
+  'message_reactions',
+  {
+    messageId: text('message_id')
+      .notNull()
+      .references(() => messages.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    emoji: text('emoji').notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.messageId, table.userId, table.emoji] }),
+    // The only read pattern: every reaction on one message, grouped into pills.
+    index('message_reactions_message_idx').on(table.messageId),
+  ],
+);
+
+/**
  * Something a person wants staff to look at.
  *
  * Moderation before this was entirely per-server: kick, ban and mute inside a
@@ -924,6 +960,7 @@ export const guildEmojiRelations = relations(guildEmoji, ({ one }) => ({
 }));
 
 export type GuildEmojiRow = typeof guildEmoji.$inferSelect;
+export type MessageReactionRow = typeof messageReactions.$inferSelect;
 export type AttachmentRow = typeof attachments.$inferSelect;
 export type ChannelRow = typeof channels.$inferSelect;
 export type MessageRow = typeof messages.$inferSelect;

@@ -25,12 +25,21 @@ export function EmojiPicker({
   onPickCustom,
   guildId,
   onClose,
+  className = '',
 }: {
   onPick(emoji: Emoji): void;
   /** Inserts `:name:` rather than a character - see RichText. */
   onPickCustom(emoji: CustomEmoji): void;
   guildId: string | null;
   onClose(): void;
+  /**
+   * Appended to the root's own class. Composer usage does not need this -
+   * `.emoji`'s own `position: absolute` already anchors it correctly there.
+   * Reacting to a message does: see ReactionPicker in ChatPanel.tsx, which
+   * positions a fixed-position wrapper by hand and needs this panel to fill
+   * it rather than fight it for placement.
+   */
+  className?: string;
 }) {
   const allEmoji = useApp((s) => s.emoji);
 
@@ -90,7 +99,7 @@ export function EmojiPicker({
   const customShowing = term ? custom.filter((one) => one.name.includes(term)) : custom;
 
   return (
-    <div className="emoji" ref={panelRef} role="dialog" aria-label="Emoji">
+    <div className={`emoji ${className}`.trim()} ref={panelRef} role="dialog" aria-label="Emoji">
       <div className="emoji__head">
         <input
           ref={searchRef}

@@ -9,6 +9,7 @@ import type {
   PresenceStatus,
   PublicUser,
   Rank,
+  Reaction,
   SelfUser,
   Snowflake,
   VoiceState,
@@ -64,7 +65,15 @@ export type ClientMessage =
         nonce?: string;
       };
     }
-  | { op: 'typing:start'; d: { channelId: Snowflake } };
+  | { op: 'typing:start'; d: { channelId: Snowflake } }
+  /**
+   * `emoji` is the unicode character, or `custom:<guild emoji id>` - see the
+   * comment on `Reaction`. Adding one you already added, or removing one you
+   * never added, is a no-op rather than an error: a click that lands twice
+   * because of a slow connection should not surface as a failure.
+   */
+  | { op: 'reaction:add'; d: { messageId: Snowflake; emoji: string } }
+  | { op: 'reaction:remove'; d: { messageId: Snowflake; emoji: string } };
 
 // ---------------------------------------------------------------------------
 // Server -> Client
@@ -221,6 +230,14 @@ export type ServerMessage =
   | { op: 'channel:overwrites'; d: { channelId: Snowflake; overwrites: ChannelOverwrite[] } }
   | { op: 'message:update'; d: Message }
   | { op: 'message:delete'; d: { channelId: Snowflake; messageId: Snowflake } }
+  /**
+   * The full reaction list for one message, replacing whatever the client
+   * held - the same reasoning as `channel:overwrites`. A delta would be
+   * smaller, but two of these racing (two people reacting within the same
+   * moment) would then depend on arrival order to end up correct; the full
+   * set does not.
+   */
+  | { op: 'message:reaction'; d: { channelId: Snowflake; messageId: Snowflake; reactions: Reaction[] } }
   /** A profile changed. Sent to every guild the user shares with the recipient. */
   | { op: 'user:update'; d: PublicUser }
   /** Someone asked to be your friend. Sent to the recipient only. */
