@@ -1,5 +1,6 @@
 import type { PublicUser } from '@chitchak/protocol';
 import { registry } from '../gateway/registry.js';
+import * as cosmetics from './cosmetics.js';
 import {
   awardXp,
   claimMessageXp,
@@ -8,7 +9,7 @@ import {
   randomMessageXp,
   touchStreak,
 } from './levels.js';
-import { TASKS, claimTask, completedTaskIds, type Trigger } from './tasks.js';
+import { TASK_BADGES, TASKS, claimTask, completedTaskIds, type Trigger } from './tasks.js';
 
 /**
  * The one door XP and tasks go through.
@@ -28,7 +29,12 @@ export interface ProgressResult {
   xp: number;
   level: number;
   levelledUp: boolean;
-  completed: Array<{ id: string; name: string; xp: number }>;
+  completed: Array<{
+    id: string;
+    name: string;
+    xp: number;
+    badge?: { id: string; name: string; blurb: string; value: string };
+  }>;
 }
 
 export async function progress(
@@ -70,7 +76,23 @@ export async function progress(
         const afterTask = await awardXp(userId, task.xp);
         // Levelling up during a run of task grants still counts as levelling up.
         award = { ...afterTask, levelledUp: award.levelledUp || afterTask.levelledUp };
-        completed.push({ id: task.id, name: task.name, xp: task.xp });
+
+        // A badge on top of the XP, for the handful of tiers that carry one.
+        // Its own try/catch: the XP has already landed, and a cosmetic that
+        // fails to grant must not take that back with it.
+        let badge: ProgressResult['completed'][number]['badge'];
+        const badgeId = TASK_BADGES[task.id];
+        if (badgeId) {
+          try {
+            await cosmetics.award(userId, badgeId);
+            const item = cosmetics.COSMETICS_BY_ID.get(badgeId);
+            if (item) badge = { id: item.id, name: item.name, blurb: item.blurb, value: item.value };
+          } catch (error) {
+            console.error('[progress] badge award failed', { userId, task: task.id, badgeId, error });
+          }
+        }
+
+        completed.push({ id: task.id, name: task.name, xp: task.xp, badge });
       }
     }
 

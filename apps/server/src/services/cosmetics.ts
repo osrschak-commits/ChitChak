@@ -1,7 +1,8 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { ownedCosmetics, users } from '../db/schema.js';
+import { ownedCosmetics, staffActions, users } from '../db/schema.js';
 import { errors } from '../lib/errors.js';
+import { generateId } from '../lib/ids.js';
 import * as keys from './keys.js';
 import { standingOf } from './subscriptions.js';
 
@@ -157,6 +158,115 @@ export const COSMETICS: Cosmetic[] = [
     awarded: true,
     earnedAfterDays: 365,
     value: '❶',
+  },
+  {
+    id: 'badge.2year',
+    name: 'Year two',
+    slot: 'badge',
+    blurb: 'Two years on ChitChak, to the day.',
+    price: 0,
+    awarded: true,
+    earnedAfterDays: 730,
+    value: '❷',
+  },
+
+  /*
+    The rest of these are also `awarded: true`, but granted the other way -
+    not derived at the moment somebody is drawn, like the two above, but
+    handed out once by `award()` the moment a specific task tier completes
+    (see TASK_BADGES in tasks.ts). A badge for finishing the hardest tier of
+    something is a record of having done it, which is exactly the same
+    reasoning that keeps Founder and Year one out of the shop: sold, it would
+    stop meaning anything.
+  */
+  {
+    id: 'badge.openmic',
+    name: 'Open mic',
+    slot: 'badge',
+    blurb: 'A hundred hours with the mic live.',
+    price: 0,
+    awarded: true,
+    value: '◍',
+  },
+  {
+    id: 'badge.wire',
+    name: 'Wire',
+    slot: 'badge',
+    blurb: 'Ten thousand messages. The place would sound different without you.',
+    price: 0,
+    awarded: true,
+    value: '≡',
+  },
+  {
+    id: 'badge.rolodex',
+    name: 'Rolodex',
+    slot: 'badge',
+    blurb: 'A hundred people who would say hello back.',
+    price: 0,
+    awarded: true,
+    value: '✱',
+  },
+  {
+    id: 'badge.host',
+    name: 'Host',
+    slot: 'badge',
+    blurb: 'Fifty people who are here because you asked.',
+    price: 0,
+    awarded: true,
+    value: '⌂',
+  },
+  {
+    id: 'badge.frequent',
+    name: 'Frequent',
+    slot: 'badge',
+    blurb: 'Ten servers, all at once.',
+    price: 0,
+    awarded: true,
+    value: '✧',
+  },
+  {
+    id: 'badge.unbroken',
+    name: 'Unbroken',
+    slot: 'badge',
+    blurb: 'Thirty days running, no gap.',
+    price: 0,
+    awarded: true,
+    value: '⟳',
+  },
+
+  /*
+    A third kind of `awarded: true`, next to "derived at the moment somebody
+    is drawn" and "granted the moment a task tier completes": these have no
+    condition behind them at all. Staff hand them out one at a time, for
+    something that mattered but was never going to fit a task's `check()` -
+    see the staff routes for who may call `award()` with one of these.
+  */
+  {
+    id: 'badge.wreath.bronze',
+    name: 'Bronze wreath',
+    slot: 'badge',
+    blurb: 'Handed over by someone on staff, for something worth noticing.',
+    price: 0,
+    awarded: true,
+    value: '⚘',
+  },
+  {
+    id: 'badge.wreath.silver',
+    name: 'Silver wreath',
+    slot: 'badge',
+    blurb: 'Handed over by someone on staff, for something worth remembering.',
+    price: 0,
+    awarded: true,
+    value: '⚘',
+  },
+  {
+    id: 'badge.wreath.gold',
+    name: 'Gold wreath',
+    slot: 'badge',
+    blurb: 'Handed over by someone on staff, for something worth saying out loud.',
+    price: 0,
+    awarded: true,
+    value: '⚘',
   },
 
   // --- Badges: a small mark beside your name --------------------------------
@@ -426,6 +536,48 @@ export async function award(userId: string, cosmeticId: string): Promise<boolean
     .returning({ cosmeticId: ownedCosmetics.cosmeticId });
 
   return claimed.length > 0;
+}
+
+const WREATH_IDS = {
+  bronze: 'badge.wreath.bronze',
+  silver: 'badge.wreath.silver',
+  gold: 'badge.wreath.gold',
+} as const;
+
+export type WreathTier = keyof typeof WREATH_IDS;
+
+/**
+ * The one cosmetic a person on staff can hand out by hand, to someone they
+ * name rather than something a query can check.
+ *
+ * Logged to `staff_actions` before the grant, same as a suspension - a
+ * record that this was attempted outlives a request that fails partway
+ * through. Unlike a suspension, though, there is no version of this that
+ * takes a wreath back: it was given because something someone did was worth
+ * noticing, and that stays true regardless of what happens afterwards.
+ */
+export async function awardWreath(input: {
+  actorId: string;
+  username: string;
+  tier: WreathTier;
+}): Promise<{ username: string; tier: WreathTier; granted: boolean }> {
+  const target = await db.query.users.findFirst({
+    where: eq(users.username, input.username.trim().toLowerCase()),
+  });
+  if (!target) throw errors.notFound(`Nobody here is called "${input.username}"`);
+
+  const cosmeticId = WREATH_IDS[input.tier];
+
+  await db.insert(staffActions).values({
+    id: generateId(),
+    actorId: input.actorId,
+    action: 'wreath',
+    subjectId: target.id,
+    detail: input.tier,
+  });
+
+  const granted = await award(target.id, cosmeticId);
+  return { username: target.username, tier: input.tier, granted };
 }
 
 /**

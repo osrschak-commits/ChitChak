@@ -3777,9 +3777,16 @@ textarea::placeholder {
   border-color: var(--brass-500);
 }
 
-.celebration--level {
+.celebration--level,
+.celebration--badge {
   border-left-color: var(--brass-300);
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--brass-glow);
+}
+
+/* The badge's own glyph, not a generic mark - bigger, since it is standing
+   in for artwork that does not exist yet. */
+.celebration--badge .celebration__mark {
+  font-size: 18px;
 }
 
 .celebration__mark {
