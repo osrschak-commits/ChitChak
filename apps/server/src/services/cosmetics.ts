@@ -128,244 +128,160 @@ export const COSMETICS: Cosmetic[] = [
     value: 'linear-gradient(135deg, #7d2f34, #3a1417)',
   },
 
-  /*
-    --- Badges nobody can buy ------------------------------------------------
-
-    These are records of when somebody turned up, and a record that can be
-    bought later is not a record of anything - so they are out of the shop and
-    out of the chest, which is what `awarded` means.
-
-    They are earned two different ways. Founder is handed out at registration
-    while `PRE_LAUNCH` is on, and stops for good the day it is turned off. Year
-    one is not handed out at all: it is a question asked about the account's
-    age, so it appears on its own the day it is true.
-  */
+  // --- Awarded badges: records of something somebody actually did ----------
   {
     id: 'badge.founder',
     name: 'Founder',
     slot: 'badge',
-    blurb: 'Here before it was finished. Given, never sold.',
+    blurb: 'Here before the doors properly opened.',
     price: 0,
     awarded: true,
     value: '◆',
   },
   {
-    id: 'badge.1year',
-    name: 'Year one',
+    id: 'badge.headliner',
+    name: 'Headliner',
     slot: 'badge',
-    blurb: 'A year on ChitChak, to the day.',
+    blurb: 'A hundred hours spent talking with people.',
     price: 0,
     awarded: true,
-    earnedAfterDays: 365,
-    value: '❶',
+    value: '●',
   },
   {
-    id: 'badge.2year',
-    name: 'Year two',
+    id: 'badge.hotline',
+    name: 'Hotline',
     slot: 'badge',
-    blurb: 'Two years on ChitChak, to the day.',
+    blurb: 'Ten thousand messages sent. You keep the line alive.',
     price: 0,
     awarded: true,
-    earnedAfterDays: 730,
-    value: '❷',
-  },
-
-  /*
-    The rest of these are also `awarded: true`, but granted the other way -
-    not derived at the moment somebody is drawn, like the two above, but
-    handed out once by `award()` the moment a specific task tier completes
-    (see TASK_BADGES in tasks.ts). A badge for finishing the hardest tier of
-    something is a record of having done it, which is exactly the same
-    reasoning that keeps Founder and Year one out of the shop: sold, it would
-    stop meaning anything.
-  */
-  {
-    id: 'badge.openmic',
-    name: 'Open mic',
-    slot: 'badge',
-    blurb: 'A hundred hours with the mic live.',
-    price: 0,
-    awarded: true,
-    value: '◍',
+    value: '⌁',
   },
   {
-    id: 'badge.wire',
-    name: 'Wire',
-    slot: 'badge',
-    blurb: 'Ten thousand messages. The place would sound different without you.',
-    price: 0,
-    awarded: true,
-    value: '≡',
-  },
-  {
-    id: 'badge.rolodex',
-    name: 'Rolodex',
+    id: 'badge.known-face',
+    name: 'Known Face',
     slot: 'badge',
     blurb: 'A hundred people who would say hello back.',
     price: 0,
     awarded: true,
-    value: '✱',
+    value: '◎',
   },
   {
-    id: 'badge.host',
-    name: 'Host',
+    id: 'badge.open-house',
+    name: 'Open House',
     slot: 'badge',
-    blurb: 'Fifty people who are here because you asked.',
+    blurb: 'Fifty people arrived because you invited them.',
     price: 0,
     awarded: true,
-    value: '⌂',
+    value: '▱',
   },
   {
-    id: 'badge.frequent',
-    name: 'Frequent',
+    id: 'badge.wayfinder',
+    name: 'Wayfinder',
     slot: 'badge',
-    blurb: 'Ten servers, all at once.',
+    blurb: 'Ten different servers, and you know your way around all of them.',
     price: 0,
     awarded: true,
-    value: '✧',
+    value: '✥',
   },
   {
-    id: 'badge.unbroken',
-    name: 'Unbroken',
+    id: 'badge.long-run',
+    name: 'Long Run',
     slot: 'badge',
-    blurb: 'Thirty days running, no gap.',
+    blurb: 'Thirty days in a row, without missing one.',
     price: 0,
     awarded: true,
-    value: '⟳',
+    value: '30',
   },
 
-  /*
-    A third kind of `awarded: true`, next to "derived at the moment somebody
-    is drawn" and "granted the moment a task tier completes": these have no
-    condition behind them at all. Staff hand them out one at a time, for
-    something that mattered but was never going to fit a task's `check()` -
-    see the staff routes for who may call `award()` with one of these.
-  */
+  // Staff recognition keeps its stable tier ids so previous awards survive.
   {
     id: 'badge.wreath.bronze',
-    name: 'Bronze wreath',
+    name: 'The Nod',
     slot: 'badge',
-    blurb: 'Handed over by someone on staff, for something worth noticing.',
+    blurb: 'A quiet thank-you from the ChitChak team.',
     price: 0,
     awarded: true,
-    value: '⚘',
+    value: '•',
   },
   {
     id: 'badge.wreath.silver',
-    name: 'Silver wreath',
+    name: 'Applause',
     slot: 'badge',
-    blurb: 'Handed over by someone on staff, for something worth remembering.',
+    blurb: 'Recognised by the team for something worth remembering.',
     price: 0,
     awarded: true,
-    value: '⚘',
-  },
-  {
-    id: 'badge.wreath.gold',
-    name: 'Gold wreath',
-    slot: 'badge',
-    blurb: 'Handed over by someone on staff, for something worth saying out loud.',
-    price: 0,
-    awarded: true,
-    value: '⚘',
-  },
-
-  // --- Badges: a small mark beside your name --------------------------------
-  {
-    id: 'badge.meter',
-    name: 'Meter',
-    slot: 'badge',
-    blurb: 'Three bars, the mark this app is named after.',
-    price: 3,
-    rarity: 'uncommon',
-    value: '▮▮▮',
-  },
-  {
-    id: 'badge.dot',
-    name: 'On air',
-    slot: 'badge',
-    blurb: 'The lamp above a studio door.',
-    price: 3,
-    rarity: 'common',
-    value: '●',
-  },
-
-  /*
-    The rest of the chest.
-
-    Bought as well as won on purpose: somebody who wants one specific thing
-    should be able to go and get it rather than roll for it, which is the
-    difference between a shop with a chest in it and a chest with a shop
-    attached. Prices climb with rarity because a rarer item is a longer wait,
-    not because it is better.
-  */
-  {
-    id: 'badge.wave',
-    name: 'Wave',
-    slot: 'badge',
-    blurb: 'A signal, moving.',
-    price: 3,
-    rarity: 'common',
-    value: '〜',
-  },
-  {
-    id: 'badge.pin',
-    name: 'Pin',
-    slot: 'badge',
-    blurb: 'For the ones who never miss a thread.',
-    price: 3,
-    rarity: 'common',
     value: '✦',
   },
   {
-    id: 'badge.cassette',
-    name: 'Cassette',
+    id: 'badge.wreath.gold',
+    name: 'Standing Ovation',
     slot: 'badge',
-    blurb: 'Rewound, taped over, handed round.',
+    blurb: 'The team’s highest recognition, for something exceptional.',
+    price: 0,
+    awarded: true,
+    value: '★',
+  },
+
+  // --- Collectible pins: every one can be bought directly or found ----------
+  {
+    id: 'badge.hello',
+    name: 'Hello',
+    slot: 'badge',
+    blurb: 'The smallest possible start to a good conversation.',
+    price: 3,
+    rarity: 'common',
+    value: '◡',
+  },
+  {
+    id: 'badge.headphones',
+    name: 'Headphones',
+    slot: 'badge',
+    blurb: 'Put them on. Stay a while.',
+    price: 3,
+    rarity: 'common',
+    value: 'Ω',
+  },
+  {
+    id: 'badge.mixtape',
+    name: 'Mixtape',
+    slot: 'badge',
+    blurb: 'Made carefully, passed around, played too many times.',
     price: 4,
     rarity: 'uncommon',
     value: '⊞',
   },
   {
-    id: 'badge.night',
-    name: 'Night shift',
+    id: 'badge.night-owl',
+    name: 'Night Owl',
     slot: 'badge',
-    blurb: 'Still here at four in the morning.',
+    blurb: 'For conversations that outlast the clock.',
     price: 4,
     rarity: 'uncommon',
-    value: '☾',
+    value: '◉',
   },
   {
-    id: 'badge.antenna',
-    name: 'Antenna',
+    id: 'badge.satellite',
+    name: 'Satellite',
     slot: 'badge',
-    blurb: 'Picks up everything, says little.',
-    price: 6,
+    blurb: 'Always listening for a signal.',
+    price: 7,
     rarity: 'rare',
-    value: '⟟',
+    value: '◒',
   },
   {
-    id: 'badge.relay',
-    name: 'Relay',
+    id: 'badge.supernova',
+    name: 'Supernova',
     slot: 'badge',
-    blurb: 'Passes it on without dropping a word.',
-    price: 6,
-    rarity: 'rare',
-    value: '⇄',
-  },
-  {
-    id: 'badge.eclipse',
-    name: 'Eclipse',
-    slot: 'badge',
-    blurb: 'Rare, brief, and worth looking up for.',
-    price: 10,
+    blurb: 'Brief, bright, and impossible to miss.',
+    price: 11,
     rarity: 'epic',
-    value: '◑',
+    value: '✦',
   },
   {
     id: 'badge.crown',
-    name: 'Brass crown',
+    name: 'King',
     slot: 'badge',
-    blurb: 'Not awarded. Found.',
+    blurb: 'Heavy is the tiny crown.',
     price: 16,
     rarity: 'legendary',
     value: '♛',

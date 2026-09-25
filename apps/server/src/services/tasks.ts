@@ -437,12 +437,12 @@ export const TASKS_BY_ID = new Map(TASKS.map((task) => [task.id, task]));
  * own, and not everything needs a second reward on top of that.
  */
 export const TASK_BADGES: Record<string, string> = {
-  'voice.hours.h100': 'badge.openmic',
-  'talk.messages.m10k': 'badge.wire',
-  'people.friends.f100': 'badge.rolodex',
-  'people.invited.i50': 'badge.host',
-  'belong.servers.g10': 'badge.frequent',
-  'habit.streak.s30': 'badge.unbroken',
+  'voice.hours.h100': 'badge.headliner',
+  'talk.messages.m10k': 'badge.hotline',
+  'people.friends.f100': 'badge.known-face',
+  'people.invited.i50': 'badge.open-house',
+  'belong.servers.g10': 'badge.wayfinder',
+  'habit.streak.s30': 'badge.long-run',
 };
 
 /** Which of these has this person already finished. */
