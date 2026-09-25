@@ -1,4 +1,3 @@
-import { DecorativeIcon } from './DecorativeIcon.js';
 import { artworkFor } from './Badge.js';
 import { useEffect, useState } from 'react';
 import { api, type ChestResult, type ChestStatus, type Rarity } from '../lib/api.js';
@@ -75,9 +74,35 @@ export function BrassChest({
 
       <div className="chest">
         <div className={`chest__box chest__box--${phase}`} aria-hidden="true">
-          <span className="chest__lid" />
+          <span className="chest__shadow" />
           <span className="chest__glow" />
-          <span className="chest__mark">{phase === 'revealed' ? null : <DecorativeIcon name="lock" size={26} />}</span>
+          <span className="chest__interior" />
+          <span className="chest__lid">
+            <span className="chest__lid-panel" />
+            <span className="chest__lid-band chest__lid-band--left" />
+            <span className="chest__lid-band chest__lid-band--right" />
+          </span>
+          <span className="chest__body">
+            <span className="chest__body-panel" />
+            <span className="chest__band chest__band--left" />
+            <span className="chest__band chest__band--right" />
+            <span className="chest__corner chest__corner--left" />
+            <span className="chest__corner chest__corner--right" />
+            <span className="chest__engraving">
+              <i />
+              <i />
+              <i />
+            </span>
+            <span className="chest__latch">
+              <span className="chest__keyhole" />
+            </span>
+            <span className="chest__rivet chest__rivet--one" />
+            <span className="chest__rivet chest__rivet--two" />
+            <span className="chest__rivet chest__rivet--three" />
+            <span className="chest__rivet chest__rivet--four" />
+          </span>
+          <span className="chest__foot chest__foot--left" />
+          <span className="chest__foot chest__foot--right" />
         </div>
 
         {phase === 'revealed' && result ? (

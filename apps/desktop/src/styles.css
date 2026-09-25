@@ -1806,58 +1806,242 @@ textarea::placeholder {
 .chest {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 20px;
+  gap: 28px;
+  padding: 24px;
   border: 1px solid var(--line-strong);
-  border-radius: 16px;
-  background: linear-gradient(135deg, rgba(193,176,246,.06), var(--graphite-800));
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 12% 45%, rgba(237, 200, 120, 0.08), transparent 28%),
+    linear-gradient(135deg, rgba(193, 176, 246, 0.05), var(--graphite-800));
 }
 
 .chest__box {
   position: relative;
-  width: 92px;
-  height: 76px;
+  width: 168px;
+  height: 132px;
   flex: none;
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  background: linear-gradient(145deg, #b88447, #674b31);
-  border: 2px solid #edc878;
-  box-shadow: inset 0 -8px 16px rgba(0,0,0,.2), 0 8px 24px rgba(0,0,0,.2);
-  overflow: hidden;
+  perspective: 420px;
+  isolation: isolate;
 }
 
-/* The lid. A band across the top that lifts and stays lifted, so the box
-   still reads as open while the prize is on screen. */
+.chest__shadow {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 0;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(6, 7, 11, 0.58);
+  filter: blur(7px);
+}
+
+.chest__interior {
+  position: absolute;
+  z-index: 1;
+  left: 16px;
+  right: 16px;
+  top: 43px;
+  height: 44px;
+  border: 3px solid #9a7138;
+  border-radius: 9px 9px 5px 5px;
+  background: radial-gradient(circle at 50% 0, #623c68, #271b31 68%);
+  box-shadow: inset 0 9px 18px rgba(0, 0, 0, 0.75);
+}
+
 .chest__lid {
   position: absolute;
-  inset: 0 0 auto 0;
-  height: 30px;
-  background: linear-gradient(135deg, #f3d698, #c39658);
-  border-bottom: 2px solid #674b31;
-  transform-origin: top center;
-  transition: transform 420ms cubic-bezier(0.3, 0, 0.2, 1);
+  z-index: 4;
+  left: 8px;
+  right: 8px;
+  top: 10px;
+  height: 55px;
+  border: 3px solid #7e572c;
+  border-bottom-color: #d4aa63;
+  border-radius: 46% 46% 7px 7px / 68% 68% 8px 8px;
+  background:
+    linear-gradient(90deg, transparent 12%, rgba(255,255,255,.14) 50%, transparent 88%),
+    linear-gradient(180deg, #91633a, #593a28);
+  box-shadow:
+    inset 0 5px 8px rgba(255, 220, 155, 0.12),
+    inset 0 -6px 8px rgba(30, 16, 12, 0.38),
+    0 4px 0 #3b241b;
+  transform-origin: 50% 100%;
+  transition: transform 620ms cubic-bezier(0.22, 0.72, 0.2, 1);
 }
 
-.chest__mark {
-  position: relative;
-  font-size: 18px;
-  filter: none;
-  color: #fff0c7;
-  display: grid;
-  place-items: center;
+.chest__lid-panel {
+  position: absolute;
+  inset: 9px 13px 7px;
+  border: 1px solid rgba(239, 198, 123, 0.44);
+  border-radius: 50% 50% 5px 5px / 70% 70% 5px 5px;
+  box-shadow: inset 0 0 0 2px rgba(55, 32, 22, 0.45);
 }
 
-/* What comes out of the gap, once the lid moves. */
+.chest__lid-band,
+.chest__band {
+  position: absolute;
+  width: 12px;
+  background: linear-gradient(90deg, #89602e, #e8c479 42%, #a97737 68%, #67431f);
+  border: 1px solid #765023;
+  box-shadow: inset 1px 0 rgba(255,255,255,.18);
+}
+
+.chest__lid-band {
+  top: -2px;
+  bottom: -3px;
+  border-radius: 9px 9px 2px 2px;
+}
+
+.chest__lid-band--left { left: 27px; }
+.chest__lid-band--right { right: 27px; }
+
+.chest__body {
+  position: absolute;
+  z-index: 3;
+  left: 10px;
+  right: 10px;
+  top: 55px;
+  height: 66px;
+  overflow: hidden;
+  border: 3px solid #765027;
+  border-radius: 6px 6px 13px 13px;
+  background:
+    linear-gradient(90deg, transparent, rgba(255,255,255,.07) 48%, transparent 78%),
+    repeating-linear-gradient(0deg, rgba(35,18,13,.13) 0 1px, transparent 1px 11px),
+    linear-gradient(145deg, #754a30, #3d251e);
+  box-shadow:
+    inset 0 5px 10px rgba(255, 199, 122, 0.08),
+    inset 0 -13px 18px rgba(21, 12, 11, 0.34),
+    0 11px 18px rgba(5, 6, 10, 0.28);
+}
+
+.chest__body-panel {
+  position: absolute;
+  inset: 9px 20px 11px;
+  border: 1px solid rgba(230, 184, 104, 0.35);
+  border-radius: 4px 4px 8px 8px;
+  box-shadow: inset 0 0 0 2px rgba(35, 20, 16, 0.38);
+}
+
+.chest__band {
+  top: -2px;
+  bottom: -2px;
+}
+
+.chest__band--left { left: 27px; }
+.chest__band--right { right: 27px; }
+
+.chest__corner {
+  position: absolute;
+  bottom: -4px;
+  width: 24px;
+  height: 22px;
+  border: 2px solid #7c5426;
+  background: linear-gradient(145deg, #e0b76d, #8b5d29);
+}
+
+.chest__corner--left { left: -5px; border-radius: 0 10px 0 10px; }
+.chest__corner--right { right: -5px; border-radius: 10px 0 10px 0; }
+
+.chest__engraving {
+  position: absolute;
+  left: 50%;
+  top: 18px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  transform: translateX(-50%);
+  opacity: 0.48;
+}
+
+.chest__engraving i {
+  display: block;
+  width: 3px;
+  height: 8px;
+  border-radius: 2px;
+  background: #e7c17a;
+  box-shadow: 0 1px #3e281b;
+}
+
+.chest__engraving i:nth-child(2) { height: 14px; }
+.chest__engraving i:nth-child(3) { height: 10px; }
+
+.chest__latch {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 30px;
+  width: 30px;
+  height: 28px;
+  transform: translateX(-50%);
+  transform-origin: 50% 25%;
+  border: 2px solid #68441d;
+  border-radius: 5px 5px 8px 8px;
+  background: linear-gradient(145deg, #f2d28a, #9b6b2f);
+  box-shadow: inset 0 2px rgba(255,255,255,.24), 0 2px 4px rgba(0,0,0,.3);
+  transition: transform 240ms ease;
+}
+
+.chest__keyhole {
+  position: absolute;
+  left: 50%;
+  top: 7px;
+  width: 7px;
+  height: 11px;
+  transform: translateX(-50%);
+  border-radius: 50% 50% 3px 3px;
+  background: #3b281e;
+  clip-path: polygon(0 0, 100% 0, 72% 44%, 88% 100%, 12% 100%, 28% 44%);
+}
+
+.chest__rivet {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #e4bd73;
+  box-shadow: inset -1px -1px #815625, 0 1px 2px rgba(0,0,0,.35);
+}
+
+.chest__rivet--one { left: 9px; top: 10px; }
+.chest__rivet--two { right: 9px; top: 10px; }
+.chest__rivet--three { left: 9px; bottom: 9px; }
+.chest__rivet--four { right: 9px; bottom: 9px; }
+
+.chest__foot {
+  position: absolute;
+  z-index: 2;
+  bottom: 6px;
+  width: 25px;
+  height: 14px;
+  border-radius: 2px 2px 7px 7px;
+  background: linear-gradient(90deg, #6d4724, #bd8742, #65401f);
+}
+
+.chest__foot--left { left: 22px; transform: skewX(-12deg); }
+.chest__foot--right { right: 22px; transform: skewX(12deg); }
+
 .chest__glow {
   position: absolute;
-  inset: 0;
+  z-index: 2;
+  left: 11px;
+  right: 11px;
+  top: 25px;
+  height: 86px;
   opacity: 0;
-  background: radial-gradient(circle at 50% 30%, rgba(255, 226, 160, 0.95), transparent 68%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 238, 171, 0.96), rgba(255, 180, 96, 0.2) 48%, transparent 72%);
+  filter: blur(4px);
+  pointer-events: none;
 }
 
-.chest__box--opening .chest__lid {
-  transform: rotateX(105deg) translateY(-4px);
+.chest__box--opening .chest__latch {
+  transform: translateX(-50%) rotateX(72deg);
+}
+
+.chest__box--opening .chest__lid,
+.chest__box--revealed .chest__lid {
+  transform: translateY(-15px) rotateX(-72deg);
 }
 
 .chest__box--opening .chest__glow {
@@ -1865,35 +2049,30 @@ textarea::placeholder {
 }
 
 .chest__box--opening {
-  animation: chest-shake 0.5s ease-in-out 2;
-}
-
-.chest__box--revealed .chest__lid {
-  transform: rotateX(105deg) translateY(-4px);
+  animation: chest-settle 420ms ease-out;
 }
 
 .chest__box--revealed .chest__glow {
-  opacity: 0.5;
+  opacity: 0.66;
 }
 
-/* Builds rather than flashes: the wait is the point, and a light that grows is
-   a wait with a direction. */
 @keyframes chest-glow {
   0% { opacity: 0; }
-  60% { opacity: 0.35; }
-  100% { opacity: 1; }
+  45% { opacity: 0.25; }
+  100% { opacity: 0.9; }
 }
 
-@keyframes chest-shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-2px); }
-  75% { transform: translateX(2px); }
+@keyframes chest-settle {
+  0% { transform: translateY(0); }
+  45% { transform: translateY(-3px); }
+  100% { transform: translateY(0); }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .chest__box--opening,
   .chest__box--opening .chest__glow { animation: none; }
-  .chest__lid { transition: none; }
+  .chest__lid,
+  .chest__latch { transition: none; }
 }
 
 .chest__side,
