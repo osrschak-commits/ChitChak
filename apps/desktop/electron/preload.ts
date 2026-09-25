@@ -81,6 +81,11 @@ const api = {
   installUpdate(): Promise<{ ok: boolean }> {
     return ipcRenderer.invoke('update:install');
   },
+
+  /** Restores and focuses the window - what a desktop notification's click needs. */
+  focusWindow(): Promise<{ ok: boolean }> {
+    return ipcRenderer.invoke('window:focus');
+  },
 };
 
 contextBridge.exposeInMainWorld('chitchak', api);

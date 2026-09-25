@@ -18,6 +18,10 @@ import type {
 } from '@chitchak/protocol';
 import { create } from 'zustand';
 import { api } from '../lib/api.js';
+import {
+  requestDesktopNotificationPermission,
+  showDesktopNotification,
+} from '../lib/desktopNotify.js';
 import { gateway, type GatewayStatus } from '../lib/gateway.js';
 import { play, type SoundName } from '../lib/sounds.js';
 import {
@@ -262,6 +266,13 @@ export interface NotifySettings {
   /** 0-100. */
   volume: number;
   events: Record<SoundName, boolean>;
+  /**
+   * OS-level toasts for a DM or a mention - the two things worth being pulled
+   * out of another app for. Separate from `enabled`: that one is about sound,
+   * and someone who works with the volume off is exactly who most needs the
+   * visual instead.
+   */
+  desktopNotifications: boolean;
 }
 
 /*
@@ -276,6 +287,7 @@ const defaultNotifySettings: NotifySettings = {
   enabled: true,
   volume: 55,
   events: { dm: true, message: true, join: true, leave: true, friend: true },
+  desktopNotifications: true,
 };
 
 function loadNotifySettings(): NotifySettings {
@@ -517,6 +529,10 @@ export const useApp = create<AppState>((set, get) => ({
   async boot() {
     if (!api.isAuthenticated) return;
     bindGatewayListeners();
+    // Silent unless the person already turned this on in a previous session -
+    // asking again every launch would be the annoying kind of permission
+    // prompt, not the useful kind.
+    if (get().notifySettings.desktopNotifications) void requestDesktopNotificationPermission();
     await gateway.connect();
   },
 
@@ -928,6 +944,10 @@ export const useApp = create<AppState>((set, get) => ({
     const notifySettings = { ...get().notifySettings, ...patch };
     set({ notifySettings });
     localStorage.setItem('chitchak.notify', JSON.stringify(notifySettings));
+    // Asked for at the moment of turning it on, which is the one point a
+    // browser's own permission prompt (Electron has none) is not a surprise -
+    // it is the direct result of something the person just clicked.
+    if (patch.desktopNotifications) void requestDesktopNotificationPermission();
   },
 
   previewSound(name) {
@@ -1243,11 +1263,15 @@ function applyServerMessage(
       });
       // Arrived in the conversation already open in front of them: clear it at
       // once rather than lighting the bell for something they are reading.
+      // Otherwise it is exactly the moment an OS toast earns its place - the
+      // same condition the sound already uses for the same reason.
       {
         const state = get();
         const isDm = state.dmChannels.has(incoming.channelId);
         if (isWatching(state, incoming.channelId, isDm)) {
           state.markNotificationsRead({ ids: [incoming.id] });
+        } else {
+          notifyDesktop(incoming, state);
         }
       }
       return;
@@ -1601,6 +1625,43 @@ function isWatching(state: AppState, channelId: string, isDm: boolean): boolean 
   if (typeof document !== 'undefined' && !document.hasFocus()) return false;
   if (state.mainView !== 'chat') return false;
   return isDm ? state.selectedDmChannelId === channelId : state.selectedTextChannelId === channelId;
+}
+
+/**
+ * An OS toast for a DM or a mention, if the setting is on.
+ *
+ * Name resolution mirrors the bell menu's `NotificationRow`: a guild mention's
+ * author is in that guild's member list (nickname first), a DM's is in
+ * `people` - unless a server is shared, in which case a scan over `members`
+ * still finds them. Falling back to 'Someone' only happens when the client
+ * truly has nothing, which is rare enough that it is not worth an extra fetch
+ * just to avoid it.
+ */
+function notifyDesktop(n: Notification, state: AppState): void {
+  if (!state.notifySettings.desktopNotifications) return;
+
+  const member =
+    (n.guildId ? state.members.get(`${n.guildId}:${n.authorId}`) : undefined) ??
+    [...state.members.values()].find((m) => m.userId === n.authorId);
+  const person = state.people.get(n.authorId);
+  const authorProfile = member?.user ?? person;
+  const author =
+    (n.guildId ? member?.nickname : undefined) ?? authorProfile?.displayName ?? 'Someone';
+
+  const channelName = n.guildId ? state.channels.get(n.channelId)?.name : undefined;
+  const title =
+    n.kind === 'dm' ? author : channelName ? `${author} in #${channelName}` : `${author} mentioned you`;
+  const body = n.preview || (n.kind === 'dm' ? 'Sent you a message' : 'Mentioned you');
+
+  showDesktopNotification({
+    title,
+    body,
+    // Read through the store rather than closing over `state`: the click
+    // happens whenever it happens, and by then guilds, channels or the whole
+    // session may have moved on from the snapshot this notification was built
+    // against.
+    onClick: () => useApp.getState().openNotification(n),
+  });
 }
 
 /**
