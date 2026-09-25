@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { desktopNotificationPermission } from '../lib/desktopNotify.js';
 import type { SoundName } from '../lib/sounds.js';
 import { listMediaDevices } from '../lib/voice.js';
 import { useApp } from '../store/app.js';
@@ -51,6 +52,9 @@ export function VoiceSettingsDialog({ onClose }: { onClose(): void }) {
   // Null until a call has been joined, since the server is what says what each
   // preset is worth here. The numbers are simply omitted until then.
   const current = videoPresets?.[streamPreset] ?? null;
+  // 'denied' is a refusal only the browser's or the OS's own settings can
+  // undo - the switch below is disabled rather than pretending it can help.
+  const desktopNotifyBlocked = desktopNotificationPermission() === 'denied';
 
   const [devices, setDevices] = useState<{
     inputs: MediaDeviceInfo[];
@@ -456,6 +460,27 @@ export function VoiceSettingsDialog({ onClose }: { onClose(): void }) {
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="section">
+            <h3 className="section__title">Desktop notifications</h3>
+
+            <div className="row">
+              <div>
+                <div className="row__label">Show notifications</div>
+                <div className="row__hint">
+                  {desktopNotifyBlocked
+                    ? 'Blocked in your browser or OS settings - allow notifications for ChitChak there to use this.'
+                    : 'A DM or a mention pops up on your desktop when you are not already looking at that conversation.'}
+                </div>
+              </div>
+              <Switch
+                label="Show desktop notifications"
+                checked={notifySettings.desktopNotifications}
+                disabled={desktopNotifyBlocked}
+                onChange={(v) => setNotifySettings({ desktopNotifications: v })}
+              />
+            </div>
           </div>
         </div>
 

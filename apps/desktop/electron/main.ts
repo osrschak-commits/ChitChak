@@ -273,13 +273,14 @@ function installPermissionHandlers(): void {
    *   media          - microphone and camera
    *   display-capture - the screen-share prompt
    *   fullscreen     - element.requestFullscreen()
+   *   notifications  - the OS toast for a mention or a DM
    *
-   * That last one is not obvious. Without it `requestFullscreen()` neither
+   * That third one is not obvious. Without it `requestFullscreen()` neither
    * resolves nor rejects; it simply hangs, and fullscreen silently does
-   * nothing. Everything else - geolocation, notifications, MIDI, clipboard
-   * reads - stays denied.
+   * nothing. Everything else - geolocation, MIDI, clipboard reads - stays
+   * denied.
    */
-  const ALLOWED_PERMISSIONS = new Set(['media', 'display-capture', 'fullscreen']);
+  const ALLOWED_PERMISSIONS = new Set(['media', 'display-capture', 'fullscreen', 'notifications']);
 
   session.setPermissionRequestHandler((_webContents, permission, callback, details) => {
     if (!ALLOWED_PERMISSIONS.has(permission)) {
@@ -438,6 +439,22 @@ app.whenReady().then(() => {
     });
 
   registerPushToTalk(pushToTalkAccelerator);
+
+  /**
+   * Brings the window forward when a desktop notification is clicked.
+   *
+   * The notification itself is created in the renderer, by the standard web
+   * Notification API - there is no main-process object to hang a click handler
+   * off. What that handler cannot do on its own is undo `mainWindow.hide()`:
+   * the window may be sitting in the tray with nothing on screen at all, and a
+   * renderer-side `window.focus()` does not restore that. This is the one step
+   * of "open what I was told about" that only the main process can do; the
+   * renderer does the rest (selecting the channel) once it is back in front.
+   */
+  ipcMain.handle('window:focus', () => {
+    showWindow();
+    return { ok: true };
+  });
 
   /**
    * Screens and windows available to share, with preview thumbnails.
